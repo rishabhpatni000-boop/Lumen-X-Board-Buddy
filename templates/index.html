@@ -1,0 +1,1975 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>VisualAssistCam</title>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#111;color:#eee;
+  font-family:-apple-system,"Helvetica Neue",Arial,sans-serif;
+  overflow:hidden;display:flex;flex-direction:column}
+
+/* ── TOP BAR ── */
+#topbar{display:flex;align-items:center;gap:8px;padding:5px 12px;
+  background:#181818;border-bottom:1px solid #282828;height:46px;flex-shrink:0}
+#topbar label{font-size:12px;color:#888;white-space:nowrap}
+#topbar select{background:#222;color:#eee;border:1px solid #3a3a3a;
+  padding:3px 8px;border-radius:4px;font-size:12px;height:28px}
+.tb-spacer{flex:1}
+.tb-btn{background:#252525;color:#ccc;border:1px solid #3a3a3a;
+  border-radius:5px;cursor:pointer;font-size:12px;padding:4px 10px;
+  height:28px;white-space:nowrap;transition:background .15s}
+.tb-btn:hover{background:#333}
+
+/* ── VIEW TOGGLE (segmented) ── */
+.view-seg{display:flex;border:1px solid #3a3a3a;border-radius:7px;
+  overflow:hidden;height:32px;flex-shrink:0}
+.view-seg button{background:#1e1e1e;color:#888;border:none;
+  border-right:1px solid #3a3a3a;cursor:pointer;
+  font-size:12px;padding:0 16px;transition:all .15s;white-space:nowrap}
+.view-seg button:last-child{border-right:none}
+.view-seg button.active{background:#1d4080;color:#fff;font-weight:600}
+.view-seg button:hover:not(.active){background:#2a2a2a;color:#ddd}
+
+/* ── MAIN AREA ── */
+#mainArea{flex:1;position:relative;overflow:hidden;background:#0a0a0a;min-height:0}
+
+/* ─── ORIGINAL VIEW ─── */
+#originalView{position:absolute;inset:0;display:flex;
+  align-items:center;justify-content:center}
+#mainCanvas{cursor:grab;display:block}
+#mainCanvas.dragging{cursor:grabbing}
+video{display:none}
+#frozenBadge{display:none;position:absolute;top:10px;left:50%;
+  transform:translateX(-50%);background:rgba(120,20,20,.9);color:#fff;
+  font-size:13px;font-weight:600;padding:4px 18px;border-radius:20px;
+  pointer-events:none;z-index:10;letter-spacing:.3px}
+
+/* ─── AI BOARD VIEW ─── */
+#aiBoardView{position:absolute;inset:0;display:none;
+  overflow:hidden;cursor:grab;background:#0a0a0a}
+#aiBoardView.dragging{cursor:grabbing}
+/* svgWrapper fills the full view so SVG can scale to fill it */
+#svgWrapper{position:absolute;inset:0;
+  display:flex;align-items:center;justify-content:center;
+  transform-origin:center center;will-change:transform}
+#svgWrapper svg{width:100%;height:100%;display:block;
+  max-width:none !important;max-height:none !important}
+
+/* ─── AI ANALYSIS — CHAT ─── */
+#aiAnalysisView{position:absolute;inset:0;display:none;
+  flex-direction:column;background:#0d0d0d}
+#chatEmpty{position:absolute;inset:0;display:flex;align-items:center;
+  justify-content:center;pointer-events:none}
+#chatMessages{flex:1;overflow-y:auto;padding:16px 20px;
+  display:flex;flex-direction:column;gap:14px}
+.cmsg{max-width:88%;padding:13px 16px;border-radius:12px;
+  font-size:18px;line-height:1.8;white-space:pre-wrap;
+  font-family:-apple-system,"Helvetica Neue",Arial,sans-serif}
+.cmsg.teacher{background:#132213;color:#cde8cd;
+  align-self:flex-start;border-bottom-left-radius:3px}
+.cmsg.student{background:#0d2040;color:#b8d0f0;
+  align-self:flex-end;border-bottom-right-radius:3px;text-align:right}
+.cmsg-sender{font-size:10px;font-weight:700;letter-spacing:.6px;
+  text-transform:uppercase;margin-bottom:6px;color:#5aaa5a}
+/* Markdown rendered inside teacher bubbles */
+.cmsg.teacher h1,.cmsg.teacher h2,.cmsg.teacher h3{
+  font-size:1em;font-weight:700;margin:.6em 0 .3em;color:#a8d8a8}
+.cmsg.teacher strong{color:#c8f0c8;font-weight:700}
+.cmsg.teacher em{color:#a8c8a8;font-style:italic}
+.cmsg.teacher ul,.cmsg.teacher ol{padding-left:1.4em;margin:.4em 0}
+.cmsg.teacher li{margin:.25em 0}
+.cmsg.teacher code{background:#0d2a0d;border-radius:4px;padding:1px 6px;
+  font-family:monospace;font-size:.92em;color:#88cc88}
+.cmsg.teacher p{margin:.4em 0}
+.cmsg.teacher hr{border:none;border-top:1px solid #2a4a2a;margin:.6em 0}
+.typing-dots span{animation:blink 1.2s infinite;display:inline-block;
+  font-size:22px;margin:0 1px}
+.typing-dots span:nth-child(2){animation-delay:.2s}
+.typing-dots span:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,80%,100%{opacity:.2}40%{opacity:1}}
+/* Suggested question chips */
+#suggestedQs{flex-shrink:0;padding:8px 14px 6px;
+  border-top:1px solid #1e1e1e;background:#0f0f0f}
+#suggestedQs p{font-size:10px;color:#444;margin-bottom:5px;letter-spacing:.4px;text-transform:uppercase}
+.q-chip{display:inline-block;background:#141e2a;color:#6a9abf;
+  border:1px solid #243344;border-radius:16px;padding:5px 12px;
+  font-size:13px;cursor:pointer;margin:3px;transition:background .15s}
+.q-chip:hover{background:#1e2e40}
+/* Chat input */
+#chatInputArea{flex-shrink:0;display:none;gap:8px;padding:10px 12px;
+  border-top:1px solid #1e1e1e;background:#111;align-items:flex-end}
+#chatInput{flex:1;background:#1a1a1a;color:#eee;border:1px solid #2e2e2e;
+  border-radius:8px;padding:10px 14px;font-size:15px;resize:none;height:52px;
+  font-family:-apple-system,Arial,sans-serif;line-height:1.4}
+#chatInput:focus{outline:none;border-color:#3a5a7a}
+#chatSendBtn{background:#1d4080;color:#fff;border:none;border-radius:8px;
+  padding:0 18px;height:52px;font-size:14px;font-weight:600;cursor:pointer;
+  white-space:nowrap;flex-shrink:0}
+#chatSendBtn:hover{background:#2a5a9a}
+
+/* ─── OVERLAY STATES (loading / empty) ─── */
+.overlay{position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;z-index:5}
+.overlay.solid{background:rgba(0,0,0,.65)}
+.spinner{width:44px;height:44px;border:4px solid #333;
+  border-top-color:#4a7fc1;border-radius:50%;
+  animation:spin .8s linear infinite;margin-bottom:14px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.overlay p{color:#666;font-size:14px;text-align:center;max-width:280px;line-height:1.6}
+
+/* ── STATUS ── */
+#statusBar{font-size:11px;color:#555;padding:3px 12px;
+  background:#141414;border-top:1px solid #1e1e1e;
+  height:22px;flex-shrink:0;white-space:nowrap;overflow:hidden;
+  width:100%}
+
+/* ── WORKSPACE: video left, controls right ── */
+#workspace{flex:1;display:flex;flex-direction:row;min-height:0;overflow:hidden}
+#mainArea{flex:1;position:relative;overflow:hidden;background:#0a0a0a;min-width:0}
+
+/* ── CONTROLS sidebar ── */
+#controls{width:200px;flex-shrink:0;display:flex;flex-direction:column;
+  gap:6px;padding:8px 8px;background:#151515;border-left:1px solid #222;
+  overflow-y:auto;overflow-x:hidden}
+fieldset{border:1px solid #252525;border-radius:6px;
+  padding:5px 7px 7px;min-width:0;width:100%}
+legend{font-size:10px;color:#555;padding:0 3px;letter-spacing:.2px}
+
+/* ── BUTTONS ── */
+button{background:#242424;color:#ddd;border:1px solid #333;
+  border-radius:5px;cursor:pointer;font-size:11px;padding:4px 6px;
+  transition:background .15s;white-space:nowrap}
+button:hover{background:#2e2e2e}
+.sq{width:28px;height:28px;padding:0;font-size:13px;flex-shrink:0}
+.bigbtn{height:34px;font-size:12px;font-weight:600;
+  width:100%;display:block;margin-bottom:4px}
+#freezeBtn{background:#145a22;border-color:#1c7a2e}
+#freezeBtn:hover{background:#1a7230}
+#freezeBtn.frozen{background:#7a1414;border-color:#9a2020}
+#captureBtn{background:#12345e;border-color:#1a4a80}
+#captureBtn:hover{background:#1a4a80}
+#invertBtn.on{background:#3a1a5e;border-color:#5a2a8e}
+
+/* ── SLIDERS (compact for sidebar) ── */
+.srow{display:flex;align-items:center;gap:4px;margin-bottom:3px}
+.srow label{font-size:10px;color:#666;width:48px;flex-shrink:0;line-height:1.2}
+.srow input[type=range]{flex:1;accent-color:#4a6fa5;height:3px;min-width:0;cursor:pointer}
+.srow .val{font-size:10px;color:#999;width:20px;text-align:right;flex-shrink:0}
+
+/* ── D-PAD (compact) ── */
+.dpad{display:grid;grid-template-columns:repeat(3,28px);
+  grid-template-rows:repeat(3,28px);gap:2px;margin:5px auto 0;width:fit-content}
+
+/* ── CALIBRATION ── */
+#calibrateGroup{border-color:#2a3a5a !important}
+.cal-badge{font-size:10px;color:#5a9adf;margin-top:3px;text-align:center;min-height:12px}
+
+/* ── FONT SIZE ── */
+.fsz-ctrl{display:flex;align-items:center;gap:8px;margin-top:5px;justify-content:center}
+.fsz-btn{width:36px;height:36px;font-weight:bold;border-radius:6px;font-size:15px}
+#fontSizeLbl{font-size:12px;color:#888;min-width:30px;text-align:center}
+
+/* ── SESSION MODAL ── */
+#sessionModal{position:fixed;inset:0;background:linear-gradient(160deg,#0a0c12,#111825);
+  z-index:500;display:flex;align-items:center;justify-content:center;flex-direction:column;
+  padding:20px}
+.sm-logo{text-align:center;margin-bottom:36px}
+.sm-logo h1{font-size:30px;color:#eee;font-weight:300;letter-spacing:2px}
+.sm-logo p{color:#444;font-size:13px;margin-top:6px}
+.sm-home{display:flex;gap:20px;flex-wrap:wrap;justify-content:center}
+.sm-card{background:#161e2a;border:1px solid #2a3a4a;border-radius:14px;
+  padding:32px 36px;text-align:center;cursor:pointer;min-width:200px;
+  transition:all .2s}
+.sm-card:hover{background:#1e2c3e;border-color:#3a5a7a;transform:translateY(-2px)}
+.sm-card .icon{font-size:44px;margin-bottom:12px}
+.sm-card h2{font-size:18px;color:#ddd;margin-bottom:6px}
+.sm-card p{font-size:13px;color:#555}
+.sm-panel{display:none;width:100%;max-width:520px}
+.sm-panel h2{font-size:20px;color:#ddd;margin-bottom:20px}
+.sm-input{width:100%;background:#111820;color:#eee;border:1px solid #2a3a4a;
+  border-radius:8px;padding:12px 16px;font-size:16px;margin-bottom:12px;outline:none}
+.sm-input:focus{border-color:#4a7fc1}
+.sm-input::placeholder{color:#444}
+.sm-meta{color:#444;font-size:13px;margin-bottom:20px;padding:10px 14px;
+  background:#0d1018;border-radius:6px;border:1px solid #1e2a3a}
+.sm-btns{display:flex;gap:10px;margin-top:4px}
+.sm-btn-primary{flex:1;background:#1d4080;color:#fff;border:none;border-radius:8px;
+  padding:14px;font-size:16px;font-weight:600;cursor:pointer}
+.sm-btn-primary:hover{background:#2a5a9a}
+.sm-btn-secondary{background:#1a2030;color:#888;border:1px solid #2a3a4a;
+  border-radius:8px;padding:14px 18px;font-size:14px;cursor:pointer}
+.sm-btn-secondary:hover{background:#222c3c}
+/* Previous classes */
+.sort-btns{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.sort-btn{background:#131b28;color:#6a8aaa;border:1px solid #2a3a4a;
+  border-radius:20px;padding:6px 14px;font-size:13px;cursor:pointer;transition:all .15s}
+.sort-btn.active{background:#1d4080;color:#fff;border-color:#2a5a9a}
+.sort-btn:hover:not(.active){background:#1e2c3e}
+#prevGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+  gap:12px;max-height:380px;overflow-y:auto;margin-bottom:16px}
+.prev-card{background:#131b28;border:1px solid #2a3a4a;border-radius:10px;
+  padding:16px;cursor:pointer;transition:all .15s}
+.prev-card:hover{background:#1e2c3e;border-color:#3a5a7a}
+.prev-subj{font-size:17px;color:#eee;font-weight:600;margin-bottom:4px}
+.prev-date{font-size:12px;color:#555;margin-bottom:4px}
+.prev-teacher{font-size:12px;color:#4a7a9a}
+.prev-count{font-size:11px;color:#333;margin-top:6px}
+.prev-locked{float:right;font-size:14px;color:#6a4a00}
+
+/* ── GALLERY VIEW ── */
+#galleryView{position:absolute;inset:0;display:none;
+  flex-direction:column;background:#0a0a0a;overflow:hidden}
+#galleryHeader{flex-shrink:0;padding:10px 16px;background:#111;
+  border-bottom:1px solid #1e1e1e;display:flex;align-items:center;gap:12px}
+#galleryHeader span{color:#666;font-size:13px}
+#galleryGrid{flex:1;overflow-y:auto;padding:16px;
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:14px}
+.gcap-card{background:#141414;border:1px solid #222;border-radius:10px;
+  overflow:hidden;position:relative}
+.gcap-thumbs{display:flex;gap:2px;background:#0a0a0a;height:160px;overflow:hidden}
+.gcap-thumb{flex:1;object-fit:cover;object-position:center top;display:block;
+  cursor:pointer;height:160px;width:100%;background:#0f0f0f}
+.gcap-thumb:hover{opacity:.85}
+/* 🗑 Delete — always-visible overlay in top-right corner */
+.gcap-del{position:absolute;top:6px;right:6px;background:rgba(0,0,0,.8);
+  color:#e07070;border:1px solid #7a2020;border-radius:50%;
+  width:26px;height:26px;cursor:pointer;font-size:13px;
+  display:flex;align-items:center;justify-content:center;z-index:20;
+  transition:background .15s;padding:0;line-height:1}
+.gcap-del:hover{background:rgba(180,20,20,.9);color:#fff;border-color:#c03030}
+.gcap-no-img{flex:1;min-height:100px;display:flex;align-items:center;
+  justify-content:center;color:#2a2a2a;font-size:30px;background:#0a0a0a}
+.gcap-info{padding:7px 10px 3px}
+.gcap-subject{font-size:13px;font-weight:700;color:#ddd;margin-bottom:1px}
+.gcap-topic{font-size:12px;color:#7ab;margin-bottom:3px;line-height:1.3}
+.gcap-meta{font-size:11px;color:#555;display:flex;flex-wrap:wrap;gap:5px}
+.gcap-actions{padding:3px 10px 8px;display:flex;gap:6px}
+.gcap-dl{flex:1;background:#0d1a2a;color:#5a9adf;border:1px solid #1a3a5a;
+  border-radius:5px;padding:5px 4px;font-size:11px;cursor:pointer;text-align:center}
+.gcap-dl:hover{background:#142a3a}
+.gcap-empty{display:flex;align-items:center;justify-content:center;
+  color:#333;font-size:15px;grid-column:1/-1;padding:60px}
+
+/* ── SESSION BAR (class info in topbar) ── */
+#sessionInfo{font-size:12px;color:#4a7aaa;white-space:nowrap;
+  padding:0 6px;border-left:1px solid #2a2a2a;border-right:1px solid #2a2a2a}
+#lockBtn{background:#1a2a1a;color:#5a9a5a;border:1px solid #2a4a2a;
+  border-radius:5px;cursor:pointer;font-size:12px;padding:4px 10px;
+  height:28px;white-space:nowrap;transition:all .15s}
+#lockBtn.locked{background:#2a1a0a;color:#ca8a2a;border-color:#4a3a1a}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ SESSION MODAL ═══════════════ -->
+<div id="sessionModal">
+  <div class="sm-logo">
+    <h1>VisualAssistCam</h1>
+    <p>Smart classroom assistant</p>
+  </div>
+
+  <!-- Home: two choices -->
+  <div id="smHome" class="sm-home">
+    <div class="sm-card" onclick="smShowNew()">
+      <div class="icon">📚</div>
+      <h2>New Class</h2>
+      <p>Start a new lesson</p>
+    </div>
+    <div class="sm-card" onclick="smShowPrev()">
+      <div class="icon">📂</div>
+      <h2>Previous Classes</h2>
+      <p>Resume or review</p>
+    </div>
+  </div>
+
+  <!-- New class form -->
+  <div id="smNewPanel" class="sm-panel">
+    <h2>📚 New Class</h2>
+    <select id="smSubject" class="sm-input" onchange="smValidate()"
+      style="appearance:auto;cursor:pointer">
+      <option value="">— Select Subject *  —</option>
+      <option value="Maths">Maths</option>
+      <option value="English">English</option>
+      <option value="Science">Science</option>
+      <option value="InS">InS</option>
+    </select>
+
+    <!-- Teacher: free-text with autocomplete from past sessions -->
+    <input id="smTeacher" class="sm-input" placeholder="Teacher name  (optional)"
+           list="teacherSuggestions" autocomplete="off">
+    <datalist id="teacherSuggestions"></datalist>
+    <div class="sm-meta" id="smAutoMeta">📅 Date &amp; time will be recorded automatically</div>
+    <div class="sm-btns">
+      <button class="sm-btn-secondary" onclick="smBack()">← Back</button>
+      <button class="sm-btn-primary" id="smStartBtn" onclick="smCreateSession()" disabled>Start Class →</button>
+    </div>
+  </div>
+
+  <!-- Previous classes -->
+  <div id="smPrevPanel" class="sm-panel">
+    <h2>📂 Previous Classes</h2>
+    <div class="sort-btns">
+      <button class="sort-btn active" id="sb-date"    onclick="smSort('date')">📅 By Date</button>
+      <button class="sort-btn"        id="sb-subject" onclick="smSort('subject')">📚 By Subject</button>
+      <button class="sort-btn"        id="sb-teacher" onclick="smSort('teacher')">👩‍🏫 By Teacher</button>
+    </div>
+    <div id="prevGrid"></div>
+    <div class="sm-btns">
+      <button class="sm-btn-secondary" onclick="smBack()">← Back</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ TOP BAR ═══════════════ -->
+<div id="topbar">
+  <label>Camera:</label>
+  <select id="camSel" onchange="switchCamera()"></select>
+  <label>Preset:</label>
+  <select id="presetSel" onchange="applyPreset(this.value)">
+    <option value="default">Default</option>
+    <option value="whiteboard">Whiteboard</option>
+    <option value="highcontrast">High Contrast</option>
+    <option value="inverted">Inverted Board</option>
+    <option value="lowglare">Low Glare</option>
+  </select>
+
+  <!-- Home + session info (compact) -->
+  <button onclick="goHome()" title="Go to session picker"
+    style="background:#1d3a6a;color:#7ab4f0;border:1px solid #2a5a9a;
+    border-radius:5px;cursor:pointer;font-size:12px;padding:4px 10px;
+    height:28px;font-weight:600;white-space:nowrap">⌂ Home</button>
+  <span id="sessionInfo" style="font-size:12px;color:#4a7aaa;white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis">No class</span>
+  <button id="lockBtn" onclick="toggleLock()" title="Lock/Unlock" style="display:none;background:#1a2a1a;color:#5a9a5a;border:1px solid #2a4a2a;border-radius:5px;cursor:pointer;font-size:13px;padding:0 8px;height:28px">🔓</button>
+  <button id="newBoardBtn" onclick="confirmNewBoard()" title="Start fresh board"
+    style="display:none;background:#2a1a00;color:#ca8a2a;border:1px solid #4a3a1a;
+    border-radius:5px;cursor:pointer;font-size:12px;padding:0 8px;height:28px">🆕</button>
+
+  <div class="tb-spacer"></div>
+
+  <!-- 4-way view toggle -->
+  <div class="view-seg">
+    <button id="btnOrig"     class="active" onclick="setView('orig')"    title="1">📷 Original</button>
+    <button id="btnBoard"               onclick="setView('board')"   title="2">🎨 AI Board</button>
+    <button id="btnAnalysis"            onclick="setView('analysis')"title="3">📖 AI Analysis</button>
+    <button id="btnGallery"             onclick="setView('gallery')" title="4">🖼️ Gallery</button>
+  </div>
+
+  <button class="tb-btn" onclick="openSettings()" title="Edit prompts">⚙️</button>
+  <button class="tb-btn" onclick="toggleControls()" title="H">Controls</button>
+  <button class="tb-btn" onclick="toggleFullscreen()" title="F">⛶</button>
+</div>
+
+<!-- ═══════════════ WORKSPACE (video + right sidebar) ═══════════════ -->
+<div id="workspace">
+
+<!-- ═══════════════ MAIN AREA ═══════════════ -->
+<div id="mainArea">
+
+  <!-- ORIGINAL -->
+  <div id="originalView">
+    <video id="vid" autoplay playsinline muted></video>
+    <canvas id="mainCanvas"
+      onmousedown="oDragStart(event)" onmousemove="oDragMove(event)"
+      onmouseup="oDragEnd()"          onmouseleave="oDragEnd()"
+      onwheel="oWheel(event)">
+    </canvas>
+    <div id="frozenBadge">FROZEN</div>
+  </div>
+
+  <!-- AI BOARD -->
+  <div id="aiBoardView"
+    onmousedown="bDragStart(event)" onmousemove="bDragMove(event)"
+    onmouseup="bDragEnd()"          onmouseleave="bDragEnd()"
+    onwheel="bWheel(event)">
+    <div id="svgWrapper"><!-- SVG injected here --></div>
+    <!-- loading -->
+    <div id="boardLoading" class="overlay solid" style="display:none">
+      <div class="spinner"></div>
+      <p>Claude is recreating the whiteboard…<br><small style="color:#444">(~5 seconds)</small></p>
+    </div>
+    <!-- empty state -->
+    <div id="boardEmpty" class="overlay">
+      <p style="color:#3a3a3a;font-size:15px">Press <strong style="color:#555">Space</strong> to freeze a frame<br>and generate the AI Board</p>
+    </div>
+  </div>
+
+  <!-- AI ANALYSIS — CHAT -->
+  <div id="aiAnalysisView">
+    <div id="chatEmpty">
+      <div style="text-align:center">
+        <p style="color:#333;font-size:15px;line-height:1.8;margin-bottom:16px">
+          Freeze a frame first, then tap <strong style="color:#555">Analyse Board</strong>
+        </p>
+        <button id="analyseNowBtn" onclick="runTextAnalysis()"
+          style="background:#1d4080;color:#fff;border:none;border-radius:8px;
+                 padding:12px 24px;font-size:15px;font-weight:600;cursor:pointer;
+                 opacity:0.4;pointer-events:none">
+          📖 Analyse Board
+        </button>
+      </div>
+    </div>
+    <div id="analyseBarWrapper" style="display:none;flex-shrink:0;padding:8px 12px;
+      border-bottom:1px solid #1e1e1e;background:#0f0f0f">
+      <button onclick="runTextAnalysis()"
+        style="background:#1d4080;color:#fff;border:none;border-radius:6px;
+               padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer">
+        📖 Analyse Board
+      </button>
+      <span style="font-size:11px;color:#444;margin-left:10px">Ask Claude to explain what's on the board</span>
+    </div>
+    <div id="chatMessages"></div>
+    <div id="suggestedQs" style="display:none">
+      <p>Suggested questions:</p>
+      <div id="suggestedQsList"></div>
+    </div>
+    <div id="chatInputArea">
+      <textarea id="chatInput"
+        placeholder="Ask Claude Teacher anything about the lesson… (Enter to send)"
+        onkeydown="chatKeydown(event)"></textarea>
+      <button id="chatSendBtn" onclick="sendChat()">Send ↑</button>
+    </div>
+  </div>
+
+  <!-- GALLERY -->
+  <div id="galleryView">
+    <div id="galleryHeader">
+      <span id="galleryTitle">Gallery</span>
+      <span id="galleryCount" style="margin-left:auto;color:#444;font-size:12px"></span>
+    </div>
+    <div id="galleryGrid">
+      <div class="gcap-empty">Freeze a frame to start capturing — your saves will appear here.</div>
+    </div>
+  </div>
+
+</div><!-- /mainArea -->
+
+<!-- ═══════════════ CONTROLS (right sidebar) ═══════════════ -->
+
+<!-- ═══════════════ CONTROLS ═══════════════ -->
+<div id="controls">
+
+  <!-- ACTIONS — always visible -->
+  <fieldset style="flex:0 0 auto;min-width:148px">
+    <legend>Actions</legend>
+    <button id="freezeBtn"  class="bigbtn" onclick="toggleFreeze()">❚❚  Freeze  [Space]</button>
+    <button id="captureBtn" class="bigbtn" onclick="doCapture()">📷  Capture  [⌘S]</button>
+  </fieldset>
+
+  <!-- AUTO-FREEZE -->
+  <fieldset id="autoFreezeGroup" style="flex:0 0 auto;min-width:130px;border-color:#2a4a2a">
+    <legend>Auto-Freeze</legend>
+    <div style="display:flex;align-items:center;gap:5px;margin-bottom:5px">
+      <label style="font-size:11px;color:#666">Every:</label>
+      <select id="afInterval" onchange="setAutoFreeze()"
+        style="background:#1a1a1a;color:#ccc;border:1px solid #333;
+               border-radius:4px;padding:3px 5px;font-size:11px;flex:1">
+        <option value="0">Off</option>
+        <option value="60">1 min</option>
+        <option value="120">2 min</option>
+        <option value="300">5 min</option>
+        <option value="600">10 min</option>
+      </select>
+    </div>
+    <button id="afPauseBtn" onclick="toggleAutoFreezePause()"
+      style="display:none;width:100%;background:#1a2a1a;color:#5a8a5a;
+             border:1px solid #2a3a2a;border-radius:5px;cursor:pointer;
+             font-size:11px;padding:4px">⏸ Pause</button>
+    <div id="afStatus" style="font-size:10px;color:#3a5a3a;margin-top:3px;
+      text-align:center;min-height:14px"></div>
+  </fieldset>
+
+  <!-- ZOOM & PAN — Original + AI Board -->
+  <fieldset id="zoomGroup" style="flex:0 0 auto">
+    <legend>Zoom &amp; Pan</legend>
+    <div style="display:flex;align-items:center;gap:5px;margin-bottom:6px">
+      <button class="sq" onclick="doZoom(-1)">−</button>
+      <input id="zoomSlider" type="range" min="10" max="100" value="10"
+             oninput="sliderZoom()" style="flex:1;accent-color:#4a6fa5;height:3px">
+      <button class="sq" onclick="doZoom(1)">+</button>
+      <span id="zoomLbl" style="font-size:13px;min-width:38px;text-align:center">1.0×</span>
+    </div>
+    <div class="dpad">
+      <div></div>
+      <button class="sq" onclick="doPan(0,-1)">▲</button><div></div>
+      <button class="sq" onclick="doPan(-1,0)">◀</button>
+      <button class="sq" onclick="resetView()" title="Reset">⊙</button>
+      <button class="sq" onclick="doPan(1,0)">▶</button>
+      <div></div>
+      <button class="sq" onclick="doPan(0,1)">▼</button><div></div>
+    </div>
+    <div style="font-size:10px;color:#3a3a3a;text-align:center;margin-top:4px">Drag · Scroll to zoom</div>
+  </fieldset>
+
+  <!-- CALIBRATE (Original view only) -->
+  <fieldset id="calibrateGroup" style="flex:0 0 auto;min-width:140px">
+    <legend>Auto-Frame</legend>
+    <button id="calBtn" onclick="calibrateView()"
+      style="width:100%;background:#1a2a4a;color:#7ab0e8;
+             border:1px solid #2a4a7a;border-radius:5px;
+             cursor:pointer;font-size:12px;padding:6px 8px;font-weight:600">
+      📐 Calibrate View
+    </button>
+    <div id="calBadge" class="cal-badge">Zoom &amp; pan work normally</div>
+  </fieldset>
+
+  <!-- IMAGE ADJUSTMENTS — Original only -->
+  <fieldset id="imgGroup" style="flex:1">
+    <legend>Image Adjustments</legend>
+    <div class="srow"><label>Brightness</label><input id="brightness" type="range" min="-100" max="100" value="0"   oninput="sv(this,'bV')"><span id="bV"  class="val">0</span></div>
+    <div class="srow"><label>Contrast</label>  <input id="contrast"   type="range" min="50"  max="300" value="100" oninput="sv(this,'cV')"><span id="cV"  class="val">100</span></div>
+    <div class="srow"><label>Saturation</label><input id="saturation" type="range" min="0"   max="200" value="100" oninput="sv(this,'sV')"><span id="sV"  class="val">100</span></div>
+    <div class="srow"><label>Sharpness</label> <input id="sharpness"  type="range" min="0"   max="10"  value="0"   oninput="sv(this,'shV')"><span id="shV" class="val">0</span></div>
+    <div style="display:flex;gap:5px;margin-top:5px">
+      <button id="invertBtn" onclick="toggleInvert()" style="flex:1">Invert [I]</button>
+      <button onclick="resetAll()" style="flex:1">Reset [R]</button>
+    </div>
+  </fieldset>
+
+  <!-- FONT SIZE — AI Analysis only -->
+  <fieldset id="fszGroup" style="display:none;flex:0 0 auto">
+    <legend>Text Size</legend>
+    <div class="fsz-ctrl">
+      <button class="fsz-btn" onclick="chgFont(-2)" style="font-size:17px">A−</button>
+      <span id="fontSizeLbl">20px</span>
+      <button class="fsz-btn" onclick="chgFont(2)"  style="font-size:21px">A+</button>
+    </div>
+  </fieldset>
+
+</div><!-- /controls -->
+
+</div><!-- /workspace -->
+
+<!-- ═══════════════ STATUS ═══════════════ -->
+<div id="statusBar">Ready</div>
+
+<!-- ═══════════════ SETTINGS MODAL ═══════════════ -->
+<div id="settingsModal" style="display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,.88);z-index:200;overflow-y:auto;padding:24px">
+  <div style="max-width:720px;margin:0 auto;background:#1a1a1a;
+    border-radius:10px;padding:28px;border:1px solid #333">
+
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <h2 style="color:#eee;font-size:17px;font-weight:600">⚙️ Prompt Settings</h2>
+      <button onclick="closeSettings()"
+        style="background:#333;color:#aaa;border:1px solid #444;border-radius:5px;
+               cursor:pointer;font-size:18px;padding:2px 10px;line-height:1">✕</button>
+    </div>
+
+    <p style="color:#666;font-size:12px;margin-bottom:20px;line-height:1.6">
+      These are the instructions sent to Claude when you freeze a frame.
+      Edit them to change how Claude reads the board or writes the analysis.
+      Changes take effect on the next freeze.
+    </p>
+
+    <label style="color:#aaa;font-size:11px;letter-spacing:.5px;
+      text-transform:uppercase;display:block;margin-bottom:6px">
+      📖 AI Analysis Prompt
+    </label>
+    <textarea id="aPromptTA" style="width:100%;height:220px;background:#0f0f0f;
+      color:#ccc;border:1px solid #333;border-radius:6px;padding:10px;
+      font-size:12px;font-family:monospace;resize:vertical;line-height:1.5;
+      margin-bottom:20px"></textarea>
+
+    <label style="color:#aaa;font-size:11px;letter-spacing:.5px;
+      text-transform:uppercase;display:block;margin-bottom:6px">
+      🎨 AI Board Prompt
+    </label>
+    <textarea id="bPromptTA" style="width:100%;height:180px;background:#0f0f0f;
+      color:#ccc;border:1px solid #333;border-radius:6px;padding:10px;
+      font-size:12px;font-family:monospace;resize:vertical;line-height:1.5;
+      margin-bottom:24px"></textarea>
+
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button onclick="resetPrompts()"
+        style="background:#2a2a2a;color:#888;border:1px solid #333;border-radius:5px;
+               cursor:pointer;font-size:13px;padding:8px 16px">Reset to Defaults</button>
+      <button onclick="closeSettings()"
+        style="background:#2a2a2a;color:#ccc;border:1px solid #444;border-radius:5px;
+               cursor:pointer;font-size:13px;padding:8px 16px">Cancel</button>
+      <button onclick="saveSettings()"
+        style="background:#1d4080;color:#fff;border:none;border-radius:5px;
+               cursor:pointer;font-size:13px;padding:8px 18px;font-weight:600">
+        Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════
+//  Session state
+// ════════════════════════════════════════════════
+let currentSession  = null;  // full session object from server
+let lastSvgString   = '';    // raw SVG from last AI Board (for PNG export)
+let lastOrigPng     = '';    // data-URL of last frozen frame
+let previousSvg     = '';    // SVG used as base for next incremental update
+let boardFrozen     = false; // is there a board available to analyse?
+let boardId         = 0;     // increments each time "New Board" is pressed
+// Perspective calibration
+let calCorners      = null;   // 4 src corners [[x,y],...] in video pixels
+let calHomography   = null;   // 3×3 homography matrix (row-major)
+let calOutputSize   = null;   // [w,h] of corrected output
+let calFrameSize    = null;   // [w,h] of source frame
+let calActive       = false;
+
+// Auto-freeze
+let afTimer         = null;
+let afMs            = 0;
+let afPaused        = false;
+let afCountdown     = 0;
+let afCountTimer    = null;
+
+// ── Session Modal ────────────────────────────────
+function smShowNew() {
+  document.getElementById('smHome').style.display = 'none';
+  document.getElementById('smNewPanel').style.display = 'block';
+  // Auto-fill date/time preview
+  const now = new Date();
+  document.getElementById('smAutoMeta').textContent =
+    `📅 ${now.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}  ⏰ ${now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}`;
+  document.getElementById('smSubject').focus();
+  _populateTeacherSuggestions();
+}
+
+function smShowPrev() {
+  document.getElementById('smHome').style.display = 'none';
+  document.getElementById('smPrevPanel').style.display = 'block';
+  smLoadPrev('date');
+}
+
+function smBack() {
+  document.getElementById('smHome').style.display = 'flex';
+  document.getElementById('smNewPanel').style.display = 'none';
+  document.getElementById('smPrevPanel').style.display = 'none';
+  // Reset form
+  document.getElementById('smSubject').value = '';
+  document.getElementById('smTeacher').value = '';
+  document.getElementById('smStartBtn').disabled = true;
+}
+
+function smValidate() {
+  document.getElementById('smStartBtn').disabled =
+    !document.getElementById('smSubject').value;
+}
+
+async function _populateTeacherSuggestions() {
+  // Load teacher names from all previous sessions
+  try {
+    const r = await fetch('/api/sessions');
+    const sessions = await r.json();
+    const names = [...new Set(
+      sessions.map(s => s.teacher).filter(t => t && t.trim())
+    )].sort();
+    const dl = document.getElementById('teacherSuggestions');
+    dl.innerHTML = names.map(n => `<option value="${n}">`).join('');
+  } catch(e) { /* ignore */ }
+}
+
+async function smCreateSession() {
+  const subject = document.getElementById('smSubject').value;
+  const teacher = document.getElementById('smTeacher').value.trim();
+  if (!subject) return;
+  const r   = await fetch('/api/sessions', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({subject, teacher})
+  });
+  const s = await r.json();
+  smLaunch(s, false);
+}
+
+let _smSessions = [];
+let _smSort     = 'date';
+
+async function smLoadPrev(sortBy) {
+  _smSort = sortBy;
+  ['date','subject','teacher'].forEach(k => {
+    document.getElementById('sb-'+k).classList.toggle('active', k===sortBy);
+  });
+  if (!_smSessions.length) {
+    const r = await fetch('/api/sessions');
+    _smSessions = await r.json();
+  }
+  const sorted = [..._smSessions].sort((a,b) => {
+    if (sortBy==='date')    return b.created_at.localeCompare(a.created_at);
+    if (sortBy==='subject') return a.subject.localeCompare(b.subject);
+    if (sortBy==='teacher') return (a.teacher||'').localeCompare(b.teacher||'');
+    return 0;
+  });
+  const grid = document.getElementById('prevGrid');
+  if (!sorted.length) {
+    grid.innerHTML = '<p style="color:#444;font-size:14px;padding:20px">No previous classes yet.</p>';
+    return;
+  }
+  grid.innerHTML = sorted.map(s => {
+    const d = new Date(s.created_at);
+    const dateStr = d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+    const timeStr = d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+    return `<div class="prev-card" onclick="smResumeSession('${s.id}')">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div class="prev-subj">${s.subject}${s.locked ? ' 🔒' : ''}</div>
+        <button onclick="deleteSessionConfirm('${s.id}',event)"
+          style="background:none;border:none;color:#5a2a2a;cursor:pointer;
+                 font-size:14px;padding:0 2px" title="Delete class">🗑</button>
+      </div>
+      <div class="prev-date">${dateStr} at ${timeStr}</div>
+      ${s.teacher ? `<div class="prev-teacher">👩‍🏫 ${s.teacher}</div>` : ''}
+      <div class="prev-count">${s.captures.length} capture${s.captures.length!==1?'s':''}</div>
+    </div>`;
+  }).join('');
+}
+
+function smSort(by) { smLoadPrev(by); }
+
+async function smResumeSession(sid) {
+  const r = await fetch(`/api/sessions/${sid}`);
+  const s = await r.json();
+  smLaunch(s, true);
+}
+
+function smLaunch(session, isResume) {
+  currentSession = session;
+  boardId = 0;   // reset board counter for new/resumed session
+  document.getElementById('sessionModal').style.display = 'none';
+
+  // Update topbar
+  document.getElementById('sessionInfo').textContent =
+    `${session.subject}${session.teacher ? ' · ' + session.teacher : ''}`;
+  const lockBtn = document.getElementById('lockBtn');
+  lockBtn.style.display = '';
+  _syncLockBtn();
+
+  // On resume: restore the last AI Board so the student sees it immediately
+  if (isResume && session.captures.length > 0) {
+    const aiboards = session.captures.filter(c => c.capture_type === 'aiboard');
+    if (aiboards.length > 0) {
+      const last = aiboards[aiboards.length - 1];
+      if (last.aiboard_file) {
+        const sw = document.getElementById('svgWrapper');
+        sw.innerHTML = `<img src="/api/images/${last.aiboard_file}"
+          style="width:100%;height:100%;object-fit:contain;display:block">`;
+        hasSvg = true;
+        document.getElementById('boardEmpty').style.display  = 'none';
+        document.getElementById('newBoardBtn').style.display = '';
+        boardFrozen = true;
+        _syncAnalyseBtn();
+        // Set boardId to the max board_id from existing captures + 1 so
+        // new freezes create a new board slot rather than overwriting old ones
+        const maxBid = Math.max(...session.captures.map(c => c.board_id || 0));
+        boardId = maxBid;
+      }
+    }
+  }
+
+  status(isResume
+    ? `Resumed: ${session.subject} (${session.captures.length} captures)`
+    : `New class: ${session.subject}`);
+  loadGallery();
+}
+
+// ── Lock / Unlock ────────────────────────────────
+async function toggleLock() {
+  if (!currentSession) return;
+  const r = await fetch(`/api/sessions/${currentSession.id}/lock`, {method:'POST'});
+  const res = await r.json();
+  currentSession.locked = res.locked;
+  _syncLockBtn();
+  status(currentSession.locked ? '🔒 Session locked — no new captures' : '🔓 Session unlocked');
+}
+function _syncLockBtn() {
+  const btn = document.getElementById('lockBtn');
+  if (currentSession?.locked) {
+    btn.textContent = '🔒';
+    btn.title = 'Locked — click to unlock';
+    btn.classList.add('locked');
+  } else {
+    btn.textContent = '🔓';
+    btn.title = 'Unlocked — click to lock';
+    btn.classList.remove('locked');
+  }
+}
+
+// ── Home ─────────────────────────────────────────
+function goHome() {
+  // Stop auto-freeze before going home
+  stopAutoFreeze();
+  document.getElementById('sessionModal').style.display = 'flex';
+  _smSessions = [];  // force refresh next time
+}
+
+// ── New Board (within same class) ────────────────
+function confirmNewBoard() {
+  if (!confirm('Start a fresh board? The previous board will stay in the Gallery.')) return;
+  boardId++;          // new board_id → AI board saves won't overwrite previous board
+  previousSvg = '';
+  boardFrozen = false;
+  document.getElementById('svgWrapper').innerHTML = '';
+  document.getElementById('boardEmpty').style.display = 'flex';
+  hasSvg = false;
+  document.getElementById('newBoardBtn').style.display = 'none';
+  status('🆕 New board started — freeze a frame to begin');
+}
+
+// ── Auto-freeze ───────────────────────────────────
+function setAutoFreeze() {
+  const secs = parseInt(document.getElementById('afInterval').value);
+  afMs = secs * 1000;
+  stopAutoFreeze();
+  if (afMs > 0) {
+    afPaused = false;
+    document.getElementById('afPauseBtn').style.display = '';
+    document.getElementById('afPauseBtn').textContent = '⏸ Pause';
+    startAfCountdown();
+    afTimer = setInterval(afTick, afMs);
+    document.getElementById('afStatus').textContent = `Next in ${secs}s`;
+  } else {
+    document.getElementById('afPauseBtn').style.display = 'none';
+    document.getElementById('afStatus').textContent = '';
+  }
+}
+
+function stopAutoFreeze() {
+  if (afTimer)       { clearInterval(afTimer);       afTimer = null; }
+  if (afCountTimer)  { clearInterval(afCountTimer);  afCountTimer = null; }
+}
+
+function startAfCountdown() {
+  afCountdown = afMs / 1000;
+  if (afCountTimer) clearInterval(afCountTimer);
+  afCountTimer = setInterval(() => {
+    if (afPaused) return;
+    afCountdown--;
+    if (afCountdown > 0) {
+      document.getElementById('afStatus').textContent = `Next in ${afCountdown}s`;
+    }
+  }, 1000);
+}
+
+function toggleAutoFreezePause() {
+  afPaused = !afPaused;
+  const btn = document.getElementById('afPauseBtn');
+  btn.textContent = afPaused ? '▶ Resume' : '⏸ Pause';
+  btn.style.color  = afPaused ? '#ca8a2a' : '#5a8a5a';
+  document.getElementById('afStatus').textContent = afPaused ? 'Paused' : `Next in ${afCountdown}s`;
+}
+
+async function afTick() {
+  if (afPaused || frozen) return;   // don't interrupt manual freeze
+  afCountdown = afMs / 1000;
+  toast('⏱ Auto-updating AI Board…');
+  await updateBoardOnly(mc.toDataURL('image/png'), /*quiet=*/true);
+}
+
+// Subtle toast in status bar (non-distracting)
+function toast(msg, duration = 3000) {
+  const sb = document.getElementById('statusBar');
+  const prev = sb.textContent;
+  const prevColor = sb.style.color;
+  sb.textContent = msg;
+  sb.style.color = '#5aaa5a';
+  setTimeout(() => {
+    sb.style.color = prevColor || '#555';
+    if (sb.textContent === msg) sb.textContent = prev;
+  }, duration);
+}
+
+// ── Board-only update (incremental) ───────────────
+async function updateBoardOnly(dataURL, quiet = false) {
+  const sw = document.getElementById('svgWrapper');
+  if (!quiet) {
+    if (!hasSvg) document.getElementById('boardEmpty').style.display = 'flex';
+    document.getElementById('boardLoading').style.display = 'flex';
+  }
+  try {
+    const r = await fetch('/update-board', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        image:        dataURL,
+        previous_svg: previousSvg,
+        svg_prompt:   boardPrompt,
+      })
+    });
+    const res = await r.json();
+
+    if (!quiet) document.getElementById('boardLoading').style.display = 'none';
+    document.getElementById('boardEmpty').style.display = 'none';
+
+    if (res.svg && res.svg.trim().startsWith('<svg')) {
+      sw.innerHTML = res.svg;
+      const svgEl = sw.querySelector('svg');
+      if (svgEl) {
+        svgEl.removeAttribute('width'); svgEl.removeAttribute('height');
+        svgEl.style.cssText = 'width:100%;height:100%;display:block;max-width:none;max-height:none';
+      }
+      previousSvg   = res.svg;   // store as base for next update
+      lastSvgString = res.svg;
+      hasSvg = true;
+      document.getElementById('newBoardBtn').style.display = '';
+      bZoom=1; bPanX=0; bPanY=0; updBoardTransform();
+
+      // Unlock "Analyse" button now that there's a board
+      boardFrozen = true;
+      _syncAnalyseBtn();
+
+      // Save/overwrite AI board for current board in gallery
+      saveAiBoard(res.svg, `Board ${boardId + 1}`);
+
+      if (quiet) toast('✓ AI Board updated');
+
+      // New board detected?
+      if (res.is_new_board && previousSvg) {
+        setTimeout(() => {
+          if (confirm('⚠️ This looks like a new board — the teacher may have erased it.\n\nStart a fresh board in this class?')) {
+            previousSvg = res.svg;  // use new board as the new base
+            toast('🆕 New board started');
+          }
+        }, 500);
+      }
+    } else if (!hasSvg && !quiet) {
+      sw.innerHTML = '<p style="color:#555;padding:40px;font-size:14px;text-align:center">AI Board could not be generated.</p>';
+    }
+  } catch(e) {
+    if (!quiet) {
+      document.getElementById('boardLoading').style.display = 'none';
+      toast('⚠ Board update failed: ' + e.message, 4000);
+    }
+  }
+}
+
+function _syncAnalyseBtn() {
+  const btn  = document.getElementById('analyseNowBtn');
+  const wrap = document.getElementById('analyseBarWrapper');
+  if (boardFrozen) {
+    btn.style.opacity        = '1';
+    btn.style.pointerEvents  = 'auto';
+    wrap.style.display       = 'flex';
+    document.getElementById('chatEmpty').style.display =
+      chatHistory.length ? 'none' : 'flex';
+  } else {
+    btn.style.opacity        = '0.4';
+    btn.style.pointerEvents  = 'none';
+    wrap.style.display       = 'none';
+  }
+}
+
+// ── Auto-save capture after analysis ────────────
+function extractTopic(analysisText) {
+  const lines = analysisText.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    if (/LESSON TOPIC|CLASS OBJECTIVE/i.test(lines[i])) {
+      for (let j = i+1; j < lines.length; j++) {
+        const t = lines[j].trim().replace(/^[━\[\]📚]/g,'').trim();
+        if (t && t.length > 3 && !t.startsWith('━')) return t.substring(0, 70);
+      }
+    }
+  }
+  return 'Lesson ' + new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+}
+
+async function svgToPngDataUrl(svgString) {
+  return new Promise(resolve => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 900; canvas.height = 620;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#f8f8f4';
+    ctx.fillRect(0, 0, 900, 620);
+    const img = new Image();
+    const blob = new Blob([svgString], {type:'image/svg+xml'});
+    const url  = URL.createObjectURL(blob);
+    img.onload = () => {
+      ctx.drawImage(img, 0, 0, 900, 620);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL('image/png'));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(''); };
+    img.src = url;
+  });
+}
+
+// ── Camera shutter sound ──────────────────────────
+function playCameraSound() {
+  try {
+    const actx = new (window.AudioContext || window.webkitAudioContext)();
+    const now  = actx.currentTime;
+    const sr   = actx.sampleRate;
+    // Mechanical click: noise burst + short tone
+    const buf  = actx.createBuffer(1, Math.floor(sr * 0.07), sr);
+    const d    = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) {
+      d[i] = (Math.random()*2-1) * Math.exp(-i/(d.length*0.12));
+    }
+    const src = actx.createBufferSource();
+    src.buffer = buf;
+    const g = actx.createGain();
+    g.gain.setValueAtTime(0.5, now);
+    const f = actx.createBiquadFilter();
+    f.type = 'highpass'; f.frequency.value = 600;
+    src.connect(f); f.connect(g); g.connect(actx.destination);
+    src.start(now);
+    setTimeout(() => actx.close(), 300);
+  } catch(e) {}
+}
+
+// ── Session saves (three types) ───────────────────
+async function _saveCapture(origPng, aiboardPng, topic, capType) {
+  if (!currentSession || currentSession.locked) return;
+  try {
+    const r = await fetch(`/api/sessions/${currentSession.id}/capture`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        capture_type: capType,
+        board_id:     boardId,
+        topic:        topic || 'Lesson',
+        original:     origPng  || '',
+        aiboard:      aiboardPng || '',
+      })
+    });
+    const cap = await r.json();
+    // Keep local list in sync
+    if (capType === 'latest_freeze') {
+      const idx = currentSession.captures.findIndex(c => c.capture_type === 'latest_freeze');
+      if (idx !== -1) currentSession.captures.splice(idx, 1);
+    } else if (capType === 'aiboard') {
+      const idx = currentSession.captures.findIndex(
+        c => c.capture_type === 'aiboard' && c.board_id === boardId);
+      if (idx !== -1) currentSession.captures.splice(idx, 1);
+    }
+    currentSession.captures.push(cap);
+    if (view === 'gallery') loadGallery();
+    return cap;
+  } catch(e) {
+    console.error('Save failed:', e);
+  }
+}
+
+// Called automatically on every freeze — saves/overwrites "latest frozen frame"
+async function saveLatestFreeze() {
+  if (!lastOrigPng || !currentSession) return;
+  await _saveCapture(lastOrigPng, '', extractTopic(''), 'latest_freeze');
+}
+
+// Called when AI board is generated — saves/overwrites AI board for current board
+async function saveAiBoard(svgString, topic) {
+  if (!currentSession) return;
+  const png = svgString ? await svgToPngDataUrl(svgString) : '';
+  if (!png) return;
+  await _saveCapture('', png, topic, 'aiboard');
+}
+
+// Legacy — called from runTextAnalysis
+async function autoSaveCapture(analysisText, svgString) {
+  // Now handled by saveLatestFreeze + saveAiBoard separately
+  if (svgString) await saveAiBoard(svgString, extractTopic(analysisText));
+}
+
+// ── Gallery ──────────────────────────────────────
+function _capTypeLabel(cap) {
+  switch(cap.capture_type) {
+    case 'explicit':      return '📷';
+    case 'latest_freeze': return '⏸';
+    case 'aiboard':       return '🎨';
+    default:              return '📌';
+  }
+}
+
+async function loadGallery() {
+  if (!currentSession) return;
+  const grid = document.getElementById('galleryGrid');
+
+  // Fetch ALL sessions for the same subject
+  const r    = await fetch(`/api/sessions/by-subject/${encodeURIComponent(currentSession.subject)}`);
+  const sessions = await r.json();
+
+  // Flatten all captures with session info, sort newest first
+  const all = [];
+  sessions.forEach(s => {
+    s.captures.forEach(c => all.push({cap: c, session: s}));
+  });
+  all.sort((a,b) => b.cap.timestamp.localeCompare(a.cap.timestamp));
+
+  const subj = currentSession.subject;
+  document.getElementById('galleryTitle').textContent = `🖼️ Gallery — ${subj}`;
+  document.getElementById('galleryCount').textContent = `${all.length} capture${all.length!==1?'s':''}`;
+
+  if (!all.length) {
+    grid.innerHTML = '<div class="gcap-empty">No captures yet — freeze a frame to save one.</div>';
+    return;
+  }
+
+  grid.innerHTML = all.map(({cap, session}) => {
+    const d       = new Date(cap.timestamp);
+    const dateStr = d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+    const timeStr = d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+    const origSrc = cap.original_file ? `/api/images/${cap.original_file}` : '';
+    const aiSrc   = cap.aiboard_file  ? `/api/images/${cap.aiboard_file}`  : '';
+    return `
+    <div class="gcap-card">
+      <!-- 🗑 Delete always visible top-right -->
+      <button class="gcap-del" title="Delete this capture"
+        onclick="deleteCapture('${session.id}','${cap.id}',this)">🗑</button>
+      <div class="gcap-thumbs">
+        ${origSrc
+          ? `<img src="${origSrc}" class="gcap-thumb" title="Click to open Original"
+               onclick="window.open('${origSrc}')"
+               onerror="this.parentNode.innerHTML='<div class=gcap-no-img>📷</div>'">`
+          : (aiSrc ? '' : '<div class="gcap-no-img">📷</div>')}
+        ${aiSrc
+          ? `<img src="${aiSrc}" class="gcap-thumb" title="Click to open AI Board"
+               onclick="window.open('${aiSrc}')"
+               onerror="this.parentNode.innerHTML+='<div class=gcap-no-img>🎨</div>'">`
+          : ''}
+      </div>
+      <div class="gcap-info">
+        <div class="gcap-subject">${_capTypeLabel(cap)} ${session.subject}${session.locked?' 🔒':''}</div>
+        <div class="gcap-topic">${cap.topic || '—'}</div>
+        <div class="gcap-meta">
+          <span>${dateStr}</span>
+          <span>${timeStr}</span>
+          ${session.teacher ? `<span>👩‍🏫 ${session.teacher}</span>` : ''}
+        </div>
+      </div>
+      ${(origSrc || aiSrc) ? `<div class="gcap-actions">
+        ${origSrc ? `<button class="gcap-dl" onclick="dlImg('${origSrc}','${cap.id}_orig.png')">⬇ Photo</button>` : ''}
+        ${aiSrc   ? `<button class="gcap-dl" onclick="dlImg('${aiSrc}','${cap.id}_board.png')">⬇ AI Board</button>` : ''}
+      </div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+async function deleteCapture(sessionId, capId, btn) {
+  if (!confirm('Delete this capture from the gallery?')) return;
+  try {
+    const r = await fetch(`/api/sessions/${sessionId}/captures/${capId}`, {method:'DELETE'});
+    if ((await r.json()).ok) {
+      const card = btn.closest('.gcap-card');
+      card.style.transition = 'opacity .3s';
+      card.style.opacity = '0';
+      setTimeout(() => {
+        card.remove();
+        const remaining = document.querySelectorAll('.gcap-card').length;
+        document.getElementById('galleryCount').textContent =
+          `${remaining} capture${remaining!==1?'s':''}`;
+        if (!remaining) loadGallery();
+      }, 300);
+      // Keep local session data in sync
+      if (currentSession?.id === sessionId) {
+        const idx = currentSession.captures.findIndex(c => c.id === capId);
+        if (idx !== -1) currentSession.captures.splice(idx, 1);
+      }
+    }
+  } catch(e) { alert('Delete failed: ' + e.message); }
+}
+
+async function deleteSessionConfirm(sid, e) {
+  e.stopPropagation();
+  if (!confirm('⚠️ Delete this ENTIRE class and ALL its captures?\n\nThis cannot be undone.')) return;
+  if (!confirm('⚠️ FINAL WARNING\n\nAll images and AI boards for this class will be permanently deleted.\n\nAre you absolutely sure?')) return;
+  try {
+    const r = await fetch(`/api/sessions/${sid}`, {method:'DELETE'});
+    if ((await r.json()).ok) {
+      _smSessions = _smSessions.filter(s => s.id !== sid);
+      smLoadPrev(_smSort);
+      toast('Class deleted');
+    }
+  } catch(e) { alert('Delete failed: ' + e.message); }
+}
+
+function dlImg(url, filename) {
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+}
+
+// ════════════════════════════════════════════════
+//  Default prompts (user-editable via ⚙️ Settings)
+// ════════════════════════════════════════════════
+const DEFAULT_ANALYSIS_PROMPT = `You are an enthusiastic, patient teacher. A student with low vision has shared a photo of their classroom whiteboard. Help them understand the lesson fully.
+
+Read the whiteboard carefully. Then provide a clear, confident explanation structured like this:
+
+📚 LESSON TOPIC
+[Identify the subject and what is being taught today — be specific]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[Walk through EVERYTHING on the board — one section per topic, question, or concept. Explain each item step by step, using plain language and examples a student would find helpful. If there are problems, show the working. If there are diagrams, explain what they show and why they matter.]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🤔 YOU MIGHT WONDER:
+• [A question a student would commonly ask about this topic]
+• [Another natural follow-up question]
+• [A third question about something tricky or interesting]
+
+💬 Ask me anything about the lesson — I am here to help!
+
+---
+Rules:
+- Be CONFIDENT and DIRECT. Never say "it appears", "I think", or "it seems".
+- This works for ANY subject — maths, science, history, English, etc.
+- Write warmly and encouragingly, like a teacher who wants the student to succeed.`;
+
+const DEFAULT_BOARD_PROMPT = `Recreate this classroom whiteboard as a clean, readable SVG image.
+
+STYLE — match these exactly:
+• SVG: viewBox="0 0 900 620" xmlns="http://www.w3.org/2000/svg"
+• Outer rect: x=10 y=10 w=880 h=600 rx=8 fill="#f8f8f4" stroke="#c0b8a0" stroke-width="3"
+• Inner rect: x=20 y=20 w=860 h=580 rx=4 fill="#fdfdf8" stroke="#d0c8b0" stroke-width="1.5"
+• All text: font-family="Georgia, serif" fill="#1a1a1a"
+• Section dividers: dashed lines stroke="#c8c0a8" stroke-dasharray="6,4" stroke-width="1.5"
+• Question labels bold: font-weight="bold"
+• Colours: bar chart fill="#5a8bbf", line graph stroke="#c0392b", pie slices fill="#4a7fc1" and fill="#e8c97a"
+
+CONTENT — read everything and:
+• Replace ALL handwriting with clean Georgia serif text
+• Use proper maths symbols: ∴ ≠ × ÷ + − = √
+• Recreate diagrams cleanly as SVG shapes
+• Match the spatial layout exactly
+
+Return ONLY raw SVG code starting with <svg and ending with </svg>. No explanation. No markdown.`;
+
+let analysisPrompt = DEFAULT_ANALYSIS_PROMPT;
+let boardPrompt    = DEFAULT_BOARD_PROMPT;
+let hasSvg = false;   // track whether we have a previous SVG to show while loading
+
+// ════════════════════════════════════════════════
+//  State
+// ════════════════════════════════════════════════
+let view = 'orig';
+let frozen = false, inverted = false, ctrlsShown = true;
+let raf;
+
+// Original zoom / pan
+let zoom = 1, panX = 0, panY = 0;
+let oDrag = false, oDX = 0, oDY = 0;
+
+// Board zoom / pan
+let bZoom = 1, bPanX = 0, bPanY = 0;
+let bDrag = false, bDX = 0, bDY = 0;
+
+// Analysis font
+let fontSize = 20;
+
+const vid  = document.getElementById('vid');
+const mc   = document.getElementById('mainCanvas');
+const mCtx = mc.getContext('2d');
+
+// ════════════════════════════════════════════════
+//  View switching
+// ════════════════════════════════════════════════
+function setView(v) {
+  view = v;
+  const isOrig    = v === 'orig';
+  const isBoard   = v === 'board';
+  const isAnal    = v === 'analysis';
+  const isGallery = v === 'gallery';
+
+  document.getElementById('originalView').style.display   = isOrig    ? 'flex'   : 'none';
+  document.getElementById('aiBoardView').style.display    = isBoard   ? 'flex'   : 'none';
+  document.getElementById('aiAnalysisView').style.display = isAnal    ? 'flex'   : 'none';
+  document.getElementById('galleryView').style.display    = isGallery ? 'flex'   : 'none';
+
+  document.getElementById('btnOrig').classList.toggle('active',    isOrig);
+  document.getElementById('btnBoard').classList.toggle('active',   isBoard);
+  document.getElementById('btnAnalysis').classList.toggle('active',isAnal);
+  document.getElementById('btnGallery').classList.toggle('active', isGallery);
+
+  // Show/hide controls
+  document.getElementById('zoomGroup').style.display      = (isOrig||isBoard) ? '' : 'none';
+  document.getElementById('calibrateGroup').style.display = isOrig ? '' : 'none';
+  document.getElementById('imgGroup').style.display       = isOrig ? '' : 'none';
+  document.getElementById('fszGroup').style.display       = isAnal ? '' : 'none';
+  // Hide Freeze & Capture in Analysis view (chat input uses Space/Enter)
+  document.getElementById('freezeBtn').style.display  = isAnal ? 'none' : '';
+  document.getElementById('captureBtn').style.display = isAnal ? 'none' : '';
+
+  // Sync zoom slider
+  const z = isBoard ? bZoom : zoom;
+  document.getElementById('zoomSlider').value = Math.round(z * 10);
+  document.getElementById('zoomLbl').textContent = z.toFixed(1) + '×';
+
+  if (isOrig) resizeCanvas();
+  if (isGallery) loadGallery();
+}
+
+// ════════════════════════════════════════════════
+//  Camera
+// ════════════════════════════════════════════════
+async function initCameras() {
+  try { await navigator.mediaDevices.getUserMedia({video:true,audio:false}); } catch(e){}
+  const devs = await navigator.mediaDevices.enumerateDevices();
+  const cams = devs.filter(d => d.kind === 'videoinput');
+  const sel  = document.getElementById('camSel');
+  sel.innerHTML = '';
+  let best = 0;
+  cams.forEach((c,i) => {
+    const o = document.createElement('option');
+    o.value = c.deviceId; o.text = c.label || `Camera ${i}`;
+    if (/4k|veo|usb|external/i.test(c.label)) best = i;
+    sel.appendChild(o);
+  });
+  sel.selectedIndex = best;
+  await startCamera(cams[best]?.deviceId);
+}
+
+async function startCamera(deviceId) {
+  if (vid.srcObject) vid.srcObject.getTracks().forEach(t => t.stop());
+  try {
+    vid.srcObject = await navigator.mediaDevices.getUserMedia({
+      video: { deviceId: deviceId ? {exact:deviceId} : undefined,
+               width:{ideal:1920}, height:{ideal:1080} }
+    });
+    await vid.play();
+    resizeCanvas();
+    status(`Live — ${vid.videoWidth}×${vid.videoHeight}`);
+    startLoop();
+  } catch(e) { status('Camera error: ' + e.message); }
+}
+
+function switchCamera() { startCamera(document.getElementById('camSel').value); }
+
+function resizeCanvas() {
+  const va = document.getElementById('originalView');
+  const w  = va.offsetWidth;
+  const h  = va.offsetHeight;
+  if (w > 0 && h > 0) { mc.width = w; mc.height = h; }
+}
+
+// ResizeObserver fires AFTER layout settles — handles hide controls,
+// fullscreen, window resize, all in one place
+const _ro = new ResizeObserver(() => resizeCanvas());
+_ro.observe(document.getElementById('originalView'));
+
+// ════════════════════════════════════════════════
+//  Render loop
+// ════════════════════════════════════════════════
+// ════════════════════════════════════════════════
+//  Calibration — auto-frame + perspective warp
+// ════════════════════════════════════════════════
+async function calibrateView() {
+  // If already active, this button acts as Stop
+  if (calActive) { resetCalibration(); return; }
+
+  const badge = document.getElementById('calBadge');
+  const btn   = document.getElementById('calBtn');
+  badge.textContent = '⏳ Detecting whiteboard…';
+  badge.style.color = '#ca8a2a';
+  btn.disabled = true;
+  btn.textContent = '⏳ Detecting…';
+
+  const dataURL = mc.toDataURL('image/png');
+  try {
+    const r   = await fetch('/calibrate', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({image: dataURL})
+    });
+    const res = await r.json();
+    btn.disabled = false;
+
+    if (res.success) {
+      // Detection succeeded — activate perspective correction
+      calFrameSize  = res.frame_size;
+      calCorners    = res.corners;
+      calHomography = res.homography;
+      calOutputSize = res.output_size;
+      calActive     = true;
+      _setCalBtn(true);
+      badge.textContent = '✓ Whiteboard detected & straightened';
+      badge.style.color = '#5aaa5a';
+      status('📐 Auto-Frame ON — whiteboard fills screen, perspective corrected');
+    } else {
+      // Detection failed — do NOT activate, leave zoom/pan working
+      calActive = false;
+      _setCalBtn(false);
+      badge.textContent = '⚠ Could not detect edges — zoom/pan still work normally';
+      badge.style.color = '#ca8a2a';
+      status('⚠ ' + (res.message || 'Edge detection failed — try better lighting or a cleaner board border'));
+    }
+  } catch(e) {
+    btn.disabled = false;
+    _setCalBtn(false);
+    badge.textContent = 'Error — try again';
+    badge.style.color = '#c33';
+  }
+}
+
+function _setCalBtn(active) {
+  const btn = document.getElementById('calBtn');
+  if (active) {
+    btn.textContent  = '✕ Stop Auto-Frame';
+    btn.style.background  = '#5a1a1a';
+    btn.style.color       = '#f08080';
+    btn.style.borderColor = '#8a2a2a';
+  } else {
+    btn.textContent  = '📐 Calibrate View';
+    btn.style.background  = '#1a2a4a';
+    btn.style.color       = '#7ab0e8';
+    btn.style.borderColor = '#2a4a7a';
+  }
+}
+
+function resetCalibration() {
+  calCorners = null; calHomography = null;
+  calOutputSize = null; calFrameSize = null;
+  calActive = false;
+  _setCalBtn(false);
+  document.getElementById('calBadge').textContent = 'Zoom & pan work normally';
+  document.getElementById('calBadge').style.color = '#555';
+  zoom = 1; panX = 0; panY = 0; syncZUI();
+  status('Auto-Frame stopped — zoom & pan restored');
+}
+
+// ── Perspective warp helpers ──────────────────────
+// Compute affine transform from src triangle to dst triangle.
+// Returns [a,b,c,d,e,f] for ctx.setTransform(a,b,c,d,e,f).
+function affineFromTriangle(s0,s1,s2, d0,d1,d2) {
+  const [x0,y0]=s0, [x1,y1]=s1, [x2,y2]=s2;
+  const [u0,v0]=d0, [u1,v1]=d1, [u2,v2]=d2;
+  const det = x0*(y1-y2) + x1*(y2-y0) + x2*(y0-y1);
+  const a = (u0*(y1-y2)+u1*(y2-y0)+u2*(y0-y1))/det;
+  const c = (u0*(x2-x1)+u1*(x0-x2)+u2*(x1-x0))/det;
+  const e = (u0*(x1*y2-x2*y1)+u1*(x2*y0-x0*y2)+u2*(x0*y1-x1*y0))/det;
+  const b = (v0*(y1-y2)+v1*(y2-y0)+v2*(y0-y1))/det;
+  const d2_ = (v0*(x2-x1)+v1*(x0-x2)+v2*(x1-x0))/det;
+  const f = (v0*(x1*y2-x2*y1)+v1*(x2*y0-x0*y2)+v2*(x0*y1-x1*y0))/det;
+  return [a, b, c, d2_, e, f];
+}
+
+// Bilinear interpolation over a quad
+function bilerp(tl, tr, bl, br, u, v) {
+  return [
+    (1-u)*(1-v)*tl[0] + u*(1-v)*tr[0] + (1-u)*v*bl[0] + u*v*br[0],
+    (1-u)*(1-v)*tl[1] + u*(1-v)*tr[1] + (1-u)*v*bl[1] + u*v*br[1],
+  ];
+}
+
+// Warp one triangle from src video coords to dst canvas coords
+function warpTriangle(ctx, img, s0,s1,s2, d0,d1,d2) {
+  const [a,b,c,d,e,f] = affineFromTriangle(s0,s1,s2, d0,d1,d2);
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(d0[0],d0[1]);
+  ctx.lineTo(d1[0],d1[1]);
+  ctx.lineTo(d2[0],d2[1]);
+  ctx.closePath();
+  ctx.clip();
+  ctx.setTransform(a,b,c,d,e,f);
+  ctx.drawImage(img, 0, 0);
+  ctx.restore();
+}
+
+// Draw perspective-corrected frame using a grid of triangles (N×N grid)
+function drawWarped(ctx, img, corners, cw, ch, N=4) {
+  const [tl,tr,br,bl] = corners;  // src corners in video pixels
+  // dst corners: fill the entire canvas
+  const DTL=[0,0], DTR=[cw,0], DBR=[cw,ch], DBL=[0,ch];
+
+  for (let i=0; i<N; i++) {
+    for (let j=0; j<N; j++) {
+      const u0=i/N, u1=(i+1)/N, v0=j/N, v1=(j+1)/N;
+      // Source quad cell (video pixel coords)
+      const ss = [
+        bilerp(tl,tr,bl,br, u0,v0),
+        bilerp(tl,tr,bl,br, u1,v0),
+        bilerp(tl,tr,bl,br, u1,v1),
+        bilerp(tl,tr,bl,br, u0,v1),
+      ];
+      // Destination quad cell (canvas pixel coords)
+      const dd = [
+        bilerp(DTL,DTR,DBL,DBR, u0,v0),
+        bilerp(DTL,DTR,DBL,DBR, u1,v0),
+        bilerp(DTL,DTR,DBL,DBR, u1,v1),
+        bilerp(DTL,DTR,DBL,DBR, u0,v1),
+      ];
+      // Two triangles per cell
+      warpTriangle(ctx, img, ss[0],ss[1],ss[2], dd[0],dd[1],dd[2]);
+      warpTriangle(ctx, img, ss[0],ss[2],ss[3], dd[0],dd[2],dd[3]);
+    }
+  }
+}
+
+function startLoop() {
+  if (raf) cancelAnimationFrame(raf);
+  (function loop() {
+    if (!frozen && vid.readyState >= 2) drawFrame();
+    raf = requestAnimationFrame(loop);
+  })();
+}
+
+function drawFrame() {
+  const vw = vid.videoWidth, vh = vid.videoHeight;
+  const cw = mc.width,       ch = mc.height;
+  if (!vw || !ch) return;
+
+  mCtx.clearRect(0, 0, cw, ch);
+  mCtx.filter = cssFilter();
+
+  if (calActive && calCorners) {
+    // ── Perspective-corrected render ──
+    // Scale corners from calibration frame size to current video size
+    const scaleX = vw / (calFrameSize?.[0] || vw);
+    const scaleY = vh / (calFrameSize?.[1] || vh);
+    const scaledCorners = calCorners.map(([x,y]) => [x*scaleX, y*scaleY]);
+    drawWarped(mCtx, vid, scaledCorners, cw, ch, 4);
+  } else {
+    // ── Normal render (with zoom/pan) ──
+    const srcW = vw / zoom, srcH = vh / zoom;
+    const maxPX = (vw-srcW)/2, maxPY = (vh-srcH)/2;
+    const cpX = Math.max(-maxPX, Math.min(maxPX, panX));
+    const cpY = Math.max(-maxPY, Math.min(maxPY, panY));
+    mCtx.drawImage(vid, vw/2-srcW/2+cpX, vh/2-srcH/2+cpY, srcW, srcH, 0, 0, cw, ch);
+  }
+
+  mCtx.filter = 'none';
+}
+
+function cssFilter() {
+  const b = 1 + parseInt(document.getElementById('brightness').value)/100;
+  const c = parseInt(document.getElementById('contrast').value)/100;
+  const s = parseInt(document.getElementById('saturation').value)/100;
+  let f = `brightness(${b}) contrast(${c}) saturate(${s})`;
+  if (inverted) f += ' invert(1)';
+  return f;
+}
+
+// ════════════════════════════════════════════════
+//  Freeze → trigger Claude
+// ════════════════════════════════════════════════
+function toggleFreeze() {
+  // Block freeze if session is locked
+  if (!frozen && currentSession?.locked) {
+    status('🔒 Session is locked — click 🔒 Locked button to unlock first');
+    return;
+  }
+
+  frozen = !frozen;
+  const btn = document.getElementById('freezeBtn');
+  const badge = document.getElementById('frozenBadge');
+
+  if (frozen) {
+    btn.textContent = '▶  Resume  [Space]';
+    btn.classList.add('frozen');
+    badge.style.display = 'block';
+    // Capture the original frame PNG right now (before analysis modifies anything)
+    lastOrigPng = mc.toDataURL('image/png');
+    status('FROZEN — updating AI Board…');
+    updateBoardOnly(lastOrigPng);
+    saveLatestFreeze();   // overwrite latest frozen frame in gallery
+  } else {
+    btn.textContent = '❚❚  Freeze  [Space]';
+    btn.classList.remove('frozen');
+    badge.style.display = 'none';
+    // AI Board: keep last generated image visible (don't clear)
+    // Chat: clear for next lesson
+    document.getElementById('chatMessages').innerHTML = '';
+    document.getElementById('suggestedQs').style.display = 'none';
+    document.getElementById('chatInputArea').style.display = 'none';
+    document.getElementById('chatEmpty').style.display = 'flex';
+    chatHistory = []; currentAnalysisContext = '';
+    boardFrozen = false; _syncAnalyseBtn();
+    status('Live');
+  }
+}
+
+// On-demand text analysis (called from "Analyse Board" button)
+async function runTextAnalysis() {
+  if (!lastOrigPng) { status('Freeze a frame first'); return; }
+
+  document.getElementById('chatEmpty').style.display = 'none';
+  document.getElementById('analyseBarWrapper').style.display = 'none';
+  addChatTyping();
+  setView('analysis');
+
+  try {
+    const r = await fetch('/analyze', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({image: lastOrigPng, analysis_prompt: analysisPrompt, svg_prompt: ''})
+    });
+    const res = await r.json();
+    removeTyping();
+    const analysis = res.analysis || '(No analysis)';
+    currentAnalysisContext = analysis;
+    chatHistory = [{role:'assistant', content: analysis}];
+    addChatMsg('teacher', analysis);
+    document.getElementById('chatInputArea').style.display = 'flex';
+    document.getElementById('analyseBarWrapper').style.display = 'flex';
+
+    // Auto-save with analysis
+    if (currentSession) autoSaveCapture(analysis, lastSvgString);
+
+    status('Analysis ready — ask follow-up questions below');
+  } catch(e) {
+    removeTyping();
+    addChatMsg('teacher', 'Error: ' + e.message);
+    document.getElementById('analyseBarWrapper').style.display = 'flex';
+  }
+}
+
+// ════════════════════════════════════════════════
+//  Zoom & Pan — shared logic dispatches by view
+// ════════════════════════════════════════════════
+function doZoom(dir) {
+  if (view === 'orig') {
+    zoom = Math.max(1, Math.min(10, Math.round((zoom+dir*0.5)*10)/10));
+    syncZUI();
+  } else if (view === 'board') {
+    bZoom = Math.max(0.5, Math.min(8, Math.round((bZoom+dir*0.3)*10)/10));
+    updBoardTransform(); syncZUI();
+  }
+}
+
+function sliderZoom() {
+  const v = parseInt(document.getElementById('zoomSlider').value) / 10;
+  if (view === 'orig')  { zoom = v; syncZUI(); }
+  else if (view === 'board') { bZoom = v; updBoardTransform(); syncZUI(); }
+}
+
+function syncZUI() {
+  const z = view === 'board' ? bZoom : zoom;
+  document.getElementById('zoomSlider').value = Math.round(z*10);
+  document.getElementById('zoomLbl').textContent = z.toFixed(1) + '×';
+}
+
+function doPan(dx, dy) {
+  if (view === 'orig') {
+    const step = (vid.videoWidth / zoom) * 0.05;
+    panX += dx * step; panY += dy * step;
+  } else if (view === 'board') {
+    bPanX -= dx * 40 / bZoom;
+    bPanY -= dy * 40 / bZoom;
+    updBoardTransform();
+  }
+}
+
+function resetView() {
+  if (view === 'orig')  { zoom=1; panX=0; panY=0; }
+  else if (view === 'board') { bZoom=1; bPanX=0; bPanY=0; updBoardTransform(); }
+  syncZUI();
+}
+
+function updBoardTransform() {
+  document.getElementById('svgWrapper').style.transform =
+    `scale(${bZoom}) translate(${bPanX}px, ${bPanY}px)`;
+}
+
+// Original drag
+function oDragStart(e) { oDrag=true; oDX=e.clientX; oDY=e.clientY; mc.classList.add('dragging'); }
+function oDragMove(e) {
+  if (!oDrag) return;
+  const srcW=vid.videoWidth/zoom, srcH=vid.videoHeight/zoom;
+  const sc=Math.min(mc.width/srcW, mc.height/srcH);
+  panX -= (e.clientX-oDX)/sc; panY -= (e.clientY-oDY)/sc;
+  oDX=e.clientX; oDY=e.clientY;
+}
+function oDragEnd() { oDrag=false; mc.classList.remove('dragging'); }
+function oWheel(e)  { e.preventDefault(); doZoom(e.deltaY<0?1:-1); }
+
+// Board drag
+function bDragStart(e) { bDrag=true; bDX=e.clientX-bPanX*bZoom; bDY=e.clientY-bPanY*bZoom; document.getElementById('aiBoardView').classList.add('dragging'); }
+function bDragMove(e) {
+  if (!bDrag) return;
+  bPanX = (e.clientX - bDX) / bZoom;
+  bPanY = (e.clientY - bDY) / bZoom;
+  updBoardTransform();
+}
+function bDragEnd() { bDrag=false; document.getElementById('aiBoardView').classList.remove('dragging'); }
+function bWheel(e)  { e.preventDefault(); doZoom(e.deltaY<0?1:-1); }
+
+// ════════════════════════════════════════════════
+//  Font size (chat messages)
+// ════════════════════════════════════════════════
+function chgFont(delta) {
+  fontSize = Math.max(12, Math.min(42, fontSize + delta));
+  document.getElementById('fontSizeLbl').textContent = fontSize + 'px';
+  document.querySelectorAll('.cmsg').forEach(el => el.style.fontSize = fontSize + 'px');
+}
+
+// ════════════════════════════════════════════════
+//  Capture (works from any view)
+// ════════════════════════════════════════════════
+async function doCapture() {
+  // Use the last frozen frame (or current canvas if live)
+  const imgPng = lastOrigPng || (frozen ? mc.toDataURL('image/png') : mc.toDataURL('image/png'));
+  if (!imgPng) { status('Nothing to capture — freeze a frame first'); return; }
+
+  // Play camera shutter sound
+  playCameraSound();
+
+  const ts = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
+  const fn = `capture_${ts}.png`;
+
+  // 1. Save to Downloads folder
+  try {
+    await fetch('/save', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({image: imgPng, filename: fn})
+    });
+  } catch(e) {
+    const a = document.createElement('a');
+    a.download = fn; a.href = imgPng; a.click();
+  }
+
+  // 2. Save to gallery as explicit capture (kept permanently)
+  if (currentSession) {
+    await _saveCapture(imgPng, '', `Capture ${ts.slice(0,16).replace('T',' ')}`, 'explicit');
+    if (view === 'gallery') loadGallery();
+    toast('📷 Captured & saved to gallery');
+  } else {
+    toast('📷 Captured — start a session to save to gallery');
+  }
+
+  status(`📷 Captured: ${fn}`);
+}
+
+// ════════════════════════════════════════════════
+//  Filters & Presets
+// ════════════════════════════════════════════════
+function sv(el, id) { document.getElementById(id).textContent = el.value; }
+function toggleInvert() { inverted=!inverted; document.getElementById('invertBtn').classList.toggle('on',inverted); }
+
+const PRESETS = {
+  default:     {b:0,  c:100,s:100,sh:0, inv:false},
+  whiteboard:  {b:10, c:160,s:30, sh:4, inv:false},
+  highcontrast:{b:0,  c:200,s:0,  sh:5, inv:false},
+  inverted:    {b:0,  c:180,s:0,  sh:4, inv:true},
+  lowglare:    {b:-30,c:130,s:70, sh:2, inv:false},
+};
+function applyPreset(name) {
+  const p = PRESETS[name]; if (!p) return;
+  document.getElementById('brightness').value=p.b;  document.getElementById('bV').textContent=p.b;
+  document.getElementById('contrast').value=p.c;    document.getElementById('cV').textContent=p.c;
+  document.getElementById('saturation').value=p.s;  document.getElementById('sV').textContent=p.s;
+  document.getElementById('sharpness').value=p.sh;  document.getElementById('shV').textContent=p.sh;
+  inverted=p.inv; document.getElementById('invertBtn').classList.toggle('on',inverted);
+}
+function resetAll() {
+  zoom=1; panX=0; panY=0; inverted=false;
+  syncZUI();
+  document.getElementById('invertBtn').classList.remove('on');
+  document.getElementById('presetSel').value='default';
+  applyPreset('default');
+  status('Reset');
+}
+
+// ════════════════════════════════════════════════
+//  UI helpers
+// ════════════════════════════════════════════════
+function toggleControls() {
+  ctrlsShown = !ctrlsShown;
+  // Sidebar: flex-column when shown, none when hidden
+  document.getElementById('controls').style.display = ctrlsShown ? 'flex' : 'none';
+  // ResizeObserver fires automatically after DOM change
+}
+function toggleFullscreen() {
+  if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+  else document.exitFullscreen();
+}
+document.addEventListener('fullscreenchange', () => {
+  const fs = !!document.fullscreenElement;
+  document.getElementById('topbar').style.display    = fs ? 'none' : '';
+  document.getElementById('controls').style.display  = fs ? 'none' : (ctrlsShown ? 'flex' : 'none');
+  document.getElementById('statusBar').style.display = fs ? 'none' : '';
+  setTimeout(resizeCanvas, 50);
+});
+function status(msg) { document.getElementById('statusBar').textContent = msg; }
+
+// ════════════════════════════════════════════════
+//  Keyboard shortcuts
+// ════════════════════════════════════════════════
+document.addEventListener('keydown', e => {
+  if (e.target.tagName==='INPUT' || e.target.tagName==='SELECT' || e.target.tagName==='TEXTAREA') return;
+  if ((e.metaKey||e.ctrlKey) && e.key==='s') { e.preventDefault(); doCapture(); return; }
+  switch (e.key) {
+    case '1':          setView('orig');     break;
+    case '2':          setView('board');    break;
+    case '3':          setView('analysis'); break;
+    case '4':          setView('gallery');  break;
+    case '+': case '=':doZoom(1);           break;
+    case '-':          doZoom(-1);          break;
+    case ' ':          e.preventDefault();  toggleFreeze(); break;
+    case 'i': case 'I':toggleInvert();      break;
+    case 'r': case 'R':resetAll();          break;
+    case 'f': case 'F':toggleFullscreen();  break;
+    case 'h': case 'H':toggleControls();    break;
+    case 'ArrowUp':    e.preventDefault();  doPan(0,-1); break;
+    case 'ArrowDown':  e.preventDefault();  doPan(0,1);  break;
+    case 'ArrowLeft':  e.preventDefault();  doPan(-1,0); break;
+    case 'ArrowRight': e.preventDefault();  doPan(1,0);  break;
+  }
+});
+
+// ════════════════════════════════════════════════
+//  Chat (AI Analysis view)
+// ════════════════════════════════════════════════
+let chatHistory = [];
+let currentAnalysisContext = '';
+
+// Convert LaTeX maths notation to readable Unicode symbols
+function latexToReadable(text) {
+  return text
+    // Block LaTeX $$...$$ — strip delimiters, clean inside
+    .replace(/\$\$([\s\S]+?)\$\$/g, (_, eq) => cleanLatex(eq).trim())
+    // Inline LaTeX $...$
+    .replace(/\$([^$\n]+?)\$/g,     (_, eq) => cleanLatex(eq).trim())
+    // Bare backslash commands outside $
+    .replace(/\\sqrt\{([^}]+)\}/g,  (_, x) => `√(${x})`)
+    .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, (_, a, b) => `(${a})/(${b})`);
+}
+
+function cleanLatex(eq) {
+  return eq
+    .replace(/\\sqrt\{([^}]+)\}/g,              (_, x) => `√(${x})`)
+    .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g,   (_, a, b) => `${a} / ${b}`)
+    .replace(/\^2/g,  '²').replace(/\^3/g, '³').replace(/\^4/g, '⁴')
+    .replace(/\^(\{[^}]+\}|\w)/g, (_, e) => e.replace(/[{}]/g,''))
+    .replace(/_(\{[^}]+\}|\w)/g,  (_, e) => e.replace(/[{}]/g,''))
+    .replace(/\\times/g,'×').replace(/\\cdot/g,'·').replace(/\\div/g,'÷')
+    .replace(/\\pm/g,'±').replace(/\\geq/g,'≥').replace(/\\leq/g,'≤')
+    .replace(/\\neq/g,'≠').replace(/\\approx/g,'≈').replace(/\\infty/g,'∞')
+    .replace(/\\pi/g,'π').replace(/\\theta/g,'θ').replace(/\\alpha/g,'α')
+    .replace(/\\beta/g,'β').replace(/\\gamma/g,'γ').replace(/\\delta/g,'δ')
+    .replace(/\\sum/g,'∑').replace(/\\int/g,'∫').replace(/\\rightarrow/g,'→')
+    .replace(/\\left[\([\{]/g,'(').replace(/\\right[\)\]]/g,')')
+    .replace(/\\\\/g,' ').replace(/\s+/g,' ').trim();
+}
+
+function renderMarkdown(text) {
+  // 1. Convert LaTeX to Unicode
+  let processed = latexToReadable(text);
+  // 2. Render Markdown → HTML via marked.js (if available)
+  if (typeof marked !== 'undefined') {
+    return marked.parse(processed, {breaks: true, gfm: true});
+  }
+  // Fallback: escape and preserve line breaks
+  return processed.replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                  .replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
+
+function addChatMsg(role, text) {
+  const div = document.createElement('div');
+  div.className = `cmsg ${role}`;
+  div.style.fontSize = fontSize + 'px';
+  if (role === 'teacher') {
+    const sender = document.createElement('div');
+    sender.className = 'cmsg-sender';
+    sender.textContent = '🎓 Claude Teacher';
+    div.appendChild(sender);
+    const body = document.createElement('div');
+    body.innerHTML = renderMarkdown(text);   // full rendering
+    div.appendChild(body);
+    parseSuggestedQs(text);
+  } else {
+    // Student messages: plain text (no rendering needed)
+    div.textContent = text;
+  }
+  document.getElementById('chatMessages').appendChild(div);
+  document.getElementById('chatMessages').scrollTop = 999999;
+}
+
+function addChatTyping() {
+  const div = document.createElement('div');
+  div.className = 'cmsg teacher'; div.id = 'chatTyping';
+  div.style.fontSize = fontSize + 'px';
+  div.innerHTML = '<div class="cmsg-sender">🎓 Claude Teacher</div><div class="typing-dots"><span>●</span><span>●</span><span>●</span></div>';
+  document.getElementById('chatMessages').appendChild(div);
+  document.getElementById('chatMessages').scrollTop = 999999;
+}
+
+function removeTyping() {
+  document.getElementById('chatTyping')?.remove();
+}
+
+function parseSuggestedQs(text) {
+  const lines  = text.split('\n');
+  const qs     = [];
+  let inBlock  = false;
+  for (const line of lines) {
+    if (/YOU MIGHT WONDER|QUESTIONS YOU MIGHT/i.test(line)) { inBlock=true; continue; }
+    if (inBlock && line.trim().startsWith('•')) {
+      const q = line.replace('•','').trim();
+      if (q) qs.push(q);
+    }
+    if (inBlock && !line.trim().startsWith('•') && qs.length > 0 && line.trim()==='') inBlock=false;
+  }
+  if (qs.length > 0) {
+    const list = document.getElementById('suggestedQsList');
+    list.innerHTML = '';
+    qs.forEach(q => {
+      const btn = document.createElement('button');
+      btn.className = 'q-chip'; btn.textContent = q;
+      btn.onclick = () => {
+        document.getElementById('chatInput').value = q;
+        sendChat();
+      };
+      list.appendChild(btn);
+    });
+    document.getElementById('suggestedQs').style.display = 'block';
+  }
+}
+
+async function sendChat() {
+  const input = document.getElementById('chatInput');
+  const msg   = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+  document.getElementById('suggestedQs').style.display = 'none';
+
+  addChatMsg('student', msg);
+  chatHistory.push({role:'user', content: msg});
+  addChatTyping();
+
+  try {
+    const r   = await fetch('/chat', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        message: msg,
+        history: chatHistory.slice(0,-1),   // history before this message
+        context: currentAnalysisContext
+      })
+    });
+    const res = await r.json();
+    removeTyping();
+    const reply = res.response || 'Sorry, no response.';
+    addChatMsg('teacher', reply);
+    chatHistory.push({role:'assistant', content: reply});
+  } catch(e) {
+    removeTyping();
+    addChatMsg('teacher', 'Sorry, there was a connection error. Please try again.');
+  }
+}
+
+function chatKeydown(e) {
+  if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
+}
+
+// ════════════════════════════════════════════════
+//  Settings panel
+// ════════════════════════════════════════════════
+function openSettings() {
+  document.getElementById('aPromptTA').value = analysisPrompt;
+  document.getElementById('bPromptTA').value = boardPrompt;
+  document.getElementById('settingsModal').style.display = 'block';
+}
+function closeSettings() {
+  document.getElementById('settingsModal').style.display = 'none';
+}
+function saveSettings() {
+  analysisPrompt = document.getElementById('aPromptTA').value.trim() || DEFAULT_ANALYSIS_PROMPT;
+  boardPrompt    = document.getElementById('bPromptTA').value.trim() || DEFAULT_BOARD_PROMPT;
+  closeSettings();
+  status('✓ Prompts saved — will use on next freeze');
+}
+function resetPrompts() {
+  document.getElementById('aPromptTA').value = DEFAULT_ANALYSIS_PROMPT;
+  document.getElementById('bPromptTA').value = DEFAULT_BOARD_PROMPT;
+}
+
+// ════════════════════════════════════════════════
+//  Init
+// ════════════════════════════════════════════════
+initCameras();
+setView('orig');
+// Show session picker on load; camera starts in background
+// (modal is visible by default via CSS display:flex)
+</script>
+</body>
+</html>

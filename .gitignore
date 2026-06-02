@@ -1,0 +1,18 @@
+# API keys — never commit this
+.env
+
+# Python virtual environment
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# macOS
+.DS_Store
+
+# Session data & captured images (stored locally, not in git)
+../VisualAssistCam_Sessions/
+../VisualAssistCam_Captures/
+
+# Old/backup files
+main_v1.py
