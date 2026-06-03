@@ -16,3 +16,9 @@ __pycache__/
 
 # Old/backup files
 main_v1.py
+.env
+venv/
+__pycache__/
+*.pyc
+cert.pem
+key.pem
