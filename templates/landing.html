@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VisualAssistCam</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{min-height:100vh;background:
+  radial-gradient(circle at top left,rgba(56,90,138,.35),transparent 30%),
+  radial-gradient(circle at bottom right,rgba(34,88,74,.28),transparent 32%),
+  linear-gradient(160deg,#081018,#0f1822 48%,#121e29);
+  color:#ecf2f8;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  display:flex;align-items:center;justify-content:center;padding:24px}
+.shell{width:min(1040px,100%);display:grid;grid-template-columns:1.15fr .85fr;
+  background:rgba(9,15,22,.78);border:1px solid rgba(126,157,194,.2);
+  border-radius:28px;overflow:hidden;box-shadow:0 30px 90px rgba(0,0,0,.35)}
+.hero{padding:64px 58px 56px}
+.hero h1{font-size:54px;line-height:1;letter-spacing:-1.8px;margin-bottom:18px}
+.hero p{font-size:19px;line-height:1.7;color:#b6c6d7;max-width:620px}
+.eyebrow{display:inline-flex;align-items:center;gap:10px;font-size:12px;
+  letter-spacing:1.6px;text-transform:uppercase;color:#8eaed3;margin-bottom:22px}
+.eyebrow:before{content:"";width:36px;height:1px;background:#5d7ea6}
+.panel{padding:42px 36px;background:rgba(14,24,34,.78);border-left:1px solid rgba(126,157,194,.16);
+  display:flex;flex-direction:column;justify-content:center}
+.card{background:#111b27;border:1px solid rgba(126,157,194,.18);border-radius:22px;
+  padding:28px 24px}
+.card h2{font-size:22px;margin-bottom:10px}
+.card p{color:#9cb1c7;line-height:1.7;font-size:15px}
+.benefits{margin:22px 0 28px;display:grid;gap:12px}
+.benefit{padding:14px 15px;border-radius:16px;background:#0d1721;border:1px solid rgba(126,157,194,.14)}
+.benefit strong{display:block;font-size:14px;margin-bottom:4px;color:#ecf2f8}
+.benefit span{color:#8ea3ba;font-size:14px;line-height:1.5}
+.cta{width:100%;border:none;border-radius:16px;padding:16px 18px;font-size:16px;
+  font-weight:700;cursor:pointer;background:linear-gradient(135deg,#f7fafc,#dbe7f4);color:#142334}
+.cta:disabled{cursor:not-allowed;opacity:.55}
+.foot{margin-top:14px;font-size:12px;color:#6f8195;line-height:1.6}
+.status{margin-top:14px;font-size:13px;color:#ca8a2a;min-height:20px}
+@media (max-width:880px){
+  .shell{grid-template-columns:1fr}
+  .panel{border-left:none;border-top:1px solid rgba(126,157,194,.16)}
+  .hero{padding:42px 28px 28px}
+  .hero h1{font-size:40px}
+}
+</style>
+</head>
+<body>
+  <div class="shell">
+    <section class="hero">
+      <div class="eyebrow">Accessible Classroom Capture</div>
+      <h1>VisualAssistCam</h1>
+      <p>VisualAssistCam turns live classroom whiteboards into readable digital notes, guided lesson explanations, and structured study history for each signed-in learner.</p>
+    </section>
+    <aside class="panel">
+      <div class="card">
+        <h2>Continue to your learning dashboard</h2>
+        <p>Sign in with Google to access the protected camera workflow, AI board reconstruction, OCR-assisted analysis, and your personal history.</p>
+        <div class="benefits">
+          <div class="benefit">
+            <strong>Protected access</strong>
+            <span>The classroom tools stay hidden until authentication succeeds.</span>
+          </div>
+          <div class="benefit">
+            <strong>Personal history</strong>
+            <span>Each analysis is stored under your account so only you can view it later.</span>
+          </div>
+          <div class="benefit">
+            <strong>Existing workflow preserved</strong>
+            <span>The current camera, OCR, and Claude-powered experience remains intact after sign-in.</span>
+          </div>
+        </div>
+        <button id="googleBtn" class="cta" {% if not auth_enabled %}disabled{% endif %}>
+          Continue with Google
+        </button>
+        <div id="status" class="status">{% if not auth_enabled %}Supabase Auth is not configured yet. Add the required environment variables to enable login.{% endif %}</div>
+        <div class="foot">
+          After authentication you will be redirected to the dashboard at <code>/app</code>.
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+
+    const supabaseUrl = {{ supabase_url|tojson }};
+    const supabaseAnonKey = {{ supabase_anon_key|tojson }};
+    const callbackUrl = {{ auth_callback_url|tojson }};
+    const nextUrl = {{ next_url|tojson }};
+    const statusEl = document.getElementById('status');
+    const button = document.getElementById('googleBtn');
+
+    if (button && supabaseUrl && supabaseAnonKey) {
+      const supabase = createClient(supabaseUrl, supabaseAnonKey);
+      button.addEventListener('click', async () => {
+        statusEl.textContent = 'Redirecting to Google…';
+        const redirectTo = `${callbackUrl}?next=${encodeURIComponent(nextUrl || '/app')}`;
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo,
+            queryParams: { prompt: 'select_account' },
+          },
+        });
+        if (error) {
+          statusEl.textContent = error.message;
+        }
+      });
+    }
+  </script>
+</body>
+</html>

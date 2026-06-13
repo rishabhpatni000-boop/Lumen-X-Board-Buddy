@@ -20,9 +20,21 @@ from concurrent.futures import ThreadPoolExecutor
 from dotenv import load_dotenv
 load_dotenv()
 
-from flask import Flask, request, jsonify, render_template, send_from_directory
+from flask import Flask, request, jsonify, render_template, send_from_directory, redirect, url_for
 from werkzeug.utils import secure_filename
 
+from supabase_integration import (
+    clear_auth_session,
+    configure_supabase,
+    current_user,
+    insert_history_record,
+    list_history_records,
+    login_required_api,
+    login_required_page,
+    safe_next_url,
+    store_session_from_token,
+    template_auth_context,
+)
 from web_security import configure_app_security, decode_image_data_url, require_json_payload
 
 # ── Claude ────────────────────────────────────────────────────────────────────
@@ -37,6 +49,7 @@ except ImportError:
 app = Flask(__name__, template_folder="templates")
 app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 app.config["TEMPLATES_AUTO_RELOAD"] = True
+configure_supabase(app)
 
 @app.after_request
 def no_cache(response):
@@ -86,12 +99,73 @@ _pool = ThreadPoolExecutor(max_workers=2)
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 @app.route("/")
-def index():
-    return render_template("index.html", claude_available=CLAUDE_AVAILABLE)
+def landing():
+    if current_user():
+        return redirect(url_for("app_dashboard"))
+    next_url = safe_next_url(request.args.get("next"))
+    return render_template(
+        "landing.html",
+        claude_available=CLAUDE_AVAILABLE,
+        **template_auth_context("auth_callback", next_url=next_url),
+    )
+
+
+@app.route("/auth/callback")
+def auth_callback():
+    return render_template("auth_callback.html", **template_auth_context("auth_callback"))
+
+
+@app.route("/auth/session", methods=["POST"])
+def auth_session():
+    data, error_response = require_json_payload()
+    if error_response:
+        return error_response
+    access_token = data.get("access_token", "").strip()
+    next_url = safe_next_url(data.get("next"))
+    if not access_token:
+        return jsonify({"error": "Missing access token"}), 400
+    try:
+        user = store_session_from_token(access_token)
+        return jsonify({"ok": True, "redirect_to": next_url, "user": user})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 401
+
+
+@app.route("/auth/logout", methods=["POST"])
+def auth_logout():
+    clear_auth_session()
+    return jsonify({"ok": True})
+
+
+@app.route("/app")
+@login_required_page
+def app_dashboard():
+    return render_template(
+        "index.html",
+        claude_available=CLAUDE_AVAILABLE,
+        **template_auth_context("auth_callback"),
+    )
+
+
+@app.route("/camera")
+@login_required_page
+def camera_dashboard():
+    return redirect(url_for("app_dashboard"))
+
+
+@app.route("/history")
+@login_required_page
+def history_page():
+    return render_template(
+        "history.html",
+        claude_available=CLAUDE_AVAILABLE,
+        **template_auth_context("auth_callback"),
+    )
 
 
 @app.route("/analyze", methods=["POST"])
 @anon_api_quota
+@login_required_api
 def analyze():
     data, error_response = require_json_payload()
     if error_response:
@@ -113,12 +187,12 @@ def analyze():
     # Run SVG + analysis in parallel
     svg_f      = _pool.submit(_gen_svg,      image_bytes, custom_svg_prompt)
     analysis_f = _pool.submit(_gen_analysis, image_bytes, custom_analysis_prompt)
-
     return jsonify({"svg": svg_f.result(), "analysis": analysis_f.result()})
 
 
 @app.route("/chat", methods=["POST"])
 @anon_api_quota
+@login_required_api
 def chat():
     """Continue the lesson conversation with Claude Teacher."""
     data, error_response = require_json_payload()
@@ -162,6 +236,7 @@ def chat():
 
 @app.route("/save", methods=["POST"])
 @anon_api_quota
+@login_required_api
 def save():
     data, error_response = require_json_payload()
     if error_response:
@@ -189,6 +264,7 @@ def save():
 
 @app.route("/calibrate", methods=["POST"])
 @anon_api_quota
+@login_required_api
 def calibrate():
     """Detect whiteboard in frame. Returns corners + homography for perspective correction."""
     data, error_response = require_json_payload()
@@ -295,6 +371,7 @@ def _order_corners(pts: np.ndarray) -> np.ndarray:
 
 @app.route("/update-board", methods=["POST"])
 @anon_api_quota
+@login_required_api
 def update_board():
     """Update the AI Board. First call generates fresh; subsequent calls update incrementally."""
     data, error_response = require_json_payload()
@@ -326,12 +403,14 @@ def update_board():
 
 @app.route("/api/sessions", methods=["GET"])
 @read_api_limit
+@login_required_api
 def api_sessions():
     return jsonify(_sessions_list())
 
 
 @app.route("/api/sessions", methods=["POST"])
 @write_api_limit
+@login_required_api
 def api_create_session():
     data, error_response = require_json_payload()
     if error_response:
@@ -350,6 +429,7 @@ def api_create_session():
 
 @app.route("/api/sessions/<sid>", methods=["GET"])
 @read_api_limit
+@login_required_api
 def api_get_session(sid):
     s = _session_get(sid)
     return jsonify(s) if s else (jsonify({"error": "Not found"}), 404)
@@ -357,6 +437,7 @@ def api_get_session(sid):
 
 @app.route("/api/sessions/<sid>/lock", methods=["POST"])
 @write_api_limit
+@login_required_api
 def api_toggle_lock(sid):
     s = _session_get(sid)
     if not s:
@@ -368,6 +449,7 @@ def api_toggle_lock(sid):
 
 @app.route("/api/sessions/<sid>/capture", methods=["POST"])
 @anon_api_quota
+@login_required_api
 def api_add_capture(sid):
     s = _session_get(sid)
     if not s:
@@ -443,6 +525,7 @@ def api_add_capture(sid):
 
 @app.route("/api/sessions/<sid>", methods=["DELETE"])
 @write_api_limit
+@login_required_api
 def api_delete_session(sid):
     s = _session_get(sid)
     if not s:
@@ -459,6 +542,7 @@ def api_delete_session(sid):
 
 @app.route("/api/sessions/<sid>/captures/<cap_id>", methods=["DELETE"])
 @write_api_limit
+@login_required_api
 def api_delete_capture(sid, cap_id):
     s = _session_get(sid)
     if not s:
@@ -477,6 +561,7 @@ def api_delete_capture(sid, cap_id):
 
 @app.route("/api/sessions/by-subject/<subject>", methods=["GET"])
 @read_api_limit
+@login_required_api
 def api_by_subject(subject):
     all_s = _sessions_list()
     return jsonify([s for s in all_s
@@ -484,8 +569,41 @@ def api_by_subject(subject):
 
 
 @app.route("/api/images/<filename>")
+@login_required_api
 def api_image(filename):
     return send_from_directory(IMAGES_DIR, filename)
+
+
+@app.route("/api/history", methods=["GET"])
+@read_api_limit
+@login_required_api
+def api_history():
+    try:
+        return jsonify(list_history_records(limit=100))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/history", methods=["POST"])
+@write_api_limit
+@login_required_api
+def api_create_history():
+    data, error_response = require_json_payload()
+    if error_response:
+        return error_response
+    try:
+        record = insert_history_record({
+            "subject": data.get("subject", "").strip() or None,
+            "teacher": data.get("teacher", "").strip() or None,
+            "session_id": data.get("session_id", "").strip() or None,
+            "board_id": data.get("board_id"),
+            "topic": data.get("topic", "").strip() or None,
+            "analysis_text": data.get("analysis_text", "").strip(),
+            "board_svg": data.get("board_svg", "").strip() or None,
+        })
+        return jsonify(record or {"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # ── Claude functions ──────────────────────────────────────────────────────────

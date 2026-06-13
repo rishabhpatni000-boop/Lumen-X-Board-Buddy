@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <title>VisualAssistCam</title>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+const supabaseUrl = {{ supabase_url|tojson }};
+const supabaseAnonKey = {{ supabase_anon_key|tojson }};
+window.__vacSupabasePromise = (supabaseUrl && supabaseAnonKey)
+  ? Promise.resolve(createClient(supabaseUrl, supabaseAnonKey))
+  : Promise.resolve(null);
+</script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;background:#111;color:#eee;
@@ -259,6 +267,8 @@ button:hover{background:#2e2e2e}
   border-radius:5px;cursor:pointer;font-size:12px;padding:4px 10px;
   height:28px;white-space:nowrap;transition:all .15s}
 #lockBtn.locked{background:#2a1a0a;color:#ca8a2a;border-color:#4a3a1a}
+#authUser{font-size:12px;color:#8eaed3;white-space:nowrap;max-width:220px;
+  overflow:hidden;text-overflow:ellipsis;padding:0 4px}
 </style>
 </head>
 <body>
@@ -345,6 +355,7 @@ button:hover{background:#2e2e2e}
   <button id="newBoardBtn" onclick="confirmNewBoard()" title="Start fresh board"
     style="display:none;background:#2a1a00;color:#ca8a2a;border:1px solid #4a3a1a;
     border-radius:5px;cursor:pointer;font-size:12px;padding:0 8px;height:28px">🆕</button>
+  <span id="authUser">{{ current_user.email if current_user else '' }}</span>
 
   <div class="tb-spacer"></div>
 
@@ -356,7 +367,9 @@ button:hover{background:#2e2e2e}
     <button id="btnGallery"             onclick="setView('gallery')" title="4">🖼️ Gallery</button>
   </div>
 
+  <button class="tb-btn" onclick="window.location.href='/history'" title="History">History</button>
   <button class="tb-btn" onclick="openSettings()" title="Edit prompts">⚙️</button>
+  <button class="tb-btn" onclick="logoutUser()" title="Logout">Logout</button>
   <button class="tb-btn" onclick="toggleControls()" title="H">Controls</button>
   <button class="tb-btn" onclick="toggleFullscreen()" title="F">⛶</button>
 </div>
@@ -1248,6 +1261,7 @@ let bDrag = false, bDX = 0, bDY = 0;
 
 // Analysis font
 let fontSize = 20;
+const authenticatedUser = {{ (current_user or {})|tojson }};
 
 const vid  = document.getElementById('vid');
 const mc   = document.getElementById('mainCanvas');
@@ -1582,7 +1596,11 @@ async function runTextAnalysis() {
   try {
     const r = await fetch('/analyze', {
       method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({image: lastOrigPng, analysis_prompt: analysisPrompt, svg_prompt: ''})
+      body: JSON.stringify({
+        image: lastOrigPng,
+        analysis_prompt: analysisPrompt,
+        svg_prompt: '',
+      })
     });
     const res = await r.json();
     removeTyping();
@@ -1594,7 +1612,10 @@ async function runTextAnalysis() {
     document.getElementById('analyseBarWrapper').style.display = 'flex';
 
     // Auto-save with analysis
-    if (currentSession) autoSaveCapture(analysis, lastSvgString);
+    if (currentSession) {
+      autoSaveCapture(analysis, lastSvgString);
+      await saveAnalysisHistory(analysis);
+    }
 
     status('Analysis ready — ask follow-up questions below');
   } catch(e) {
@@ -1772,6 +1793,19 @@ document.addEventListener('fullscreenchange', () => {
 });
 function status(msg) { document.getElementById('statusBar').textContent = msg; }
 
+async function getSupabaseClient() {
+  return window.__vacSupabasePromise ? await window.__vacSupabasePromise : null;
+}
+
+async function logoutUser() {
+  try {
+    const supabase = await getSupabaseClient();
+    if (supabase) await supabase.auth.signOut();
+  } catch (e) {}
+  await fetch('/auth/logout', {method: 'POST'});
+  window.location.href = '/';
+}
+
 // ════════════════════════════════════════════════
 //  Keyboard shortcuts
 // ════════════════════════════════════════════════
@@ -1934,6 +1968,26 @@ async function sendChat() {
   } catch(e) {
     removeTyping();
     addChatMsg('teacher', 'Sorry, there was a connection error. Please try again.');
+  }
+}
+
+async function saveAnalysisHistory(analysisText) {
+  try {
+    await fetch('/api/history', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        subject: currentSession?.subject || '',
+        teacher: currentSession?.teacher || '',
+        session_id: currentSession?.id || '',
+        board_id: boardId,
+        topic: extractTopic(analysisText),
+        analysis_text: analysisText,
+        board_svg: lastSvgString || '',
+      })
+    });
+  } catch (e) {
+    console.error('History save failed:', e);
   }
 }
 

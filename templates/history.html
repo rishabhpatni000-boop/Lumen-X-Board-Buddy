@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>History - VisualAssistCam</title>
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+const supabaseUrl = {{ supabase_url|tojson }};
+const supabaseAnonKey = {{ supabase_anon_key|tojson }};
+window.__vacSupabasePromise = (supabaseUrl && supabaseAnonKey)
+  ? Promise.resolve(createClient(supabaseUrl, supabaseAnonKey))
+  : Promise.resolve(null);
+</script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:linear-gradient(160deg,#09121a,#0f1823 52%,#152433);
+  color:#edf4fb;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.topbar{display:flex;align-items:center;gap:12px;padding:16px 22px;border-bottom:1px solid rgba(126,157,194,.18);
+  background:rgba(9,15,22,.88);position:sticky;top:0;backdrop-filter:blur(12px)}
+.brand{font-weight:700;letter-spacing:.2px}
+.spacer{flex:1}
+.chip{font-size:12px;color:#8eaed3;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.btn{background:#182534;color:#edf4fb;border:1px solid rgba(126,157,194,.2);border-radius:12px;
+  padding:10px 14px;cursor:pointer;font-weight:600}
+.btn.primary{background:#eaf1f7;color:#112032}
+.wrap{padding:28px 22px 40px;max-width:1080px;margin:0 auto}
+.hero{margin-bottom:22px}
+.hero h1{margin:0 0 8px;font-size:36px}
+.hero p{margin:0;color:#9cb1c7;line-height:1.7;max-width:760px}
+#historyGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}
+.card{background:#101922;border:1px solid rgba(126,157,194,.14);border-radius:18px;padding:18px}
+.meta{font-size:12px;color:#7f96ad;margin-bottom:10px;display:flex;flex-wrap:wrap;gap:8px}
+.title{font-size:18px;margin:0 0 8px}
+.text{color:#d9e4ef;line-height:1.7;font-size:14px;display:-webkit-box;-webkit-line-clamp:9;-webkit-box-orient:vertical;overflow:hidden}
+.svgBox{margin-top:14px;background:#f8f8f4;border-radius:14px;overflow:hidden;border:1px solid #d7cfb4;min-height:120px}
+.svgBox svg{width:100%;height:auto;display:block}
+.empty,.error{padding:36px;border:1px dashed rgba(126,157,194,.2);border-radius:18px;color:#93a8be;text-align:center}
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">VisualAssistCam</div>
+    <div class="chip">{{ current_user.email if current_user else '' }}</div>
+    <div class="spacer"></div>
+    <button class="btn primary" onclick="window.location.href='/app'">Back to Dashboard</button>
+    <button class="btn" onclick="logoutUser()">Logout</button>
+  </div>
+
+  <main class="wrap">
+    <section class="hero">
+      <h1>Your Analysis History</h1>
+      <p>Every saved lesson analysis is scoped to your authenticated account. This page is backed by Supabase with row-level security, so each user only sees their own history.</p>
+    </section>
+    <section id="historyGrid">
+      <div class="empty">Loading your recent analyses…</div>
+    </section>
+  </main>
+
+  <script>
+    async function getSupabaseClient() {
+      return window.__vacSupabasePromise ? await window.__vacSupabasePromise : null;
+    }
+
+    async function logoutUser() {
+      try {
+        const supabase = await getSupabaseClient();
+        if (supabase) await supabase.auth.signOut();
+      } catch (e) {}
+      await fetch('/auth/logout', {method: 'POST'});
+      window.location.href = '/';
+    }
+
+    function escapeHtml(text) {
+      return (text || '').replace(/[&<>"]/g, (char) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+      }[char]));
+    }
+
+    async function loadHistory() {
+      const grid = document.getElementById('historyGrid');
+      try {
+        const resp = await fetch('/api/history');
+        if (!resp.ok) throw new Error('Could not load history.');
+        const records = await resp.json();
+        if (!records.length) {
+          grid.innerHTML = '<div class="empty">No saved analyses yet. Freeze a frame in the dashboard and run an analysis to build your history.</div>';
+          return;
+        }
+        grid.innerHTML = records.map((row) => {
+          const created = new Date(row.created_at).toLocaleString('en-GB', {
+            day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+          });
+          return `
+            <article class="card">
+              <div class="meta">
+                <span>${escapeHtml(row.subject || 'Class')}</span>
+                ${row.teacher ? `<span>Teacher: ${escapeHtml(row.teacher)}</span>` : ''}
+                <span>${escapeHtml(created)}</span>
+              </div>
+              <h2 class="title">${escapeHtml(row.topic || row.subject || 'Lesson analysis')}</h2>
+              <div class="text">${escapeHtml(row.analysis_text || '')}</div>
+              ${row.board_svg ? `<div class="svgBox">${row.board_svg}</div>` : ''}
+            </article>
+          `;
+        }).join('');
+      } catch (error) {
+        grid.innerHTML = `<div class="error">${escapeHtml(error.message || 'History failed to load.')}</div>`;
+      }
+    }
+
+    loadHistory();
+  </script>
+</body>
+</html>
