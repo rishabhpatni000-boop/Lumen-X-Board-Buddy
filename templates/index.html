@@ -269,6 +269,21 @@ button:hover{background:#2e2e2e}
 #lockBtn.locked{background:#2a1a0a;color:#ca8a2a;border-color:#4a3a1a}
 #authUser{font-size:12px;color:#8eaed3;white-space:nowrap;max-width:220px;
   overflow:hidden;text-overflow:ellipsis;padding:0 4px}
+#dashboardBar{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;
+  padding:10px 12px;background:#10161d;border-bottom:1px solid #1f2b36}
+.dash-card{background:#131d27;border:1px solid #223243;border-radius:12px;padding:12px 14px}
+.dash-label{font-size:11px;color:#6f89a4;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
+.dash-value{font-size:24px;color:#eef5fb;font-weight:700}
+.dash-sub{font-size:12px;color:#8fa3b9;margin-top:4px;line-height:1.5}
+#activityFeed{display:flex;gap:8px;flex-wrap:wrap}
+.activity-pill{background:#0e1720;border:1px solid #203141;border-radius:999px;padding:5px 10px;
+  color:#9fb3c8;font-size:11px}
+@media (max-width: 980px){
+  #dashboardBar{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width: 640px){
+  #dashboardBar{grid-template-columns:1fr}
+}
 </style>
 </head>
 <body>
@@ -367,12 +382,36 @@ button:hover{background:#2e2e2e}
     <button id="btnGallery"             onclick="setView('gallery')" title="4">🖼️ Gallery</button>
   </div>
 
+  <button class="tb-btn" onclick="window.location.href='/app'" title="Dashboard">Dashboard</button>
+  <button class="tb-btn" onclick="startNewAnalysis()" title="New Analysis">New Analysis</button>
   <button class="tb-btn" onclick="window.location.href='/history'" title="History">History</button>
-  <button class="tb-btn" onclick="openSettings()" title="Edit prompts">⚙️</button>
+  <button class="tb-btn" onclick="window.location.href='/settings'" title="Settings">Settings</button>
   <button class="tb-btn" onclick="logoutUser()" title="Logout">Logout</button>
   <button class="tb-btn" onclick="toggleControls()" title="H">Controls</button>
   <button class="tb-btn" onclick="toggleFullscreen()" title="F">⛶</button>
 </div>
+
+<section id="dashboardBar" aria-label="Dashboard summary">
+  <div class="dash-card">
+    <div class="dash-label">Total Analyses</div>
+    <div class="dash-value" id="dashTotal">0</div>
+    <div class="dash-sub">All analyses stored under your account.</div>
+  </div>
+  <div class="dash-card">
+    <div class="dash-label">This Month</div>
+    <div class="dash-value" id="dashMonth">0</div>
+    <div class="dash-sub">Analyses completed in the current month.</div>
+  </div>
+  <div class="dash-card">
+    <div class="dash-label">Remaining Quota</div>
+    <div class="dash-value" id="dashQuota">--</div>
+    <div class="dash-sub" id="dashQuotaSub">Loading your current usage limits…</div>
+  </div>
+  <div class="dash-card">
+    <div class="dash-label">Recent Activity</div>
+    <div id="activityFeed"><span class="activity-pill">Loading…</span></div>
+  </div>
+</section>
 
 <!-- ═══════════════ WORKSPACE (video + right sidebar) ═══════════════ -->
 <div id="workspace">
@@ -1250,6 +1289,7 @@ let hasSvg = false;   // track whether we have a previous SVG to show while load
 let view = 'orig';
 let frozen = false, inverted = false, ctrlsShown = true;
 let raf;
+const csrfToken = {{ csrf_token|tojson }};
 
 // Original zoom / pan
 let zoom = 1, panX = 0, panY = 0;
@@ -1266,6 +1306,16 @@ const authenticatedUser = {{ (current_user or {})|tojson }};
 const vid  = document.getElementById('vid');
 const mc   = document.getElementById('mainCanvas');
 const mCtx = mc.getContext('2d');
+
+const _nativeFetch = window.fetch.bind(window);
+window.fetch = (input, init = {}) => {
+  const method = (init.method || 'GET').toUpperCase();
+  const headers = new Headers(init.headers || {});
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) && csrfToken) {
+    headers.set('X-CSRF-Token', csrfToken);
+  }
+  return _nativeFetch(input, {...init, headers});
+};
 
 // ════════════════════════════════════════════════
 //  View switching
@@ -1303,6 +1353,11 @@ function setView(v) {
 
   if (isOrig) resizeCanvas();
   if (isGallery) loadGallery();
+}
+
+function startNewAnalysis() {
+  setView('orig');
+  status('Ready for a new analysis');
 }
 
 // ════════════════════════════════════════════════
@@ -1605,6 +1660,7 @@ async function runTextAnalysis() {
     const res = await r.json();
     removeTyping();
     const analysis = res.analysis || '(No analysis)';
+    if (res.quota) updateDashboardQuota(res.quota);
     currentAnalysisContext = analysis;
     chatHistory = [{role:'assistant', content: analysis}];
     addChatMsg('teacher', analysis);
@@ -1806,6 +1862,37 @@ async function logoutUser() {
   window.location.href = '/';
 }
 
+function updateDashboardQuota(quota) {
+  if (!quota) return;
+  document.getElementById('dashQuota').textContent = `${quota.daily_remaining}/${quota.limits.daily_analyses}`;
+  document.getElementById('dashQuotaSub').textContent =
+    `${quota.monthly_remaining} monthly analyses left · ${quota.upload_remaining} uploads left today`;
+}
+
+async function loadDashboardSummary() {
+  try {
+    const resp = await fetch('/api/dashboard');
+    if (!resp.ok) return;
+    const data = await resp.json();
+    document.getElementById('dashTotal').textContent = data.total_analyses ?? 0;
+    document.getElementById('dashMonth').textContent = data.analyses_this_month ?? 0;
+    updateDashboardQuota(data.remaining_quota);
+    const feed = document.getElementById('activityFeed');
+    const items = data.recent_activity || [];
+    if (!items.length) {
+      feed.innerHTML = '<span class="activity-pill">No recent activity yet</span>';
+      return;
+    }
+    feed.innerHTML = items.map((item) => {
+      const when = new Date(item.created_at).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+      return `<span class="activity-pill">${item.event_type.replace('_',' ')} · ${when}</span>`;
+    }).join('');
+  } catch (error) {
+    document.getElementById('activityFeed').innerHTML =
+      '<span class="activity-pill">Dashboard unavailable</span>';
+  }
+}
+
 // ════════════════════════════════════════════════
 //  Keyboard shortcuts
 // ════════════════════════════════════════════════
@@ -1983,7 +2070,9 @@ async function saveAnalysisHistory(analysisText) {
         board_id: boardId,
         topic: extractTopic(analysisText),
         analysis_text: analysisText,
+        ai_response: analysisText,
         board_svg: lastSvgString || '',
+        image_data: lastOrigPng || '',
       })
     });
   } catch (e) {
@@ -2021,6 +2110,7 @@ function resetPrompts() {
 //  Init
 // ════════════════════════════════════════════════
 initCameras();
+loadDashboardSummary();
 setView('orig');
 // Show session picker on load; camera starts in background
 // (modal is visible by default via CSS display:flex)

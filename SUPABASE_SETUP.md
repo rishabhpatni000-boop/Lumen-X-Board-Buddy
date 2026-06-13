@@ -19,6 +19,7 @@ This creates:
 
 - `public.users`
 - `public.analysis_history`
+- `public.usage_events`
 - RLS policies so users can only read and write their own data
 - a signup trigger to mirror `auth.users` into `public.users`
 
@@ -64,3 +65,4 @@ Copy [.env.example](/Users/rishabhpatni/Downloads/VisualAssistCam/.env.example) 
 - The signed-in user's Supabase access token is stored in the Flask session.
 - History requests to Supabase REST are made with that user token.
 - Because RLS is enabled, each user only sees their own `analysis_history` rows.
+- Usage and quota tracking are recorded in `usage_events` with the same RLS protections.

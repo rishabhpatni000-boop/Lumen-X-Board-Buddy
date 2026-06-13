@@ -17,25 +17,34 @@ window.__vacSupabasePromise = (supabaseUrl && supabaseAnonKey)
 body{margin:0;min-height:100vh;background:linear-gradient(160deg,#09121a,#0f1823 52%,#152433);
   color:#edf4fb;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 .topbar{display:flex;align-items:center;gap:12px;padding:16px 22px;border-bottom:1px solid rgba(126,157,194,.18);
-  background:rgba(9,15,22,.88);position:sticky;top:0;backdrop-filter:blur(12px)}
+  background:rgba(9,15,22,.88);position:sticky;top:0;backdrop-filter:blur(12px);flex-wrap:wrap}
 .brand{font-weight:700;letter-spacing:.2px}
 .spacer{flex:1}
 .chip{font-size:12px;color:#8eaed3;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .btn{background:#182534;color:#edf4fb;border:1px solid rgba(126,157,194,.2);border-radius:12px;
   padding:10px 14px;cursor:pointer;font-weight:600}
 .btn.primary{background:#eaf1f7;color:#112032}
-.wrap{padding:28px 22px 40px;max-width:1080px;margin:0 auto}
+.wrap{padding:28px 22px 40px;max-width:1120px;margin:0 auto}
 .hero{margin-bottom:22px}
 .hero h1{margin:0 0 8px;font-size:36px}
 .hero p{margin:0;color:#9cb1c7;line-height:1.7;max-width:760px}
+.filters{display:grid;grid-template-columns:2fr 1fr auto;gap:12px;margin:20px 0 22px}
+.filters input,.filters select{width:100%;padding:13px 14px;border-radius:14px;border:1px solid rgba(126,157,194,.18);
+  background:#101922;color:#edf4fb}
 #historyGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}
 .card{background:#101922;border:1px solid rgba(126,157,194,.14);border-radius:18px;padding:18px}
 .meta{font-size:12px;color:#7f96ad;margin-bottom:10px;display:flex;flex-wrap:wrap;gap:8px}
 .title{font-size:18px;margin:0 0 8px}
 .text{color:#d9e4ef;line-height:1.7;font-size:14px;display:-webkit-box;-webkit-line-clamp:9;-webkit-box-orient:vertical;overflow:hidden}
-.svgBox{margin-top:14px;background:#f8f8f4;border-radius:14px;overflow:hidden;border:1px solid #d7cfb4;min-height:120px}
-.svgBox svg{width:100%;height:auto;display:block}
+.thumb{margin-top:14px;border-radius:14px;overflow:hidden;border:1px solid rgba(126,157,194,.12);background:#0d141c}
+.thumb img{display:block;width:100%;height:180px;object-fit:cover}
+.placeholder{margin-top:14px;padding:12px;border-radius:12px;background:#0d141c;color:#8fa4ba;font-size:12px}
 .empty,.error{padding:36px;border:1px dashed rgba(126,157,194,.2);border-radius:18px;color:#93a8be;text-align:center}
+.pager{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-top:20px;flex-wrap:wrap}
+.pager button:disabled{opacity:.45;cursor:not-allowed}
+@media (max-width: 780px){
+  .filters{grid-template-columns:1fr}
+}
 </style>
 </head>
 <body>
@@ -43,21 +52,56 @@ body{margin:0;min-height:100vh;background:linear-gradient(160deg,#09121a,#0f1823
     <div class="brand">VisualAssistCam</div>
     <div class="chip">{{ current_user.email if current_user else '' }}</div>
     <div class="spacer"></div>
-    <button class="btn primary" onclick="window.location.href='/app'">Back to Dashboard</button>
+    <button class="btn primary" onclick="window.location.href='/app'">Dashboard</button>
+    <button class="btn" onclick="window.location.href='/settings'">Settings</button>
     <button class="btn" onclick="logoutUser()">Logout</button>
   </div>
 
   <main class="wrap">
     <section class="hero">
       <h1>Your Analysis History</h1>
-      <p>Every saved lesson analysis is scoped to your authenticated account. This page is backed by Supabase with row-level security, so each user only sees their own history.</p>
+      <p>Search, filter, and page through your saved analyses. Records are sorted newest first and scoped to your authenticated account through Supabase row-level security.</p>
     </section>
+
+    <section class="filters" aria-label="History filters">
+      <input id="searchInput" type="search" placeholder="Search topic, subject, or analysis text" aria-label="Search history">
+      <select id="subjectFilter" aria-label="Filter by subject">
+        <option value="">All subjects</option>
+        <option value="Maths">Maths</option>
+        <option value="English">English</option>
+        <option value="Science">Science</option>
+        <option value="InS">InS</option>
+      </select>
+      <button class="btn primary" onclick="applyFilters()">Apply</button>
+    </section>
+
     <section id="historyGrid">
       <div class="empty">Loading your recent analyses…</div>
     </section>
+
+    <div class="pager">
+      <button id="prevBtn" class="btn" onclick="changePage(-1)">Previous</button>
+      <div id="pageInfo" class="chip">Page 1</div>
+      <button id="nextBtn" class="btn" onclick="changePage(1)">Next</button>
+    </div>
   </main>
 
   <script>
+    const csrfToken = {{ csrf_token|tojson }};
+    const _nativeFetch = window.fetch.bind(window);
+    window.fetch = (input, init = {}) => {
+      const method = (init.method || 'GET').toUpperCase();
+      const headers = new Headers(init.headers || {});
+      if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) && csrfToken) {
+        headers.set('X-CSRF-Token', csrfToken);
+      }
+      return _nativeFetch(input, {...init, headers});
+    };
+
+    let page = 1;
+    const perPage = 12;
+    let lastTotalPages = 1;
+
     async function getSupabaseClient() {
       return window.__vacSupabasePromise ? await window.__vacSupabasePromise : null;
     }
@@ -82,18 +126,34 @@ body{margin:0;min-height:100vh;background:linear-gradient(160deg,#09121a,#0f1823
 
     async function loadHistory() {
       const grid = document.getElementById('historyGrid');
+      const search = document.getElementById('searchInput').value.trim();
+      const subject = document.getElementById('subjectFilter').value;
       try {
-        const resp = await fetch('/api/history');
+        const params = new URLSearchParams({
+          page: String(page),
+          per_page: String(perPage),
+          search,
+          subject,
+        });
+        const resp = await fetch(`/api/history?${params.toString()}`);
         if (!resp.ok) throw new Error('Could not load history.');
-        const records = await resp.json();
+        const payload = await resp.json();
+        const records = payload.items || [];
+        lastTotalPages = payload.total_pages || 1;
+        document.getElementById('pageInfo').textContent = `Page ${payload.page} of ${lastTotalPages}`;
+        document.getElementById('prevBtn').disabled = payload.page <= 1;
+        document.getElementById('nextBtn').disabled = payload.page >= lastTotalPages;
         if (!records.length) {
-          grid.innerHTML = '<div class="empty">No saved analyses yet. Freeze a frame in the dashboard and run an analysis to build your history.</div>';
+          grid.innerHTML = '<div class="empty">No analyses matched the current filters.</div>';
           return;
         }
         grid.innerHTML = records.map((row) => {
           const created = new Date(row.created_at).toLocaleString('en-GB', {
             day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
           });
+          const thumb = row.image_path
+            ? `<div class="thumb"><img src="/api/history-images/${encodeURIComponent(row.image_path)}" alt="Uploaded classroom reference image"></div>`
+            : `<div class="placeholder">No uploaded image reference saved for this analysis.</div>`;
           return `
             <article class="card">
               <div class="meta">
@@ -102,8 +162,8 @@ body{margin:0;min-height:100vh;background:linear-gradient(160deg,#09121a,#0f1823
                 <span>${escapeHtml(created)}</span>
               </div>
               <h2 class="title">${escapeHtml(row.topic || row.subject || 'Lesson analysis')}</h2>
-              <div class="text">${escapeHtml(row.analysis_text || '')}</div>
-              ${row.board_svg ? `<div class="svgBox">${row.board_svg}</div>` : ''}
+              <div class="text">${escapeHtml(row.ai_response || row.analysis_text || '')}</div>
+              ${thumb}
             </article>
           `;
         }).join('');
@@ -111,6 +171,22 @@ body{margin:0;min-height:100vh;background:linear-gradient(160deg,#09121a,#0f1823
         grid.innerHTML = `<div class="error">${escapeHtml(error.message || 'History failed to load.')}</div>`;
       }
     }
+
+    function applyFilters() {
+      page = 1;
+      loadHistory();
+    }
+
+    function changePage(delta) {
+      const next = page + delta;
+      if (next < 1 || next > lastTotalPages) return;
+      page = next;
+      loadHistory();
+    }
+
+    document.getElementById('searchInput').addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') applyFilters();
+    });
 
     loadHistory();
   </script>

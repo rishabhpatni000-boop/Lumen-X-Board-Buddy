@@ -7,6 +7,7 @@
 - `/app` -> protected main application dashboard
 - `/camera` -> protected alias to `/app`
 - `/history` -> protected per-user history page
+- `/settings` -> protected quota and security summary
 
 Protected API routes include:
 
@@ -15,8 +16,10 @@ Protected API routes include:
 - `/save`
 - `/calibrate`
 - `/update-board`
+- `/api/dashboard`
 - `/api/sessions/*`
 - `/api/history`
+- `/api/history-images/*`
 - `/api/images/*`
 
 ## Local web deployment
@@ -61,3 +64,4 @@ bash run_pi.sh
 - The default in-memory rate limiter is fine for a single process but should be replaced with Redis for multi-instance deployments.
 - Supabase redirect URLs must exactly match the deployed callback URL.
 - The logout button clears both the browser Supabase session and the Flask session.
+- The dashboard quota widgets depend on `usage_events` existing in Supabase.

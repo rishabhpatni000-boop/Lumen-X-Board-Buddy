@@ -49,15 +49,30 @@ create table if not exists public.analysis_history (
     board_id integer,
     topic text,
     analysis_text text not null,
+    ocr_text text,
+    ai_response text,
     board_svg text,
+    image_path text,
     created_at timestamptz not null default timezone('utc', now())
 );
 
 create index if not exists analysis_history_user_created_idx
     on public.analysis_history (user_id, created_at desc);
 
+create table if not exists public.usage_events (
+    id uuid primary key default gen_random_uuid(),
+    user_id uuid not null references auth.users(id) on delete cascade,
+    event_type text not null,
+    metadata jsonb not null default '{}'::jsonb,
+    created_at timestamptz not null default timezone('utc', now())
+);
+
+create index if not exists usage_events_user_created_idx
+    on public.usage_events (user_id, created_at desc);
+
 alter table public.users enable row level security;
 alter table public.analysis_history enable row level security;
+alter table public.usage_events enable row level security;
 
 drop policy if exists "Users can view their own profile" on public.users;
 create policy "Users can view their own profile"
@@ -95,3 +110,15 @@ create policy "Users can delete their own analyses"
 on public.analysis_history
 for delete
 using (auth.uid() = user_id);
+
+drop policy if exists "Users can view their own usage events" on public.usage_events;
+create policy "Users can view their own usage events"
+on public.usage_events
+for select
+using (auth.uid() = user_id);
+
+drop policy if exists "Users can insert their own usage events" on public.usage_events;
+create policy "Users can insert their own usage events"
+on public.usage_events
+for insert
+with check (auth.uid() = user_id);

@@ -19,6 +19,7 @@ import uuid
 import time
 import socket
 import datetime
+import hashlib
 import numpy as np
 import cv2
 import base64
@@ -31,17 +32,22 @@ from flask import Flask, request, jsonify, render_template, send_from_directory,
 from werkzeug.utils import secure_filename
 
 from supabase_integration import (
+    count_history_records_this_month,
     clear_auth_session,
     configure_supabase,
     current_user,
     insert_history_record,
-    list_history_records,
+    list_history_records_paginated,
     login_required_api,
     login_required_page,
     safe_next_url,
     store_session_from_token,
     template_auth_context,
 )
+from services.cache_service import TTLCache, stable_cache_key
+from services.logging_service import log_event
+from services.quota_service import QuotaExceeded, QuotaService
+from services.storage_service import StorageService
 from web_security import configure_app_security, decode_image_data_url, require_json_payload
 
 # ── Claude ────────────────────────────────────────────────────────────────────
@@ -65,41 +71,41 @@ def no_cache(response):
     return response
 
 # ── Data directories (Pi-friendly paths, no Desktop) ─────────────────────────
-BASE_DIR     = os.path.expanduser("~/VisualAssistCam")
-SAVE_DIR     = os.path.join(BASE_DIR, "captures")
-SESSIONS_DIR = os.path.join(BASE_DIR, "sessions")
-IMAGES_DIR   = os.path.join(SESSIONS_DIR, "images")
-LOG_DIR      = os.path.join(BASE_DIR, "logs")
-for d in [SAVE_DIR, SESSIONS_DIR, IMAGES_DIR, LOG_DIR]:
-    os.makedirs(d, exist_ok=True)
+DATA_DIR = os.getenv("VISUALASSISTCAM_DATA_DIR", os.path.expanduser("~/VisualAssistCam"))
 
-SECURITY = configure_app_security(app, LOG_DIR)
+STORAGE = StorageService(DATA_DIR, {"MAX_IMAGE_BYTES": app.config["MAX_IMAGE_BYTES"]} if "MAX_IMAGE_BYTES" in app.config else {"MAX_IMAGE_BYTES": 5 * 1024 * 1024})
+SECURITY = configure_app_security(app, STORAGE.logs_dir)
 anon_api_quota = SECURITY["anon_api_quota"]
 read_api_limit = SECURITY["read_api_limit"]
 write_api_limit = SECURITY["write_api_limit"]
+QUOTAS = QuotaService()
+ANALYSIS_CACHE = TTLCache(ttl_seconds=int(os.getenv("ANALYSIS_CACHE_TTL", "600")), max_entries=128)
+BOARD_CACHE = TTLCache(ttl_seconds=int(os.getenv("BOARD_CACHE_TTL", "600")), max_entries=128)
+STORAGE.max_image_bytes = app.config["MAX_IMAGE_BYTES"]
+STORAGE.cleanup_temp()
 
 # ── Session helpers ───────────────────────────────────────────────────────────
 
 def _sessions_list() -> list:
     out = []
-    for f in os.listdir(SESSIONS_DIR):
+    for f in os.listdir(STORAGE.sessions_dir):
         if f.endswith(".json"):
             try:
-                with open(os.path.join(SESSIONS_DIR, f)) as fp:
+                with open(os.path.join(STORAGE.sessions_dir, f)) as fp:
                     out.append(json.load(fp))
             except Exception:
                 pass
     return out
 
 def _session_get(sid: str):
-    p = os.path.join(SESSIONS_DIR, f"{sid}.json")
+    p = STORAGE.session_json_path(sid)
     if os.path.exists(p):
         with open(p) as f:
             return json.load(f)
     return None
 
 def _session_save(s: dict):
-    with open(os.path.join(SESSIONS_DIR, f"{s['id']}.json"), "w") as f:
+    with open(STORAGE.session_json_path(s["id"]), "w") as f:
         json.dump(s, f, indent=2)
 
 PORT = 5050
@@ -172,6 +178,17 @@ def history_page():
     )
 
 
+@app.route("/settings")
+@login_required_page
+def settings_page():
+    return render_template(
+        "settings.html",
+        claude_available=CLAUDE_AVAILABLE,
+        quota_snapshot=QUOTAS.quota_snapshot(),
+        **template_auth_context("auth_callback"),
+    )
+
+
 @app.route("/analyze", methods=["POST"])
 @anon_api_quota
 @login_required_api
@@ -179,6 +196,10 @@ def analyze():
     data, error_response = require_json_payload()
     if error_response:
         return error_response
+    try:
+        quota_snapshot = QUOTAS.ensure_analysis_available()
+    except QuotaExceeded as e:
+        return jsonify({"svg": "", "analysis": "", "error": str(e), "quota": e.quota_snapshot}), 429
     try:
         image_bytes, _ = decode_image_data_url(data.get("image", ""),
                                                app.config["MAX_IMAGE_BYTES"])
@@ -192,9 +213,29 @@ def analyze():
     custom_svg_prompt      = data.get("svg_prompt", None)
     custom_analysis_prompt = data.get("analysis_prompt", None)
 
+    cache_key = stable_cache_key("analyze", {
+        "image_sha": hashlib.sha256(image_bytes).hexdigest(),
+        "svg_prompt": custom_svg_prompt or "",
+        "analysis_prompt": custom_analysis_prompt or "",
+    })
+    cached = ANALYSIS_CACHE.get(cache_key)
+    if cached is not None:
+        return jsonify({**cached, "quota": quota_snapshot})
+
     svg_f      = _pool.submit(_gen_svg,      image_bytes, custom_svg_prompt)
     analysis_f = _pool.submit(_gen_analysis, image_bytes, custom_analysis_prompt)
-    return jsonify({"svg": svg_f.result(), "analysis": analysis_f.result()})
+    result = {"svg": svg_f.result(), "analysis": analysis_f.result()}
+    ANALYSIS_CACHE.set(cache_key, result)
+    QUOTAS.record_event("analysis", {"session_id": data.get("session_id", ""), "board_id": data.get("board_id")})
+    QUOTAS.record_event("ai_request", {"route": "/analyze"})
+    QUOTAS.record_event("ocr_request", {"route": "/analyze"})
+    log_event(
+        SECURITY["logger"],
+        "analysis_completed",
+        ip=request.remote_addr,
+        user_id=(current_user() or {}).get("id"),
+    )
+    return jsonify({**result, "quota": QUOTAS.quota_snapshot()})
 
 
 @app.route("/chat", methods=["POST"])
@@ -234,6 +275,7 @@ def chat():
             system=system,
             messages=history + [{"role": "user", "content": message}],
         )
+        QUOTAS.record_event("ai_request", {"route": "/chat"})
         return jsonify({"response": resp.content[0].text.strip()})
     except Exception as e:
         print(f"Chat error: {e}")
@@ -249,19 +291,11 @@ def save():
         return error_response
     img_data = data.get("image", "")
     try:
-        image_bytes, mime_type = decode_image_data_url(img_data, app.config["MAX_IMAGE_BYTES"])
-        ext = {
-            "image/png": ".png",
-            "image/jpeg": ".jpg",
-            "image/webp": ".webp",
-        }[mime_type]
-        filename = secure_filename(data.get("filename", "capture.png")) or f"capture{ext}"
-        if not filename.lower().endswith(ext):
-            filename = f"{os.path.splitext(filename)[0]}{ext}"
-        path = os.path.join(SAVE_DIR, filename)
-        with open(path, "wb") as f:
-            f.write(image_bytes)
-        return jsonify({"ok": True, "path": path})
+        QUOTAS.ensure_upload_available()
+        stored = STORAGE.save_data_url(img_data, "captures", data.get("filename", "capture.png"))
+        QUOTAS.record_event("upload", {"route": "/save", "filename": stored.filename})
+        log_event(SECURITY["logger"], "upload_saved", ip=request.remote_addr, filename=stored.filename)
+        return jsonify({"ok": True, "path": stored.absolute_path})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)})
 
@@ -359,11 +393,21 @@ def update_board():
         image_bytes, _ = decode_image_data_url(img_data, app.config["MAX_IMAGE_BYTES"])
     except ValueError as e:
         return jsonify({"svg": "", "is_new_board": False, "error": str(e)})
+    cache_key = stable_cache_key("board", {
+        "image_sha": hashlib.sha256(image_bytes).hexdigest(),
+        "previous_svg": previous_svg[:500],
+        "svg_prompt": svg_prompt or "",
+    })
+    cached = BOARD_CACHE.get(cache_key)
+    if cached is not None:
+        return jsonify(cached)
     if previous_svg.strip().startswith("<svg"):
         result = _gen_svg_incremental(image_bytes, previous_svg, svg_prompt)
     else:
         svg = _gen_svg(image_bytes, svg_prompt)
         result = {"svg": svg, "is_new_board": False}
+    BOARD_CACHE.set(cache_key, result)
+    QUOTAS.record_event("ai_request", {"route": "/update-board"})
     return jsonify(result)
 
 
@@ -420,6 +464,10 @@ def api_add_capture(sid):
     data, error_response = require_json_payload()
     if error_response:
         return error_response
+    try:
+        QUOTAS.ensure_upload_available()
+    except QuotaExceeded as e:
+        return jsonify({"error": str(e), "quota": e.quota_snapshot}), 429
     cap_type = data.get("capture_type", "explicit")
     board_id = data.get("board_id", 0)
     ts       = datetime.datetime.now()
@@ -427,8 +475,7 @@ def api_add_capture(sid):
     def _del(cap):
         for fk in ("original_file","aiboard_file"):
             if cap.get(fk):
-                try: os.remove(os.path.join(IMAGES_DIR, cap[fk]))
-                except: pass
+                STORAGE.delete_file("session_images", cap[fk])
 
     if cap_type == "latest_freeze":
         idx = next((i for i,c in enumerate(s["captures"])
@@ -448,21 +495,14 @@ def api_add_capture(sid):
         raw = data.get(key,"")
         if not raw:
             return None
-        image_bytes, mime_type = decode_image_data_url(raw, app.config["MAX_IMAGE_BYTES"])
-        ext = {
-            "image/png": ".png",
-            "image/jpeg": ".jpg",
-            "image/webp": ".webp",
-        }[mime_type]
-        fname = f"{sid}_{cap_id}_{suffix}{ext}"
-        with open(os.path.join(IMAGES_DIR, fname),"wb") as f:
-            f.write(image_bytes)
-        return fname
+        stored = STORAGE.save_data_url(raw, "session_images", f"{sid}_{cap_id}_{suffix}.png")
+        return stored.filename
 
     cap["original_file"] = _save("original","original")
     cap["aiboard_file"]  = _save("aiboard","aiboard")
     s["captures"].append(cap)
     _session_save(s)
+    QUOTAS.record_event("upload", {"route": "/api/sessions/capture", "capture_type": cap_type})
     return jsonify(cap)
 
 @app.route("/api/sessions/<sid>", methods=["DELETE"])
@@ -474,9 +514,8 @@ def api_delete_session(sid):
     for cap in s.get("captures",[]):
         for fk in ("original_file","aiboard_file"):
             if cap.get(fk):
-                try: os.remove(os.path.join(IMAGES_DIR, cap[fk]))
-                except: pass
-    try: os.remove(os.path.join(SESSIONS_DIR, f"{sid}.json"))
+                STORAGE.delete_file("session_images", cap[fk])
+    try: os.remove(STORAGE.session_json_path(sid))
     except: pass
     return jsonify({"ok": True})
 
@@ -491,8 +530,7 @@ def api_delete_capture(sid, cap_id):
     cap = s["captures"].pop(idx)
     for fk in ("original_file","aiboard_file"):
         if cap.get(fk):
-            try: os.remove(os.path.join(IMAGES_DIR, cap[fk]))
-            except: pass
+            STORAGE.delete_file("session_images", cap[fk])
     _session_save(s)
     return jsonify({"ok": True})
 
@@ -506,7 +544,29 @@ def api_by_subject(subject):
 @app.route("/api/images/<filename>")
 @login_required_api
 def api_image(filename):
-    return send_from_directory(IMAGES_DIR, filename)
+    return send_from_directory(STORAGE.images_dir, filename)
+
+
+@app.route("/api/history-images/<filename>")
+@read_api_limit
+@login_required_api
+def api_history_image(filename):
+    return send_from_directory(STORAGE.history_dir, filename)
+
+
+@app.route("/api/dashboard", methods=["GET"])
+@read_api_limit
+@login_required_api
+def api_dashboard():
+    quota_snapshot = QUOTAS.quota_snapshot()
+    recent = QUOTAS.recent_activity(limit=8)
+    total_analyses = list_history_records_paginated(page=1, per_page=1)["total"]
+    return jsonify({
+        "total_analyses": total_analyses,
+        "analyses_this_month": count_history_records_this_month(),
+        "remaining_quota": quota_snapshot,
+        "recent_activity": recent,
+    })
 
 
 @app.route("/api/history", methods=["GET"])
@@ -514,7 +574,11 @@ def api_image(filename):
 @login_required_api
 def api_history():
     try:
-        return jsonify(list_history_records(limit=100))
+        page = max(1, int(request.args.get("page", "1")))
+        per_page = max(1, min(25, int(request.args.get("per_page", "12"))))
+        search = request.args.get("search", "")
+        subject = request.args.get("subject", "")
+        return jsonify(list_history_records_paginated(page=page, per_page=per_page, search=search, subject=subject))
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -527,6 +591,16 @@ def api_create_history():
     if error_response:
         return error_response
     try:
+        image_path = None
+        if data.get("image_data", "").strip():
+            QUOTAS.ensure_upload_available()
+            stored = STORAGE.save_data_url(
+                data.get("image_data", "").strip(),
+                "history_uploads",
+                f"history_{uuid.uuid4().hex}.png",
+            )
+            image_path = stored.filename
+            QUOTAS.record_event("upload", {"route": "/api/history", "filename": stored.filename})
         record = insert_history_record({
             "subject": data.get("subject", "").strip() or None,
             "teacher": data.get("teacher", "").strip() or None,
@@ -534,9 +608,14 @@ def api_create_history():
             "board_id": data.get("board_id"),
             "topic": data.get("topic", "").strip() or None,
             "analysis_text": data.get("analysis_text", "").strip(),
+            "ocr_text": data.get("ocr_text", "").strip() or None,
+            "ai_response": data.get("ai_response", "").strip() or data.get("analysis_text", "").strip(),
             "board_svg": data.get("board_svg", "").strip() or None,
+            "image_path": image_path,
         })
         return jsonify(record or {"ok": True})
+    except QuotaExceeded as e:
+        return jsonify({"error": str(e), "quota": e.quota_snapshot}), 429
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

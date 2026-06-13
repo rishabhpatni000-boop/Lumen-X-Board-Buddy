@@ -8,16 +8,7 @@ from functools import wraps
 from urllib.parse import quote
 
 import requests
-from flask import jsonify, redirect, request, session, url_for
-
-
-PROTECTED_JSON_PATHS = {
-    "/analyze",
-    "/chat",
-    "/save",
-    "/calibrate",
-    "/update-board",
-}
+from flask import redirect, request, session, url_for
 
 
 def configure_supabase(app):
@@ -168,20 +159,84 @@ def insert_history_record(record: dict):
 
 
 def list_history_records(limit: int = 100):
+    return list_history_records_paginated(page=1, per_page=limit)
+
+
+def list_history_records_paginated(page: int = 1, per_page: int = 12,
+                                   search: str = "", subject: str = ""):
     cfg = supabase_config()
     token = current_access_token()
     if not cfg["url"] or not cfg["anon_key"] or not token:
-        return []
+        return {"items": [], "page": page, "per_page": per_page, "total": 0}
+
+    start = max(0, (page - 1) * per_page)
+    end = start + per_page - 1
+    params = [
+        ("select", "id,subject,teacher,session_id,board_id,topic,analysis_text,ai_response,ocr_text,board_svg,image_path,created_at"),
+        ("order", "created_at.desc"),
+        ("offset", str(start)),
+        ("limit", str(per_page)),
+    ]
+    filters = []
+    if search.strip():
+        term = search.strip().replace(",", " ")
+        filters.append(f"topic.ilike.%{term}%")
+        filters.append(f"analysis_text.ilike.%{term}%")
+        filters.append(f"subject.ilike.%{term}%")
+    if subject.strip():
+        params.append(("subject", f"eq.{subject.strip()}"))
+    if filters:
+        params.append(("or", f"({','.join(filters)})"))
 
     resp = requests.get(
         f"{cfg['url']}/rest/v1/analysis_history",
-        headers=_supabase_rest_headers(token),
-        params={
-            "select": "id,subject,teacher,session_id,board_id,topic,analysis_text,board_svg,created_at",
-            "order": "created_at.desc",
-            "limit": str(limit),
-        },
+        headers={**_supabase_rest_headers(token), "Prefer": "count=exact"},
+        params=params,
         timeout=15,
     )
     resp.raise_for_status()
-    return resp.json()
+    content_range = resp.headers.get("Content-Range", "0-0/0")
+    try:
+        total = int(content_range.split("/")[-1])
+    except (TypeError, ValueError):
+        total = len(resp.json())
+    return {
+        "items": resp.json(),
+        "page": page,
+        "per_page": per_page,
+        "total": total,
+        "total_pages": max(1, (total + per_page - 1) // per_page),
+    }
+
+
+def count_history_records_this_month():
+    cfg = supabase_config()
+    token = current_access_token()
+    if not cfg["url"] or not cfg["anon_key"] or not token:
+        return 0
+
+    from datetime import datetime
+    now = datetime.utcnow()
+    start = datetime(now.year, now.month, 1).isoformat() + "Z"
+    if now.month == 12:
+        end = datetime(now.year + 1, 1, 1).isoformat() + "Z"
+    else:
+        end = datetime(now.year, now.month + 1, 1).isoformat() + "Z"
+
+    resp = requests.get(
+        f"{cfg['url']}/rest/v1/analysis_history",
+        headers={**_supabase_rest_headers(token), "Prefer": "count=exact"},
+        params=[
+            ("select", "id"),
+            ("created_at", f"gte.{start}"),
+            ("created_at", f"lt.{end}"),
+            ("limit", "1"),
+        ],
+        timeout=15,
+    )
+    resp.raise_for_status()
+    content_range = resp.headers.get("Content-Range", "0-0/0")
+    try:
+        return int(content_range.split("/")[-1])
+    except (TypeError, ValueError):
+        return len(resp.json())

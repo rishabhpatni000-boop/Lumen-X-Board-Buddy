@@ -2,417 +2,218 @@
 
 ## Overview
 
-VisualAssistCam is a whiteboard accessibility tool with two distinct application paths in the same repository:
+VisualAssistCam is now structured as an authenticated Flask web application with a preserved camera/OCR/Claude workflow and a separate legacy macOS PyQt application.
 
-1. A Flask-based web application for classroom capture, AI whiteboard reconstruction, lesson analysis, chat follow-ups, and session galleries.
-2. A macOS-only PyQt desktop application focused on live camera zoom, image enhancement, freeze-frame OCR, and a local "Smart Board" overlay.
+Primary production web flow:
 
-The web app is the primary multi-device experience. It uses the browser for camera access, OpenCV on the server for whiteboard edge detection, and Anthropic Claude for SVG reconstruction and lesson explanation.
+Visitor -> Landing Page -> Google Sign-In -> Dashboard (`/app`) -> Analysis Features -> History -> Settings
 
-## Repository Structure
+## Application Structure
 
-| Path | Purpose |
-|---|---|
-| `app.py` | Main Flask server for local/macOS use. Binds to `127.0.0.1:5050` and auto-opens a browser. |
-| `app_pi.py` | Raspberry Pi variant of the Flask server. Binds to `0.0.0.0:5050`, supports HTTPS, and stores data under `~/VisualAssistCam`. |
-| `templates/index.html` | Single-page frontend for the web app. Contains HTML, CSS, and all browser-side JavaScript. |
-| `main.py` | Separate PyQt6 desktop app for macOS live viewing, OCR, and Smart Board generation. |
-| `requirements.txt` | Python dependencies for the PyQt desktop app. |
-| `requirements_pi.txt` | Python dependencies for the Raspberry Pi Flask deployment. |
-| `setup.sh` | macOS setup script for the PyQt app environment. Installs Homebrew/Tesseract and Python packages. |
-| `run.sh` | Launches `app.py` from the virtual environment. |
-| `setup_pi.sh` | Raspberry Pi provisioning script. Installs system packages, Python packages, SSL certs, and `.env`. |
-| `run_pi.sh` | Launches `app_pi.py` from the virtual environment. |
-| `setup_autostart.sh` | Creates a `systemd` service for auto-start on Raspberry Pi boot. |
-| `README_PI.md` | User-facing Raspberry Pi deployment guide. |
+### Web entry points
 
-## Runtime Variants
+- `app.py`: local/macOS Flask server
+- `app_pi.py`: Raspberry Pi Flask server with HTTPS/network-friendly startup
 
-### 1. Flask web app
+### Frontend templates
 
-The web app is a server-rendered SPA:
+- `templates/landing.html`: public marketing/login page
+- `templates/auth_callback.html`: Supabase OAuth callback handoff
+- `templates/index.html`: protected dashboard + analysis application
+- `templates/history.html`: protected per-user analysis history
+- `templates/settings.html`: protected quota/security settings summary
+- `templates/errors/*.html`: 403/404/500 user-facing error pages
 
-- Flask serves `templates/index.html`.
-- The frontend uses `navigator.mediaDevices.getUserMedia()` to access the camera.
-- The frontend draws video frames into a `<canvas>` and sends frozen frames to the backend as base64 PNGs.
-- The backend performs whiteboard detection, session persistence, and Claude API calls.
+### Shared backend modules
 
-There are two server variants:
+- `web_security.py`: rate limiting, request size limits, CSRF, structured request logging, error handlers
+- `supabase_integration.py`: Supabase Auth session handling and history access
+- `services/storage_service.py`: centralized local file storage abstraction
+- `services/quota_service.py`: per-user usage tracking and quota checks
+- `services/cache_service.py`: in-memory TTL caching for duplicate analysis requests
+- `services/logging_service.py`: structured application event logging helpers
 
-- `app.py`: local desktop mode for a single machine.
-- `app_pi.py`: Raspberry Pi classroom mode for access from other devices on the same network.
+### Other application paths
 
-### 2. PyQt desktop app
+- `main.py`: standalone macOS PyQt viewer/OCR app
 
-`main.py` is a separate product, not a thin wrapper around the Flask app.
+## Route Flow
 
-It provides:
+### Public routes
 
-- native macOS camera capture via OpenCV AVFoundation
-- digital zoom/pan and image enhancement
-- freeze-frame OCR using Apple Vision when available
-- Tesseract fallback OCR
-- a generated "Smart Board" overlay rendered locally with Pillow
+- `/`: landing page
+- `/auth/callback`: OAuth completion page
+- `/auth/session`: exchange Supabase access token for Flask session
 
-This path does not use Flask, the browser UI, or the Claude API.
+### Protected pages
 
-## Web Application Components
+- `/app`: main dashboard and analysis workspace
+- `/camera`: protected alias to `/app`
+- `/history`: authenticated user history
+- `/settings`: quota/security/account summary
 
-### Backend responsibilities
+### Protected APIs
 
-The Flask backend handles:
+- `/analyze`
+- `/chat`
+- `/save`
+- `/calibrate`
+- `/update-board`
+- `/api/dashboard`
+- `/api/history`
+- `/api/history-images/<filename>`
+- `/api/sessions/*`
+- `/api/images/<filename>`
+- `/auth/logout`
 
-- serving the frontend
-- session CRUD APIs
-- image persistence for captures and AI board images
-- whiteboard calibration using OpenCV
-- Claude calls for:
-  - SVG whiteboard reconstruction
-  - incremental SVG board updates
-  - lesson analysis text
-  - follow-up chat responses
+Unauthenticated access is redirected back to the landing page.
 
-### Frontend responsibilities
+## Authentication Flow
 
-The browser frontend handles:
+1. Visitor lands on `/`.
+2. Frontend starts Google OAuth using Supabase Auth.
+3. Supabase returns the browser to `/auth/callback`.
+4. Frontend exchanges the OAuth code for a Supabase session.
+5. Frontend posts the Supabase access token to `/auth/session`.
+6. Flask verifies the user through Supabase `/auth/v1/user`.
+7. Flask stores a secure server-side session cookie.
+8. User is redirected to `/app`.
 
-- camera enumeration and selection
-- live preview rendering in a canvas
-- zoom, pan, filters, invert, and fullscreen
-- auto-freeze timers
-- calibration requests
-- AI Board view management
-- AI Analysis chat UX
-- session picker and gallery views
-- conversion of SVG to PNG for gallery storage
+Logout:
 
-## HTTP/API Surface
+- Frontend signs out from Supabase JS.
+- Frontend posts to `/auth/logout`.
+- Flask session is cleared.
 
-### UI route
+## OCR / Analysis Pipeline
 
-- `GET /`: render the single-page application
+### Web application
 
-### AI routes
+The protected web app uses the browser camera and backend image processing:
 
-- `POST /analyze`: generate AI analysis text and, in parallel, an SVG board
-- `POST /update-board`: generate or incrementally update the AI board SVG
-- `POST /chat`: continue lesson discussion using prior chat history and analysis context
-- `POST /calibrate`: detect whiteboard corners and return perspective transform data
+1. Browser captures camera frames with `getUserMedia`.
+2. Frames are drawn into a canvas.
+3. Frozen frames are sent as base64 JSON payloads.
+4. `/calibrate` uses OpenCV to detect the whiteboard quadrilateral.
+5. `/update-board` generates or incrementally updates an SVG whiteboard via Claude.
+6. `/analyze` generates:
+   - SVG board representation
+   - lesson explanation text
+7. `/chat` continues lesson follow-up tutoring.
 
-### File route
+### Legacy PyQt path
 
-- `POST /save`: save a captured PNG to the user's capture directory
+`main.py` still provides native macOS OCR and Smart Board rendering using:
 
-### Session routes
+- Apple Vision OCR
+- Tesseract fallback
+- local image enhancement and zoom/pan
 
-- `GET /api/sessions`
-- `POST /api/sessions`
-- `GET /api/sessions/<sid>`
-- `DELETE /api/sessions/<sid>`
-- `POST /api/sessions/<sid>/lock`
-- `POST /api/sessions/<sid>/capture`
-- `DELETE /api/sessions/<sid>/captures/<cap_id>`
-- `GET /api/sessions/by-subject/<subject>`
-- `GET /api/images/<filename>`
+## AI Integration
 
-## Data Model
-
-Session data is stored as JSON files on disk, one file per session.
-
-Session shape:
-
-```json
-{
-  "id": "12-char-id",
-  "subject": "Maths",
-  "teacher": "Name",
-  "created_at": "ISO timestamp",
-  "locked": false,
-  "captures": [
-    {
-      "id": "cap...",
-      "timestamp": "ISO timestamp",
-      "topic": "Lesson topic",
-      "capture_type": "explicit | latest_freeze | aiboard",
-      "board_id": 0,
-      "original_file": "optional PNG filename",
-      "aiboard_file": "optional PNG filename"
-    }
-  ]
-}
-```
-
-Capture semantics:
-
-- `explicit`: user-triggered permanent capture
-- `latest_freeze`: rolling latest frozen image for a board
-- `aiboard`: rolling AI-generated board image for a board
-
-The app replaces older `latest_freeze` and `aiboard` captures for the same `board_id`, but keeps all `explicit` captures.
-
-## Storage Layout
-
-### macOS Flask server
-
-- captures: `~/Desktop/VisualAssistCam_Captures`
-- sessions: `~/Desktop/VisualAssistCam_Sessions`
-- gallery images: `~/Desktop/VisualAssistCam_Sessions/images`
-
-### Raspberry Pi Flask server
-
-- base directory: `~/VisualAssistCam`
-- captures: `~/VisualAssistCam/captures`
-- sessions: `~/VisualAssistCam/sessions`
-- gallery images: `~/VisualAssistCam/sessions/images`
-
-### PyQt desktop app
-
-- captures: `~/Desktop/VisualAssistCam_Captures`
-
-## Dependency Breakdown
-
-### Shared web-app Python dependencies
-
-From code and setup scripts, the Flask path depends on:
-
-- `flask`
-- `anthropic`
-- `numpy`
-- `python-dotenv`
-- OpenCV
-- standard library modules for JSON, threading, base64, sockets, file I/O
-
-On Raspberry Pi, OpenCV is explicitly the headless build:
-
-- `opencv-python-headless`
-
-### PyQt desktop dependencies
-
-`main.py` depends on:
-
-- `PyQt6`
-- `opencv-python`
-- `numpy`
-- `pillow`
-- `pytesseract`
-- `pyobjc-framework-Vision`
-- `pyobjc-framework-Quartz`
-
-It also expects the Tesseract binary at:
-
-- `/opt/homebrew/bin/tesseract`
-
-### External service dependency
-
-The AI features require:
-
-- `ANTHROPIC_API_KEY` in `.env`
-
-Without that key:
-
-- AI Board generation is disabled
-- AI Analysis is disabled
-- chat replies are disabled
-
-### Browser dependency
-
-The frontend loads one external JS library from CDN:
-
-- `marked` from `cdn.jsdelivr.net`
-
-This is used only for rendering teacher responses in the analysis chat view.
-
-## Deployment Requirements
-
-### Local/macOS web mode
-
-Requirements:
-
-- Python 3 with `venv`
-- browser with camera support
-- network access for Claude API
-- optional `.env` with `ANTHROPIC_API_KEY`
-
-Operational model:
-
-- run `run.sh`
-- Flask listens on `http://127.0.0.1:5050`
-- a browser tab opens automatically
-
-### Raspberry Pi mode
-
-Requirements:
-
-- Raspberry Pi 5 recommended
-- Raspberry Pi OS 64-bit
-- Python virtual environment support
-- system packages installed by `setup_pi.sh`
-- webcam or compatible camera
-- network access for Anthropic API
-- HTTPS support for browser camera access on non-localhost devices
-
-Operational model:
-
-- run `setup_pi.sh` once
-- optional `setup_autostart.sh` for `systemd`
-- run `run_pi.sh`
-- Flask listens on `0.0.0.0:5050`
-- prefers HTTPS using `cert.pem` and `key.pem`
-- falls back to adhoc OpenSSL cert if available
-- falls back to HTTP only if SSL support is unavailable
-
-Important browser constraint:
-
-- camera access from other devices generally requires HTTPS, which is why the Pi path provisions a self-signed certificate
-
-### macOS PyQt mode
-
-Requirements:
-
-- macOS
-- camera available through AVFoundation
-- PyQt6
-- OpenCV
-- Apple Vision framework for best OCR, or Tesseract as fallback
-
-Operational model:
-
-- `setup.sh` provisions Homebrew and Tesseract
-- the app runs locally as a desktop window
-
-## Concurrency and Execution Model
-
-The Flask app uses:
-
-- one request thread per incoming Flask request
-- a `ThreadPoolExecutor(max_workers=2)` for parallel AI tasks
-
-`/analyze` submits:
+Anthropic Claude remains the primary AI service for the web app:
 
 - `_gen_svg(...)`
+- `_gen_svg_incremental(...)`
 - `_gen_analysis(...)`
+- `/chat`
 
-and waits for both before returning one response.
+Protections now wrapped around the AI routes:
 
-This keeps SVG generation and lesson analysis parallelized while preserving a simple synchronous API for the frontend.
+- authentication required
+- per-IP rate limiting
+- per-user quota checks
+- request-size limits
+- duplicate-request caching
+- structured logging
 
-## Data Flow
+## Storage System
 
-### Core whiteboard flow
+All file handling now goes through `StorageService`.
 
-1. The browser opens the app and requests camera access.
-2. Live camera frames are drawn into `mainCanvas`.
-3. The user freezes the current frame.
-4. The frontend captures the frozen canvas as a base64 PNG.
-5. The frontend immediately:
-   - stores the frozen frame in the current session as `latest_freeze`
-   - calls `POST /update-board` to generate or update the AI board
-6. The backend decodes the image and, if a prior SVG exists, uses incremental board generation.
-7. Claude returns raw SVG.
-8. The frontend renders the SVG into the AI Board view.
-9. The frontend rasterizes that SVG to PNG and stores it as an `aiboard` capture.
+Storage areas:
 
-### Analysis/chat flow
+- `captures/`: explicit saved images
+- `sessions/`: JSON session files
+- `sessions/images/`: gallery/session images
+- `history_uploads/`: user history image references
+- `logs/`: application logs
+- `tmp/`: temporary working area with cleanup support
 
-1. After a frame is frozen, the user chooses "Analyse Board".
-2. The frontend calls `POST /analyze` with:
-   - the frozen PNG
-   - custom analysis prompt
-   - blank SVG prompt when only analysis is needed in that view
-3. The backend still executes the same analysis pathway and returns analysis text.
-4. The frontend renders the teacher response, extracts suggested questions, and enables chat input.
-5. Follow-up questions call `POST /chat` with:
-   - current message
-   - prior chat history
-   - original analysis context
-6. Claude returns plain-text follow-up teaching responses.
+The abstraction is local-disk based today but designed so a future move to Supabase Storage is isolated behind one service boundary.
 
-### Calibration flow
+## Database Usage
 
-1. The frontend captures the current canvas and posts it to `/calibrate`.
-2. The backend decodes the image and runs `_find_whiteboard(...)`.
-3. If a quadrilateral is found, the backend returns:
-   - ordered corners
-   - homography matrix
-   - output size
-   - frame size
-4. The frontend stores calibration metadata and performs perspective correction in the browser render loop using triangle-based warping.
+Supabase is used for authentication and persistent user-owned records.
 
-### Gallery/session flow
+### Tables
 
-1. Session creation writes a JSON file immediately.
-2. Captures write PNG files into the session image directory.
-3. Session metadata stores only filenames, not inline image data.
-4. Gallery screens fetch sessions by subject and render image URLs from `/api/images/<filename>`.
-5. Deleting captures or sessions removes both metadata and associated files where present.
+- `public.users`
+- `public.analysis_history`
+- `public.usage_events`
 
-## AI Integration Details
+### Stored data
 
-The web app uses Anthropic Claude multimodal requests with the frozen frame embedded as base64 image content.
+`analysis_history` includes:
 
-Main AI tasks:
+- subject
+- teacher
+- session id
+- board id
+- topic
+- OCR text
+- AI response
+- board SVG
+- uploaded image reference
+- timestamps
 
-- `_gen_svg(...)`: create a clean SVG reconstruction of the whiteboard
-- `_gen_svg_incremental(...)`: update a prior SVG and detect whether the board was erased
-- `_gen_analysis(...)`: explain the lesson in student-friendly text
-- `/chat`: continue tutoring from the original analysis context
+`usage_events` tracks:
 
-Response hardening already present:
+- analyses
+- AI requests
+- OCR requests
+- uploads
 
-- strips Markdown fences from SVG responses
-- strips `<script>` tags from SVG before rendering
-- detects `<!-- NEW_BOARD_DETECTED -->` marker in incremental updates
+## Security Controls
 
-## Frontend State Model
+Implemented controls:
 
-The SPA relies on in-page global state rather than a framework.
+- Google Sign-In through Supabase Auth
+- protected routes and authenticated session gating
+- row-level security in Supabase
+- CSRF validation for unsafe requests
+- request size limits
+- base64 image validation
+- filename sanitization
+- path traversal protection through controlled storage roots
+- per-IP rate limiting
+- per-user daily/monthly quota checks
+- structured request/error/event logging
+- user-facing 403/404/500 pages
+- secure session cookie configuration via env vars
 
-Important state variables include:
+## External Dependencies
 
-- `currentSession`
-- `lastOrigPng`
-- `lastSvgString`
-- `previousSvg`
-- `boardId`
-- `boardFrozen`
-- calibration state such as `calCorners` and `calActive`
-- camera display state such as zoom/pan/filter values
-- chat state such as `chatHistory` and `currentAnalysisContext`
+### Web stack
 
-This keeps the app simple to ship, but couples many features into one large template file.
+- Flask
+- Flask-Limiter
+- Requests
+- OpenCV
+- NumPy
+- python-dotenv
+- Anthropic SDK
+- Supabase JS (loaded in templates)
 
-## Architectural Observations
+### Deployment integrations
 
-### Strengths
+- Supabase Auth
+- Supabase Postgres / REST / RLS
+- Google OAuth
+- optional Redis for distributed rate limiting
 
-- Very small deployment footprint.
-- No database requirement; file-based persistence is easy to back up.
-- Clear separation between local desktop mode and Pi classroom mode.
-- Browser camera capture avoids device-specific native camera code in the web path.
-- Incremental AI board update is a good fit for evolving whiteboard lessons.
+## Operational Notes
 
-### Tradeoffs
-
-- Most frontend logic lives in one large `templates/index.html` file.
-- Session storage is file-based and not designed for concurrent multi-user writes.
-- The web and PyQt paths overlap conceptually but do not share much code.
-- Prompt text and UI logic are tightly coupled to the backend response shape.
-- The Pi requirements are documented and scripted, but the Mac Flask path has no dedicated requirements file separate from the PyQt app.
-
-## Suggested Mental Model
-
-Think of the repository as three layers:
-
-1. Capture/UI layer
-   - browser SPA in `templates/index.html`
-   - or native macOS UI in `main.py`
-2. Processing layer
-   - OpenCV whiteboard detection
-   - frontend canvas transforms
-   - OCR and Smart Board generation in the PyQt path
-3. AI/session layer
-   - Claude multimodal calls
-   - JSON session persistence
-   - PNG gallery assets
-
-For the current web product, `app.py` or `app_pi.py` plus `templates/index.html` are the architectural center of gravity.
+- The web dashboard is now the center of gravity for production use.
+- The PyQt app remains available but is not part of the authenticated public web flow.
+- In-memory caching and in-memory rate limit storage are acceptable for single-instance development, but Redis-backed rate limiting is recommended for multi-instance deployment.

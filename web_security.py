@@ -6,10 +6,11 @@ import binascii
 import json
 import logging
 import os
+import secrets
 import time
 from logging.handlers import RotatingFileHandler
 
-from flask import jsonify, request, g
+from flask import jsonify, request, g, render_template, session
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from werkzeug.exceptions import HTTPException, RequestEntityTooLarge
@@ -93,6 +94,18 @@ def _json_error(message: str, status_code: int):
     return response
 
 
+def _is_api_request():
+    return request.path.startswith("/api/") or request.path in {
+        "/analyze",
+        "/chat",
+        "/save",
+        "/calibrate",
+        "/update-board",
+        "/auth/session",
+        "/auth/logout",
+    }
+
+
 def configure_app_security(app, log_dir: str):
     trust_proxy_count = _env_int("TRUST_PROXY_COUNT", 0)
     if trust_proxy_count > 0:
@@ -106,6 +119,7 @@ def configure_app_security(app, log_dir: str):
     app.config["MAX_IMAGE_BYTES"] = _env_int("MAX_IMAGE_BYTES", DEFAULT_MAX_IMAGE_BYTES)
     app.config["MAX_CONTENT_LENGTH"] = _env_int("MAX_REQUEST_BYTES", DEFAULT_MAX_REQUEST_BYTES)
     app.config["RATELIMIT_HEADERS_ENABLED"] = True
+    app.config["CSRF_EXEMPT_PATHS"] = {"/auth/session"}
 
     limiter = Limiter(
         key_func=get_remote_address,
@@ -126,8 +140,28 @@ def configure_app_security(app, log_dir: str):
 
     logger = setup_request_logging(app, log_dir)
 
+    @app.before_request
+    def _ensure_csrf():
+        if "csrf_token" not in session:
+            session["csrf_token"] = secrets.token_urlsafe(24)
+        if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+            if request.path in app.config["CSRF_EXEMPT_PATHS"]:
+                return None
+            token = request.headers.get("X-CSRF-Token") or request.form.get("csrf_token")
+            if token != session.get("csrf_token"):
+                if _is_api_request():
+                    return _json_error("CSRF validation failed", 403)
+                return render_template("errors/403.html"), 403
+        return None
+
+    @app.context_processor
+    def _inject_security_context():
+        return {"csrf_token": session.get("csrf_token", "")}
+
     @app.errorhandler(RequestEntityTooLarge)
     def _handle_large_request(_err):
+        if not _is_api_request():
+            return render_template("errors/500.html", message="The uploaded request was too large."), 413
         return _json_error(
             f"Request too large. Maximum request size is {app.config['MAX_CONTENT_LENGTH']} bytes.",
             413,
@@ -147,7 +181,21 @@ def configure_app_security(app, log_dir: str):
                 sort_keys=True,
             )
         )
+        if not _is_api_request():
+            return render_template("errors/403.html", message="Too many requests. Please try again later."), 429
         return _json_error("Rate limit exceeded. Please try again later.", 429)
+
+    @app.errorhandler(403)
+    def _handle_forbidden(_err):
+        if _is_api_request():
+            return _json_error("Forbidden", 403)
+        return render_template("errors/403.html"), 403
+
+    @app.errorhandler(404)
+    def _handle_not_found(_err):
+        if _is_api_request():
+            return _json_error("Not found", 404)
+        return render_template("errors/404.html"), 404
 
     @app.errorhandler(Exception)
     def _handle_unexpected_error(err):
@@ -165,15 +213,9 @@ def configure_app_security(app, log_dir: str):
                 sort_keys=True,
             )
         )
-        if request.path.startswith("/api/") or request.path in {
-            "/analyze",
-            "/chat",
-            "/save",
-            "/calibrate",
-            "/update-board",
-        }:
+        if _is_api_request():
             return _json_error("Internal server error", 500)
-        return "Internal server error", 500
+        return render_template("errors/500.html"), 500
 
     return {
         "limiter": limiter,
