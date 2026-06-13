@@ -14,7 +14,6 @@ import numpy as np
 import cv2
 import threading
 import webbrowser
-import tempfile
 import base64
 from concurrent.futures import ThreadPoolExecutor
 
@@ -22,6 +21,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from flask import Flask, request, jsonify, render_template, send_from_directory
+from werkzeug.utils import secure_filename
+
+from web_security import configure_app_security, decode_image_data_url, require_json_payload
 
 # ── Claude ────────────────────────────────────────────────────────────────────
 try:
@@ -45,8 +47,14 @@ def no_cache(response):
 SAVE_DIR     = os.path.expanduser("~/Desktop/VisualAssistCam_Captures")
 SESSIONS_DIR = os.path.expanduser("~/Desktop/VisualAssistCam_Sessions")
 IMAGES_DIR   = os.path.join(SESSIONS_DIR, "images")
-for d in [SAVE_DIR, SESSIONS_DIR, IMAGES_DIR]:
+LOG_DIR      = os.path.expanduser("~/Desktop/VisualAssistCam_Logs")
+for d in [SAVE_DIR, SESSIONS_DIR, IMAGES_DIR, LOG_DIR]:
     os.makedirs(d, exist_ok=True)
+
+SECURITY = configure_app_security(app, LOG_DIR)
+anon_api_quota = SECURITY["anon_api_quota"]
+read_api_limit = SECURITY["read_api_limit"]
+write_api_limit = SECURITY["write_api_limit"]
 
 # ── Session helpers ──────────────────────────────────────────────────────────
 
@@ -83,16 +91,16 @@ def index():
 
 
 @app.route("/analyze", methods=["POST"])
+@anon_api_quota
 def analyze():
-    data = request.get_json(force=True)
-    image_data = data.get("image", "")
-    if not image_data:
-        return jsonify({"svg": "", "analysis": "", "error": "No image"})
+    data, error_response = require_json_payload()
+    if error_response:
+        return error_response
     try:
-        _, encoded = image_data.split(",", 1)
-        image_bytes = base64.b64decode(encoded)
-    except Exception as e:
-        return jsonify({"svg": "", "analysis": "", "error": str(e)})
+        image_bytes, _ = decode_image_data_url(data.get("image", ""),
+                                               app.config["MAX_IMAGE_BYTES"])
+    except ValueError as e:
+        return jsonify({"svg": "", "analysis": "", "error": str(e)}), 400
 
     if not CLAUDE_AVAILABLE:
         return jsonify({"svg": "", "analysis": "Claude API key not configured.",
@@ -110,9 +118,12 @@ def analyze():
 
 
 @app.route("/chat", methods=["POST"])
+@anon_api_quota
 def chat():
     """Continue the lesson conversation with Claude Teacher."""
-    data    = request.get_json(force=True)
+    data, error_response = require_json_payload()
+    if error_response:
+        return error_response
     message = data.get("message", "").strip()
     history = data.get("history", [])   # [{role,content}, ...]
     context = data.get("context", "")   # initial board analysis
@@ -150,17 +161,25 @@ def chat():
 
 
 @app.route("/save", methods=["POST"])
+@anon_api_quota
 def save():
-    data     = request.get_json(force=True)
+    data, error_response = require_json_payload()
+    if error_response:
+        return error_response
     img_data = data.get("image", "")
-    filename = data.get("filename", "capture.png")
-    if not img_data:
-        return jsonify({"ok": False, "error": "No image"})
     try:
-        _, encoded = img_data.split(",", 1)
+        image_bytes, mime_type = decode_image_data_url(img_data, app.config["MAX_IMAGE_BYTES"])
+        ext = {
+            "image/png": ".png",
+            "image/jpeg": ".jpg",
+            "image/webp": ".webp",
+        }[mime_type]
+        filename = secure_filename(data.get("filename", "capture.png")) or f"capture{ext}"
+        if not filename.lower().endswith(ext):
+            filename = f"{os.path.splitext(filename)[0]}{ext}"
         path = os.path.join(SAVE_DIR, filename)
         with open(path, "wb") as f:
-            f.write(base64.b64decode(encoded))
+            f.write(image_bytes)
         return jsonify({"ok": True, "path": path})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)})
@@ -169,16 +188,15 @@ def save():
 # ── Whiteboard calibration (auto-frame + perspective correction) ──────────────
 
 @app.route("/calibrate", methods=["POST"])
+@anon_api_quota
 def calibrate():
     """Detect whiteboard in frame. Returns corners + homography for perspective correction."""
-    data = request.get_json(force=True)
-    img_data = data.get("image", "")
-    if not img_data:
-        return jsonify({"success": False, "error": "No image"})
+    data, error_response = require_json_payload()
+    if error_response:
+        return error_response
     try:
-        _, enc = img_data.split(",", 1)
-        img_bytes = base64.b64decode(enc)
-        nparr = np.frombuffer(img_bytes, np.uint8)
+        image_bytes, _ = decode_image_data_url(data.get("image", ""), app.config["MAX_IMAGE_BYTES"])
+        nparr = np.frombuffer(image_bytes, np.uint8)
         frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         if frame is None:
             return jsonify({"success": False, "error": "Could not decode image"})
@@ -276,9 +294,12 @@ def _order_corners(pts: np.ndarray) -> np.ndarray:
 # ── Board update endpoint (incremental + first-time) ─────────────────────────
 
 @app.route("/update-board", methods=["POST"])
+@anon_api_quota
 def update_board():
     """Update the AI Board. First call generates fresh; subsequent calls update incrementally."""
-    data = request.get_json(force=True)
+    data, error_response = require_json_payload()
+    if error_response:
+        return error_response
     img_data     = data.get("image", "")
     previous_svg = data.get("previous_svg", "")
     svg_prompt   = data.get("svg_prompt", None)
@@ -288,9 +309,8 @@ def update_board():
     if not CLAUDE_AVAILABLE:
         return jsonify({"svg": "", "is_new_board": False, "error": "No API key"})
     try:
-        _, enc = img_data.split(",", 1)
-        image_bytes = base64.b64decode(enc)
-    except Exception as e:
+        image_bytes, _ = decode_image_data_url(img_data, app.config["MAX_IMAGE_BYTES"])
+    except ValueError as e:
         return jsonify({"svg": "", "is_new_board": False, "error": str(e)})
 
     if previous_svg.strip().startswith("<svg"):
@@ -305,13 +325,17 @@ def update_board():
 # ── Session API ──────────────────────────────────────────────────────────────
 
 @app.route("/api/sessions", methods=["GET"])
+@read_api_limit
 def api_sessions():
     return jsonify(_sessions_list())
 
 
 @app.route("/api/sessions", methods=["POST"])
+@write_api_limit
 def api_create_session():
-    data = request.get_json(force=True)
+    data, error_response = require_json_payload()
+    if error_response:
+        return error_response
     s = {
         "id":         str(uuid.uuid4())[:12],
         "subject":    data.get("subject", "Unknown").strip(),
@@ -325,12 +349,14 @@ def api_create_session():
 
 
 @app.route("/api/sessions/<sid>", methods=["GET"])
+@read_api_limit
 def api_get_session(sid):
     s = _session_get(sid)
     return jsonify(s) if s else (jsonify({"error": "Not found"}), 404)
 
 
 @app.route("/api/sessions/<sid>/lock", methods=["POST"])
+@write_api_limit
 def api_toggle_lock(sid):
     s = _session_get(sid)
     if not s:
@@ -341,6 +367,7 @@ def api_toggle_lock(sid):
 
 
 @app.route("/api/sessions/<sid>/capture", methods=["POST"])
+@anon_api_quota
 def api_add_capture(sid):
     s = _session_get(sid)
     if not s:
@@ -348,7 +375,9 @@ def api_add_capture(sid):
     if s.get("locked"):
         return jsonify({"error": "Session is locked"}), 403
 
-    data         = request.get_json(force=True)
+    data, error_response = require_json_payload()
+    if error_response:
+        return error_response
     cap_type     = data.get("capture_type", "explicit")  # explicit | latest_freeze | aiboard
     board_id     = data.get("board_id", 0)
     ts           = datetime.datetime.now()
@@ -391,12 +420,17 @@ def api_add_capture(sid):
 
     def _save_img(key, suffix):
         raw = data.get(key, "")
-        if not raw or "," not in raw:
+        if not raw:
             return None
-        _, enc = raw.split(",", 1)
-        fname = f"{sid}_{cap_id}_{suffix}.png"
+        image_bytes, mime_type = decode_image_data_url(raw, app.config["MAX_IMAGE_BYTES"])
+        ext = {
+            "image/png": ".png",
+            "image/jpeg": ".jpg",
+            "image/webp": ".webp",
+        }[mime_type]
+        fname = f"{sid}_{cap_id}_{suffix}{ext}"
         with open(os.path.join(IMAGES_DIR, fname), "wb") as f:
-            f.write(base64.b64decode(enc))
+            f.write(image_bytes)
         return fname
 
     cap["original_file"] = _save_img("original", "original")
@@ -408,6 +442,7 @@ def api_add_capture(sid):
 
 
 @app.route("/api/sessions/<sid>", methods=["DELETE"])
+@write_api_limit
 def api_delete_session(sid):
     s = _session_get(sid)
     if not s:
@@ -423,6 +458,7 @@ def api_delete_session(sid):
 
 
 @app.route("/api/sessions/<sid>/captures/<cap_id>", methods=["DELETE"])
+@write_api_limit
 def api_delete_capture(sid, cap_id):
     s = _session_get(sid)
     if not s:
@@ -440,6 +476,7 @@ def api_delete_capture(sid, cap_id):
 
 
 @app.route("/api/sessions/by-subject/<subject>", methods=["GET"])
+@read_api_limit
 def api_by_subject(subject):
     all_s = _sessions_list()
     return jsonify([s for s in all_s

@@ -1,0 +1,9 @@
+# VisualAssistCam — Flask web app requirements
+# Install with: pip install -r requirements_web.txt
+
+flask>=3.0.0
+flask-limiter>=3.8.0
+anthropic>=0.50.0
+numpy>=1.24.0
+opencv-python>=4.8.0
+python-dotenv>=1.0.0
