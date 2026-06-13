@@ -37,6 +37,126 @@ Protected API routes include:
 bash run.sh
 ```
 
+## Render deployment
+
+### 1. Prepare the repository
+
+1. Push this repository to GitHub.
+2. Make sure `requirements_web.txt` is committed.
+3. Make sure your local `.env` is **not** committed publicly unless you intentionally want those values in git.
+
+### 2. Create the Render web service
+
+1. In Render, click `New +` -> `Web Service`.
+2. Connect the GitHub repository.
+3. Choose the branch you want to deploy.
+4. Use these basic settings:
+   - Runtime: `Python 3`
+   - Build Command: `pip install -r requirements_web.txt`
+   - Start Command: `gunicorn app:app --workers 2 --threads 4 --timeout 120 --bind 0.0.0.0:$PORT`
+
+Recommended:
+
+- Instance type: start with a small instance for testing
+- Auto deploy: enabled for your chosen branch
+
+### 3. Add environment variables in Render
+
+In `Environment`, add these as **secret** environment variables:
+
+- `FLASK_SECRET_KEY`
+- `ANTHROPIC_API_KEY`
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `SESSION_COOKIE_SECURE=true`
+- `TRUST_PROXY_COUNT=1`
+- `VISUALASSISTCAM_DATA_DIR=/var/data/visualassistcam`
+
+Recommended quota and security values:
+
+- `MAX_IMAGE_BYTES=5242880`
+- `MAX_REQUEST_BYTES=8388608`
+- `DAILY_ANALYSES_LIMIT=20`
+- `MONTHLY_ANALYSES_LIMIT=200`
+- `DAILY_UPLOAD_LIMIT=30`
+
+Important:
+
+- Do **not** hardcode these into source files for production.
+- Keep the service role key only in Render secret env vars. It should never be exposed in client-side code.
+
+### 4. Persistent disk
+
+Because this app still uses local file storage for captures, session files, and logs:
+
+1. Add a Render Persistent Disk.
+2. Mount it at:
+
+```text
+/var/data
+```
+
+3. Set:
+
+```text
+VISUALASSISTCAM_DATA_DIR=/var/data/visualassistcam
+```
+
+Without a persistent disk, uploaded files and session JSON files will be lost on redeploy/restart.
+
+### 5. Supabase configuration
+
+Before first deploy:
+
+1. Run [supabase_schema.sql](/Users/rishabhpatni/Downloads/VisualAssistCam/supabase_schema.sql) in Supabase.
+2. Configure Google Auth in Supabase.
+3. Add your Render callback URL to Supabase redirect URLs:
+
+```text
+https://your-render-service.onrender.com/auth/callback
+```
+
+If you later buy and connect `visualassistcam.com`, also add:
+
+```text
+https://visualassistcam.com/auth/callback
+https://www.visualassistcam.com/auth/callback
+```
+
+4. Add the same callback URL to Supabase `Authentication -> URL Configuration`.
+
+### 6. Deploy
+
+1. Trigger the first deploy in Render.
+2. Open the Render URL after deployment completes.
+3. Verify the flow:
+   - `/` shows the landing page
+   - Google sign-in redirects correctly
+   - `/app` loads after login
+   - `/history` and `/settings` are accessible when signed in
+   - unauthenticated access redirects back to `/`
+
+### 7. Post-deploy checks
+
+Verify:
+
+- sign-in works with Google
+- Supabase history rows are created per user
+- quota widgets load on the dashboard
+- uploaded images persist after a restart
+- CSRF-protected POST routes still work from the UI
+- logs are being written under the mounted disk path
+
+### 8. Optional production improvements
+
+After initial Render deployment, consider:
+
+- using `gunicorn app:app` as the start command instead of Flask’s built-in server
+- moving rate-limit storage from memory to Redis
+- moving local file storage to Supabase Storage or S3
+- adding uptime monitoring and alerting
+
 ## Raspberry Pi deployment
 
 1. Run:
@@ -65,3 +185,4 @@ bash run_pi.sh
 - Supabase redirect URLs must exactly match the deployed callback URL.
 - The logout button clears both the browser Supabase session and the Flask session.
 - The dashboard quota widgets depend on `usage_events` existing in Supabase.
+- Render should store all secrets in its environment-variable UI, not in checked-in files.
