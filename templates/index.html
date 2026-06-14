@@ -234,6 +234,75 @@ button:hover{background:#fffdf8}
 .sm-logo{text-align:center;margin-bottom:36px}
 .sm-logo h1{font-size:30px;color:#fffaf3;font-weight:300;letter-spacing:2px}
 .sm-logo p{color:#d6c2a8;font-size:13px;margin-top:6px}
+.sm-hero{
+  width:min(960px,100%);
+  display:grid;
+  grid-template-columns:1.08fr .92fr;
+  gap:18px;
+  align-items:stretch;
+  margin-bottom:28px;
+}
+.sm-hero-card{
+  position:relative;
+  overflow:hidden;
+  background:rgba(255,250,243,.1);
+  border:1px solid rgba(255,255,255,.14);
+  border-radius:28px;
+  min-height:240px;
+  box-shadow:0 24px 60px rgba(0,0,0,.2);
+}
+.sm-hero-card img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+}
+.sm-hero-card:after{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:linear-gradient(180deg,rgba(10,18,24,.1),rgba(10,18,24,.45));
+}
+.sm-hero-copy{
+  position:absolute;
+  left:22px;
+  right:22px;
+  bottom:20px;
+  z-index:1;
+}
+.sm-hero-copy strong{
+  display:block;
+  color:#fffaf3;
+  font-size:28px;
+  line-height:1;
+  margin-bottom:10px;
+}
+.sm-hero-copy p{
+  color:rgba(255,250,243,.84);
+  line-height:1.65;
+  max-width:34ch;
+}
+.sm-side{
+  display:grid;
+  gap:14px;
+}
+.sm-side-card{
+  background:rgba(255,250,243,.92);
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:22px;
+  padding:18px 20px;
+  box-shadow:0 18px 42px rgba(0,0,0,.14);
+}
+.sm-side-card strong{
+  display:block;
+  color:var(--ink);
+  font-size:17px;
+  margin-bottom:8px;
+}
+.sm-side-card p{
+  color:var(--ink-soft);
+  line-height:1.65;
+}
 .sm-home{display:flex;gap:20px;flex-wrap:wrap;justify-content:center}
 .sm-card{background:#fffaf3;border:1px solid rgba(255,255,255,.08);border-radius:20px;
   padding:32px 36px;text-align:center;cursor:pointer;min-width:200px;
@@ -341,6 +410,7 @@ button:hover{background:#fffdf8}
   #workspace{flex-direction:column}
   #controls{width:100%;border-left:none;border-top:1px solid #222}
   #originalView{padding:12px}
+  .sm-hero{grid-template-columns:1fr}
 }
 
 /* ── POPUP PANELS ── */
@@ -372,7 +442,27 @@ button:hover{background:#fffdf8}
 <div id="sessionModal">
   <div class="sm-logo">
     <h1>Lumen</h1>
-    <p>Smart classroom assistant</p>
+    <p>Accessible classroom companion</p>
+  </div>
+
+  <div class="sm-hero">
+    <div class="sm-hero-card">
+      <img src="{{ url_for('static', filename='images/classroom-hero.png') }}" alt="Teacher writing on a classroom whiteboard while students sit at desks">
+      <div class="sm-hero-copy">
+        <strong>Enter the class with more clarity.</strong>
+        <p>Start a fresh lesson or return to a previous one without losing the visual context, board flow, or guided support that Lumen builds around each class.</p>
+      </div>
+    </div>
+    <div class="sm-side">
+      <div class="sm-side-card">
+        <strong>Built for real classroom pace</strong>
+        <p>Capture the board before it changes, rebuild it into something more readable, and keep the lesson moving without needing to catch up later.</p>
+      </div>
+      <div class="sm-side-card">
+        <strong>Your classes stay organised</strong>
+        <p>Start a new class when the lesson begins, or reopen a previous class when you want to review, continue, or compare what happened earlier.</p>
+      </div>
+    </div>
   </div>
 
   <!-- Home: two choices -->
@@ -430,8 +520,8 @@ button:hover{background:#fffdf8}
 <!-- ═══════════════ TOP BAR ═══════════════ -->
 <div id="topbar">
   <div class="top-cluster">
-    <button class="tb-btn primary" onclick="window.location.href='/'" title="Go to public home page">Home</button>
-    <button class="tb-btn" onclick="openClassPicker()" title="Open class picker">Classes</button>
+    <button class="tb-btn primary" onclick="openClassPicker()" title="Return to the app start screen">Back</button>
+    <button class="tb-btn" onclick="window.location.href='/'" title="Go to public landing page">Public Home</button>
     <div class="status-pill">
       <span>Class</span>
       <strong id="sessionInfo">No class</strong>

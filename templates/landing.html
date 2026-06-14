@@ -701,7 +701,7 @@ code{
         <a href="#why-lumen-exists">Why Lumen Exists</a>
         <a href="#journey">How it works</a>
         <a href="#founder">Founder</a>
-        <a id="signInLink" href="{% if landing_logged_in %}/app{% else %}#sign-in{% endif %}" data-auth-mode="{% if landing_logged_in %}app{% else %}login{% endif %}">{% if landing_logged_in %}Open App{% else %}Sign in{% endif %}</a>
+        <a id="signInLink" href="{% if landing_logged_in %}#logout{% else %}#sign-in{% endif %}" data-auth-mode="{% if landing_logged_in %}logout{% else %}login{% endif %}">{% if landing_logged_in %}Logout{% else %}Sign in{% endif %}</a>
       </nav>
     </header>
 
@@ -720,7 +720,7 @@ code{
               class="primary-cta"
               data-auth-mode="{% if landing_logged_in %}app{% else %}login{% endif %}"
               {% if not landing_logged_in and not auth_enabled %}disabled{% endif %}
-            >{% if landing_logged_in %}Continue to Dashboard{% else %}Continue with Google{% endif %}</button>
+            >{% if landing_logged_in %}Open App{% else %}Continue with Google{% endif %}</button>
             <a href="#founder" class="secondary-cta">Meet the creator</a>
           </div>
           <p id="status" class="status-message">{% if landing_logged_in %}Signed in{% if landing_user and landing_user.email %} as {{ landing_user.email }}{% endif %}. You can continue straight to your dashboard or explore the home page first.{% elif not auth_enabled %}Supabase Auth is not configured yet. Add the required environment variables to enable login.{% endif %}</p>
@@ -954,11 +954,30 @@ code{
       window.location.href = nextUrl || '/app';
     };
 
+    async function logoutAndReturnHome() {
+      try {
+        if (supabaseUrl && supabaseAnonKey) {
+          const supabase = createClient(supabaseUrl, supabaseAnonKey);
+          await supabase.auth.signOut();
+        }
+      } catch (error) {}
+      try {
+        await fetch('/auth/logout', { method: 'POST' });
+      } catch (error) {}
+      window.location.href = '/';
+    }
+
     if (signInLink && signInLink.dataset.authMode === 'login') {
       signInLink.addEventListener('click', async (event) => {
         event.preventDefault();
         const primaryButton = buttons[0];
         if (primaryButton) primaryButton.click();
+      });
+    } else if (signInLink && signInLink.dataset.authMode === 'logout') {
+      signInLink.addEventListener('click', async (event) => {
+        event.preventDefault();
+        if (statusEl) statusEl.textContent = 'Signing you out...';
+        await logoutAndReturnHome();
       });
     }
 
