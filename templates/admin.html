@@ -59,6 +59,7 @@ textarea{min-height:92px;resize:vertical}
     <div class="brand">Lumen Admin</div>
     <div class="chip" id="adminChip">{{ current_user.email if current_user else '' }}</div>
     <div class="spacer"></div>
+    <button class="btn" onclick="window.location.href='/'">Home</button>
     <button class="btn" onclick="window.location.href='/app'">Back to App</button>
     <button class="btn" onclick="window.location.href='/settings'">Settings</button>
     <button class="btn primary" onclick="logoutUser()">Logout</button>

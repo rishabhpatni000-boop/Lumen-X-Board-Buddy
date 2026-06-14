@@ -700,7 +700,7 @@ code{
         <a href="#solution">Solution</a>
         <a href="#journey">How it works</a>
         <a href="#founder">Founder</a>
-        <a href="#enter">Sign in</a>
+        <a href="{% if landing_logged_in %}/app{% else %}#enter{% endif %}">{% if landing_logged_in %}Open App{% else %}Sign in{% endif %}</a>
       </nav>
     </header>
 
@@ -714,10 +714,15 @@ code{
           </p>
 
           <div class="hero-actions">
-            <button id="googleBtn" class="primary-cta" {% if not auth_enabled %}disabled{% endif %}>Continue with Google</button>
+            <button
+              id="googleBtn"
+              class="primary-cta"
+              data-auth-mode="{% if landing_logged_in %}app{% else %}login{% endif %}"
+              {% if not landing_logged_in and not auth_enabled %}disabled{% endif %}
+            >{% if landing_logged_in %}Continue to Dashboard{% else %}Continue with Google{% endif %}</button>
             <a href="#founder" class="secondary-cta">Meet the creator</a>
           </div>
-          <p id="status" class="status-message">{% if not auth_enabled %}Supabase Auth is not configured yet. Add the required environment variables to enable login.{% endif %}</p>
+          <p id="status" class="status-message">{% if landing_logged_in %}Signed in{% if landing_user and landing_user.email %} as {{ landing_user.email }}{% endif %}. You can continue straight to your dashboard or explore the home page first.{% elif not auth_enabled %}Supabase Auth is not configured yet. Add the required environment variables to enable login.{% endif %}</p>
 
           <div class="hero-notes">
             <article class="note-card">
@@ -935,13 +940,18 @@ code{
           <div class="cta-copy">
             <div class="eyebrow">Enter the app</div>
             <h2>Ready to continue into Lumen?</h2>
-            <p>Sign in to access the protected camera workflow, AI board reconstruction, explanation tools, and your saved session history. The app will take you to <code>/app</code> after authentication.</p>
+            <p>{% if landing_logged_in %}You already have an active session, so you can return directly to the app dashboard from here anytime.{% else %}Sign in to access the protected camera workflow, AI board reconstruction, explanation tools, and your saved session history. The app will take you to <code>/app</code> after authentication.{% endif %}</p>
           </div>
           <div class="cta-panel">
             <h3>Continue to your learning dashboard</h3>
             <p>Authentication keeps each learner's board captures and history private while opening the full classroom workflow inside the app.</p>
-            <button id="googleBtnBottom" class="primary-cta" {% if not auth_enabled %}disabled{% endif %}>Continue with Google</button>
-            <div class="foot">If authentication is not configured yet, the sign-in buttons will remain disabled until the required Supabase environment variables are added.</div>
+            <button
+              id="googleBtnBottom"
+              class="primary-cta"
+              data-auth-mode="{% if landing_logged_in %}app{% else %}login{% endif %}"
+              {% if not landing_logged_in and not auth_enabled %}disabled{% endif %}
+            >{% if landing_logged_in %}Continue to Dashboard{% else %}Continue with Google{% endif %}</button>
+            <div class="foot">{% if landing_logged_in %}Use the dashboard when you want to jump back into the classroom workflow, or stay on this home page when you want context, story, or product information.{% else %}If authentication is not configured yet, the sign-in buttons will remain disabled until the required Supabase environment variables are added.{% endif %}</div>
           </div>
         </div>
       </div>
@@ -961,7 +971,13 @@ code{
       document.getElementById('googleBtnBottom'),
     ].filter(Boolean);
 
-    if (buttons.length && supabaseUrl && supabaseAnonKey) {
+    const goToDashboard = () => {
+      window.location.href = nextUrl || '/app';
+    };
+
+    if (buttons.length && buttons.every((button) => button.dataset.authMode === 'app')) {
+      buttons.forEach((button) => button.addEventListener('click', goToDashboard));
+    } else if (buttons.length && supabaseUrl && supabaseAnonKey) {
       const supabase = createClient(supabaseUrl, supabaseAnonKey);
       const signIn = async () => {
         if (statusEl) statusEl.textContent = 'Redirecting to Google...';

@@ -217,13 +217,14 @@ def landing_founder_photo_url():
 
 @app.route("/")
 def landing():
-    if current_user():
-        return redirect(url_for("app_dashboard"))
+    user = current_user()
     next_url = safe_next_url(request.args.get("next"))
     return render_template(
         "landing.html",
         claude_available=CLAUDE_AVAILABLE,
         founder_photo_url=landing_founder_photo_url(),
+        landing_logged_in=bool(user),
+        landing_user=user,
         **template_auth_context("auth_callback", next_url=next_url),
     )
 

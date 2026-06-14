@@ -405,7 +405,8 @@ button:hover{background:#2e2e2e}
 <!-- ═══════════════ TOP BAR ═══════════════ -->
 <div id="topbar">
   <div class="top-cluster">
-    <button class="tb-btn primary" onclick="goHome()" title="Go to session picker">Home</button>
+    <button class="tb-btn primary" onclick="window.location.href='/'" title="Go to public home page">Home</button>
+    <button class="tb-btn" onclick="openClassPicker()" title="Open class picker">Classes</button>
     <div class="status-pill">
       <span>Class</span>
       <strong id="sessionInfo">No class</strong>
@@ -705,6 +706,10 @@ button:hover{background:#2e2e2e}
     <button class="panel-close" onclick="closePanels()">✕</button>
   </div>
   <div class="panel-grid">
+    <button class="panel-tile" onclick="window.location.href='/'">
+      <strong>Home</strong>
+      <span>Return to the public landing page.</span>
+    </button>
     <button class="panel-tile" onclick="window.location.href='/app'">
       <strong>Dashboard</strong>
       <span>Open your main account dashboard.</span>
@@ -997,8 +1002,8 @@ function _syncLockBtn() {
   }
 }
 
-// ── Home ─────────────────────────────────────────
-function goHome() {
+// ── Class picker ─────────────────────────────────
+function openClassPicker() {
   closePanels();
   // Stop auto-freeze before going home
   stopAutoFreeze();
