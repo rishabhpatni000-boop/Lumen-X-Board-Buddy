@@ -832,36 +832,73 @@ def _admin_auth_users() -> list[dict]:
     return payload.get("users", [])
 
 
+def _admin_try_fetch(fetcher, default):
+    try:
+        return fetcher(), None
+    except Exception as e:
+        return default, str(e)
+
+
 @app.route("/api/admin/overview", methods=["GET"])
 @read_api_limit
 @admin_required_api
 def api_admin_overview():
-    profile_rows, _ = _admin_rest_get("/rest/v1/users", [
-        ("select", "id,email,full_name,created_at"),
-        ("order", "created_at.desc"),
-    ])
-    try:
-        auth_users = _admin_auth_users()
-    except Exception:
-        auth_users = []
-    overrides, _ = _admin_rest_get("/rest/v1/user_quota_overrides", [
-        ("select", "user_id,daily_analyses_limit,monthly_analyses_limit,daily_upload_limit,notes,updated_at"),
-    ])
-    surveys, _ = _admin_rest_get("/rest/v1/admin_surveys", [
-        ("select", "id,title,feature_key,status,target_user_id,target_email,created_at"),
-        ("order", "created_at.desc"),
-        ("limit", "20"),
-    ])
-    history, _ = _admin_rest_get("/rest/v1/analysis_history", [
-        ("select", "user_id,created_at"),
-        ("order", "created_at.desc"),
-        ("limit", "5000"),
-    ])
-    usage, _ = _admin_rest_get("/rest/v1/usage_events", [
-        ("select", "user_id,event_type,created_at"),
-        ("order", "created_at.desc"),
-        ("limit", "5000"),
-    ])
+    warnings = []
+    profile_rows, err = _admin_try_fetch(
+        lambda: _admin_rest_get("/rest/v1/users", [
+            ("select", "id,email,full_name,created_at"),
+            ("order", "created_at.desc"),
+        ])[0],
+        [],
+    )
+    if err:
+        warnings.append(f"profiles: {err}")
+
+    auth_users, err = _admin_try_fetch(_admin_auth_users, [])
+    if err:
+        warnings.append(f"auth_users: {err}")
+
+    overrides, err = _admin_try_fetch(
+        lambda: _admin_rest_get("/rest/v1/user_quota_overrides", [
+            ("select", "user_id,daily_analyses_limit,monthly_analyses_limit,daily_upload_limit,notes,updated_at"),
+        ])[0],
+        [],
+    )
+    if err:
+        warnings.append(f"quota_overrides: {err}")
+
+    surveys, err = _admin_try_fetch(
+        lambda: _admin_rest_get("/rest/v1/admin_surveys", [
+            ("select", "id,title,feature_key,status,target_user_id,target_email,created_at"),
+            ("order", "created_at.desc"),
+            ("limit", "20"),
+        ])[0],
+        [],
+    )
+    if err:
+        warnings.append(f"surveys: {err}")
+
+    history, err = _admin_try_fetch(
+        lambda: _admin_rest_get("/rest/v1/analysis_history", [
+            ("select", "user_id,created_at"),
+            ("order", "created_at.desc"),
+            ("limit", "5000"),
+        ])[0],
+        [],
+    )
+    if err:
+        warnings.append(f"history: {err}")
+
+    usage, err = _admin_try_fetch(
+        lambda: _admin_rest_get("/rest/v1/usage_events", [
+            ("select", "user_id,event_type,created_at"),
+            ("order", "created_at.desc"),
+            ("limit", "5000"),
+        ])[0],
+        [],
+    )
+    if err:
+        warnings.append(f"usage: {err}")
 
     profile_map = {item["id"]: item for item in profile_rows}
     override_map = {item["user_id"]: item for item in overrides}
@@ -913,6 +950,7 @@ def api_admin_overview():
         "admin_email": (current_user() or {}).get("email", ""),
         "users": users_payload,
         "surveys": surveys,
+        "warnings": warnings,
         "defaults": {
             "daily_analyses": QUOTAS.daily_analyses_limit,
             "monthly_analyses": QUOTAS.monthly_analyses_limit,

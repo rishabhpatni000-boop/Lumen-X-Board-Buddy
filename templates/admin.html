@@ -286,6 +286,11 @@ textarea{min-height:92px;resize:vertical}
       adminState = data;
       renderUsers();
       renderSurveys();
+      if ((data.warnings || []).length) {
+        document.getElementById('surveyList').innerHTML =
+          `<div style="color:#e8b07a;margin-bottom:12px">Warnings:<br>${data.warnings.map(w => w.replace(/</g,'&lt;')).join('<br>')}</div>` +
+          document.getElementById('surveyList').innerHTML;
+      }
     }
 
     async function saveQuotaOverride() {
