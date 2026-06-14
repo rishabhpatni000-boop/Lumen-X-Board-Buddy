@@ -20,10 +20,12 @@ window.__vacSupabasePromise = (supabaseUrl && supabaseAnonKey)
   --ink-soft:#506172;
   --surface:#fffaf3;
   --surface-strong:#f5ebdc;
+  --surface-soft:#fff6ea;
   --line:rgba(20,33,47,.12);
   --line-strong:rgba(20,33,47,.18);
   --accent:#1e5d72;
   --accent-2:#df8f47;
+  --accent-3:#7fbb8b;
   --shadow:0 24px 60px rgba(38,34,28,.12);
 }
 *{box-sizing:border-box;margin:0;padding:0}
@@ -110,23 +112,23 @@ video{display:none}
 .cmsg{max-width:88%;padding:13px 16px;border-radius:12px;
   font-size:18px;line-height:1.8;white-space:pre-wrap;
   font-family:-apple-system,"Helvetica Neue",Arial,sans-serif}
-.cmsg.teacher{background:#132213;color:#cde8cd;
+.cmsg.teacher{background:var(--surface);color:var(--ink);
   align-self:flex-start;border-bottom-left-radius:3px}
-.cmsg.student{background:#0d2040;color:#b8d0f0;
+.cmsg.student{background:#dfecef;color:#234355;
   align-self:flex-end;border-bottom-right-radius:3px;text-align:right}
 .cmsg-sender{font-size:10px;font-weight:700;letter-spacing:.6px;
-  text-transform:uppercase;margin-bottom:6px;color:#5aaa5a}
+  text-transform:uppercase;margin-bottom:6px;color:var(--accent);font-family:"Trebuchet MS",sans-serif}
 /* Markdown rendered inside teacher bubbles */
 .cmsg.teacher h1,.cmsg.teacher h2,.cmsg.teacher h3{
-  font-size:1em;font-weight:700;margin:.6em 0 .3em;color:#a8d8a8}
-.cmsg.teacher strong{color:#c8f0c8;font-weight:700}
-.cmsg.teacher em{color:#a8c8a8;font-style:italic}
+  font-size:1em;font-weight:700;margin:.6em 0 .3em;color:var(--accent)}
+.cmsg.teacher strong{color:var(--ink);font-weight:700}
+.cmsg.teacher em{color:#6f8090;font-style:italic}
 .cmsg.teacher ul,.cmsg.teacher ol{padding-left:1.4em;margin:.4em 0}
 .cmsg.teacher li{margin:.25em 0}
-.cmsg.teacher code{background:#0d2a0d;border-radius:4px;padding:1px 6px;
-  font-family:monospace;font-size:.92em;color:#88cc88}
+.cmsg.teacher code{background:#eadfce;border-radius:4px;padding:1px 6px;
+  font-family:monospace;font-size:.92em;color:#6c4f2a}
 .cmsg.teacher p{margin:.4em 0}
-.cmsg.teacher hr{border:none;border-top:1px solid #2a4a2a;margin:.6em 0}
+.cmsg.teacher hr{border:none;border-top:1px solid var(--line);margin:.6em 0}
 .typing-dots span{animation:blink 1.2s infinite;display:inline-block;
   font-size:22px;margin:0 1px}
 .typing-dots span:nth-child(2){animation-delay:.2s}
@@ -134,30 +136,30 @@ video{display:none}
 @keyframes blink{0%,80%,100%{opacity:.2}40%{opacity:1}}
 /* Suggested question chips */
 #suggestedQs{flex-shrink:0;padding:8px 14px 6px;
-  border-top:1px solid #1e1e1e;background:#0f0f0f}
-#suggestedQs p{font-size:10px;color:#444;margin-bottom:5px;letter-spacing:.4px;text-transform:uppercase}
-.q-chip{display:inline-block;background:#141e2a;color:#6a9abf;
-  border:1px solid #243344;border-radius:16px;padding:5px 12px;
+  border-top:1px solid var(--line);background:rgba(255,250,243,.86)}
+#suggestedQs p{font-size:10px;color:#7d6a55;margin-bottom:5px;letter-spacing:.4px;text-transform:uppercase;font-family:"Trebuchet MS",sans-serif}
+.q-chip{display:inline-block;background:var(--surface);color:var(--accent);
+  border:1px solid rgba(30,93,114,.18);border-radius:16px;padding:5px 12px;
   font-size:13px;cursor:pointer;margin:3px;transition:background .15s}
-.q-chip:hover{background:#1e2e40}
+.q-chip:hover{background:#f7ebdc}
 /* Chat input */
 #chatInputArea{flex-shrink:0;display:none;gap:8px;padding:10px 12px;
-  border-top:1px solid #1e1e1e;background:#111;align-items:flex-end}
-#chatInput{flex:1;background:#1a1a1a;color:#eee;border:1px solid #2e2e2e;
+  border-top:1px solid var(--line);background:rgba(255,250,243,.9);align-items:flex-end}
+#chatInput{flex:1;background:var(--surface);color:var(--ink);border:1px solid var(--line-strong);
   border-radius:8px;padding:10px 14px;font-size:15px;resize:none;height:52px;
-  font-family:-apple-system,Arial,sans-serif;line-height:1.4}
-#chatInput:focus{outline:none;border-color:#3a5a7a}
-#chatSendBtn{background:#1d4080;color:#fff;border:none;border-radius:8px;
+  font-family:Georgia,"Times New Roman",serif;line-height:1.4}
+#chatInput:focus{outline:none;border-color:rgba(30,93,114,.34)}
+#chatSendBtn{background:linear-gradient(135deg,#1e5d72,#2f7d91);color:#fff;border:none;border-radius:8px;
   padding:0 18px;height:52px;font-size:14px;font-weight:600;cursor:pointer;
   white-space:nowrap;flex-shrink:0}
-#chatSendBtn:hover{background:#2a5a9a}
+#chatSendBtn:hover{background:linear-gradient(135deg,#215f75,#35869a)}
 
 /* ─── OVERLAY STATES (loading / empty) ─── */
 .overlay{position:absolute;inset:0;display:flex;flex-direction:column;
   align-items:center;justify-content:center;z-index:5}
 .overlay.solid{background:rgba(244,239,231,.86)}
-.spinner{width:44px;height:44px;border:4px solid #333;
-  border-top-color:#4a7fc1;border-radius:50%;
+.spinner{width:44px;height:44px;border:4px solid rgba(20,33,47,.16);
+  border-top-color:var(--accent);border-radius:50%;
   animation:spin .8s linear infinite;margin-bottom:14px}
 @keyframes spin{to{transform:rotate(360deg)}}
 .overlay p{color:var(--ink-soft);font-size:14px;text-align:center;max-width:280px;line-height:1.6}
@@ -234,6 +236,9 @@ button:hover{background:#fffdf8}
 .sm-logo{text-align:center;margin-bottom:36px}
 .sm-logo h1{font-size:30px;color:#fffaf3;font-weight:300;letter-spacing:2px}
 .sm-logo p{color:#d6c2a8;font-size:13px;margin-top:6px}
+.sm-toolbar{width:min(960px,100%);display:flex;justify-content:flex-end;margin-bottom:16px}
+.sm-home-link{background:rgba(255,250,243,.92);color:var(--ink);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:10px 16px;cursor:pointer;font-family:"Trebuchet MS",sans-serif;font-size:13px;font-weight:600;box-shadow:0 14px 28px rgba(0,0,0,.12)}
+.sm-home-link:hover{background:#fffdf8}
 .sm-hero{
   width:min(960px,100%);
   display:grid;
@@ -408,7 +413,7 @@ button:hover{background:#fffdf8}
 }
 @media (max-width: 900px){
   #workspace{flex-direction:column}
-  #controls{width:100%;border-left:none;border-top:1px solid #222}
+  #controls{width:100%;border-left:none;border-top:1px solid var(--line)}
   #originalView{padding:12px}
   .sm-hero{grid-template-columns:1fr}
 }
@@ -440,6 +445,9 @@ button:hover{background:#fffdf8}
 
 <!-- ═══════════════ SESSION MODAL ═══════════════ -->
 <div id="sessionModal">
+  <div class="sm-toolbar">
+    <button class="sm-home-link" onclick="window.location.href='/'">Home</button>
+  </div>
   <div class="sm-logo">
     <h1>Lumen</h1>
     <p>Accessible classroom companion</p>
@@ -520,8 +528,8 @@ button:hover{background:#fffdf8}
 <!-- ═══════════════ TOP BAR ═══════════════ -->
 <div id="topbar">
   <div class="top-cluster">
+    <button class="tb-btn" onclick="window.location.href='/'" title="Go to public landing page">Home</button>
     <button class="tb-btn primary" onclick="openClassPicker()" title="Return to the app start screen">Back</button>
-    <button class="tb-btn" onclick="window.location.href='/'" title="Go to public landing page">Public Home</button>
     <div class="status-pill">
       <span>Class</span>
       <strong id="sessionInfo">No class</strong>
@@ -601,11 +609,11 @@ button:hover{background:#fffdf8}
     <!-- loading -->
     <div id="boardLoading" class="overlay solid" style="display:none">
       <div class="spinner"></div>
-      <p>Claude is recreating the whiteboard…<br><small style="color:#444">(~5 seconds)</small></p>
+      <p>Claude is recreating the whiteboard…<br><small style="color:#7a6855">(~5 seconds)</small></p>
     </div>
     <!-- empty state -->
     <div id="boardEmpty" class="overlay">
-      <p style="color:#3a3a3a;font-size:15px">Press <strong style="color:#555">Space</strong> to freeze a frame<br>and generate the AI Board</p>
+      <p style="color:var(--ink-soft);font-size:15px">Press <strong style="color:var(--accent)">Space</strong> to freeze a frame<br>and generate the AI Board</p>
     </div>
   </div>
 
@@ -613,25 +621,25 @@ button:hover{background:#fffdf8}
   <div id="aiAnalysisView">
     <div id="chatEmpty">
       <div style="text-align:center">
-        <p style="color:#333;font-size:15px;line-height:1.8;margin-bottom:16px">
-          Freeze a frame first, then tap <strong style="color:#555">Analyse Board</strong>
+        <p style="color:var(--ink-soft);font-size:15px;line-height:1.8;margin-bottom:16px">
+          Freeze a frame first, then tap <strong style="color:var(--accent)">Analyse Board</strong>
         </p>
         <button id="analyseNowBtn" onclick="runTextAnalysis()"
-          style="background:#1d4080;color:#fff;border:none;border-radius:8px;
+          style="background:linear-gradient(135deg,#1e5d72,#2f7d91);color:#fff;border:none;border-radius:12px;
                  padding:12px 24px;font-size:15px;font-weight:600;cursor:pointer;
-                 opacity:0.4;pointer-events:none">
+                 opacity:0.4;pointer-events:none;box-shadow:0 14px 28px rgba(38,34,28,.12)">
           📖 Analyse Board
         </button>
       </div>
     </div>
     <div id="analyseBarWrapper" style="display:none;flex-shrink:0;padding:8px 12px;
-      border-bottom:1px solid #1e1e1e;background:#0f0f0f">
+      border-bottom:1px solid var(--line);background:rgba(255,250,243,.88)">
       <button onclick="runTextAnalysis()"
-        style="background:#1d4080;color:#fff;border:none;border-radius:6px;
+        style="background:linear-gradient(135deg,#1e5d72,#2f7d91);color:#fff;border:none;border-radius:10px;
                padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer">
         📖 Analyse Board
       </button>
-      <span style="font-size:11px;color:#444;margin-left:10px">Ask Claude to explain what's on the board</span>
+      <span style="font-size:11px;color:#7a6855;margin-left:10px">Ask Claude to explain what's on the board</span>
     </div>
     <div id="chatMessages"></div>
     <div id="suggestedQs" style="display:none">
@@ -650,7 +658,7 @@ button:hover{background:#fffdf8}
   <div id="galleryView">
     <div id="galleryHeader">
       <span id="galleryTitle">Gallery</span>
-      <span id="galleryCount" style="margin-left:auto;color:#444;font-size:12px"></span>
+      <span id="galleryCount" style="margin-left:auto;color:#7a6855;font-size:12px"></span>
     </div>
     <div id="galleryGrid">
       <div class="gcap-empty">Freeze a frame to start capturing — your saves will appear here.</div>
