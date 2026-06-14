@@ -276,6 +276,13 @@ textarea{min-height:92px;resize:vertical}
     async function loadOverview() {
       const resp = await fetch('/api/admin/overview');
       const data = await resp.json();
+      if (!resp.ok) {
+        document.getElementById('userRows').innerHTML =
+          `<tr><td colspan="4" class="muted" style="color:#e49a9a">Could not load users: ${data.details || data.error || 'Unknown error'}</td></tr>`;
+        document.getElementById('surveyList').textContent =
+          `Could not load admin data: ${data.details || data.error || 'Unknown error'}`;
+        return;
+      }
       adminState = data;
       renderUsers();
       renderSurveys();

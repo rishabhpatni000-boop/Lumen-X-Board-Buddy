@@ -130,8 +130,35 @@ def fetch_supabase_user(access_token: str):
     return resp.json()
 
 
+def sync_user_profile(access_token: str, user: dict):
+    cfg = supabase_config()
+    if not cfg["url"] or not cfg["anon_key"]:
+        return
+    payload = {
+        "id": user["id"],
+        "email": user.get("email", ""),
+        "full_name": (user.get("user_metadata") or {}).get("full_name", ""),
+        "avatar_url": (user.get("user_metadata") or {}).get("avatar_url", ""),
+    }
+    resp = requests.post(
+        f"{cfg['url']}/rest/v1/users",
+        headers={
+            **_supabase_rest_headers(access_token),
+            "Prefer": "resolution=merge-duplicates,return=representation",
+        },
+        json=payload,
+        timeout=15,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
 def store_session_from_token(access_token: str):
     user = fetch_supabase_user(access_token)
+    try:
+        sync_user_profile(access_token, user)
+    except Exception:
+        pass
     session["supabase_access_token"] = access_token
     session["user"] = {
         "id": user["id"],

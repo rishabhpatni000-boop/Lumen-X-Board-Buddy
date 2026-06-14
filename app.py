@@ -822,7 +822,10 @@ def api_admin_overview():
         ("select", "id,email,full_name,created_at"),
         ("order", "created_at.desc"),
     ])
-    auth_users = _admin_auth_users()
+    try:
+        auth_users = _admin_auth_users()
+    except Exception:
+        auth_users = []
     overrides, _ = _admin_rest_get("/rest/v1/user_quota_overrides", [
         ("select", "user_id,daily_analyses_limit,monthly_analyses_limit,daily_upload_limit,notes,updated_at"),
     ])
@@ -862,7 +865,8 @@ def api_admin_overview():
             entry["last_analysis_at"] = item["created_at"]
 
     users_payload = []
-    for auth_user in auth_users:
+    source_users = auth_users or [{"id": row["id"], "email": row.get("email"), "created_at": row.get("created_at"), "user_metadata": {"full_name": row.get("full_name")}} for row in profile_rows]
+    for auth_user in source_users:
         profile = profile_map.get(auth_user["id"], {})
         user = {
             "id": auth_user["id"],
