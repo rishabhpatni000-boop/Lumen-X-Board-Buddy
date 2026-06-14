@@ -19,20 +19,28 @@ html,body{height:100%;background:#111;color:#eee;
   overflow:hidden;display:flex;flex-direction:column}
 
 /* ── TOP BAR ── */
-#topbar{display:flex;align-items:center;gap:8px;padding:5px 12px;
-  background:#181818;border-bottom:1px solid #282828;height:46px;flex-shrink:0}
-#topbar label{font-size:12px;color:#888;white-space:nowrap}
-#topbar select{background:#222;color:#eee;border:1px solid #3a3a3a;
-  padding:3px 8px;border-radius:4px;font-size:12px;height:28px}
+#topbar{display:flex;align-items:center;gap:10px;padding:8px 14px;
+  background:#161616;border-bottom:1px solid #282828;min-height:58px;flex-shrink:0;flex-wrap:wrap}
+.top-cluster{display:flex;align-items:center;gap:8px;min-width:0;flex-wrap:wrap}
+#topbar label{font-size:11px;color:#777;white-space:nowrap;text-transform:uppercase;letter-spacing:.4px}
+#topbar select{background:#202020;color:#eee;border:1px solid #343434;
+  padding:3px 10px;border-radius:8px;font-size:12px;height:34px}
 .tb-spacer{flex:1}
-.tb-btn{background:#252525;color:#ccc;border:1px solid #3a3a3a;
-  border-radius:5px;cursor:pointer;font-size:12px;padding:4px 10px;
-  height:28px;white-space:nowrap;transition:background .15s}
-.tb-btn:hover{background:#333}
+.tb-btn{background:#232323;color:#d6d6d6;border:1px solid #343434;
+  border-radius:10px;cursor:pointer;font-size:12px;padding:0 13px;
+  height:34px;white-space:nowrap;transition:all .15s}
+.tb-btn:hover{background:#2d2d2d;border-color:#454545}
+.tb-btn.primary{background:#18345f;border-color:#285089;color:#e8f1ff}
+.tb-btn.primary:hover{background:#214776}
+.tb-btn.ghost{background:transparent}
+.status-pill{display:flex;align-items:center;gap:8px;background:#10161d;border:1px solid #233243;
+  border-radius:999px;padding:0 12px;height:34px;min-width:0}
+.status-pill strong{font-size:12px;color:#dbe8f7;font-weight:600;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.status-pill span{font-size:11px;color:#6f89a4;text-transform:uppercase;letter-spacing:.5px}
 
 /* ── VIEW TOGGLE (segmented) ── */
-.view-seg{display:flex;border:1px solid #3a3a3a;border-radius:7px;
-  overflow:hidden;height:32px;flex-shrink:0}
+.view-seg{display:flex;border:1px solid #313131;border-radius:10px;
+  overflow:hidden;height:34px;flex-shrink:0;background:#121212}
 .view-seg button{background:#1e1e1e;color:#888;border:none;
   border-right:1px solid #3a3a3a;cursor:pointer;
   font-size:12px;padding:0 16px;transition:all .15s;white-space:nowrap}
@@ -41,12 +49,13 @@ html,body{height:100%;background:#111;color:#eee;
 .view-seg button:hover:not(.active){background:#2a2a2a;color:#ddd}
 
 /* ── MAIN AREA ── */
-#mainArea{flex:1;position:relative;overflow:hidden;background:#0a0a0a;min-height:0}
+#mainArea{flex:1;position:relative;overflow:hidden;background:#080808;min-height:0}
 
 /* ─── ORIGINAL VIEW ─── */
 #originalView{position:absolute;inset:0;display:flex;
-  align-items:center;justify-content:center}
-#mainCanvas{cursor:grab;display:block}
+  align-items:center;justify-content:center;padding:18px}
+#mainCanvas{cursor:grab;display:block;max-width:100%;max-height:100%;
+  border-radius:18px;background:#050505;box-shadow:0 18px 50px rgba(0,0,0,.45)}
 #mainCanvas.dragging{cursor:grabbing}
 video{display:none}
 #frozenBadge{display:none;position:absolute;top:10px;left:50%;
@@ -138,12 +147,22 @@ video{display:none}
 #mainArea{flex:1;position:relative;overflow:hidden;background:#0a0a0a;min-width:0}
 
 /* ── CONTROLS sidebar ── */
-#controls{width:200px;flex-shrink:0;display:flex;flex-direction:column;
-  gap:6px;padding:8px 8px;background:#151515;border-left:1px solid #222;
+#controls{width:230px;flex-shrink:0;display:flex;flex-direction:column;
+  gap:10px;padding:14px 12px;background:#121212;border-left:1px solid #222;
   overflow-y:auto;overflow-x:hidden}
 fieldset{border:1px solid #252525;border-radius:6px;
   padding:5px 7px 7px;min-width:0;width:100%}
 legend{font-size:10px;color:#555;padding:0 3px;letter-spacing:.2px}
+.essentials-card{background:#171717;border:1px solid #272727;border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:12px}
+.control-stack{display:flex;flex-direction:column;gap:8px}
+.control-row{display:flex;gap:8px;align-items:center}
+.core-btn{height:42px;border-radius:12px;font-size:13px;font-weight:600}
+.core-btn.flex{flex:1}
+.mini-btn{height:38px;border-radius:10px;font-size:12px}
+.section-title{font-size:11px;color:#7f8ea1;text-transform:uppercase;letter-spacing:.7px}
+.move-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.move-pad button{height:40px;border-radius:10px;font-size:14px}
+.quick-note{font-size:11px;color:#5d5d5d;line-height:1.5}
 
 /* ── BUTTONS ── */
 button{background:#242424;color:#ddd;border:1px solid #333;
@@ -190,6 +209,7 @@ button:hover{background:#2e2e2e}
 .sm-card{background:#161e2a;border:1px solid #2a3a4a;border-radius:14px;
   padding:32px 36px;text-align:center;cursor:pointer;min-width:200px;
   transition:all .2s}
+.sm-card{appearance:none;color:inherit;font:inherit}
 .sm-card:hover{background:#1e2c3e;border-color:#3a5a7a;transform:translateY(-2px)}
 .sm-card .icon{font-size:44px;margin-bottom:12px}
 .sm-card h2{font-size:18px;color:#ddd;margin-bottom:6px}
@@ -269,7 +289,7 @@ button:hover{background:#2e2e2e}
 #lockBtn.locked{background:#2a1a0a;color:#ca8a2a;border-color:#4a3a1a}
 #authUser{font-size:12px;color:#8eaed3;white-space:nowrap;max-width:220px;
   overflow:hidden;text-overflow:ellipsis;padding:0 4px}
-#dashboardBar{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;
+#dashboardBar{display:none;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;
   padding:10px 12px;background:#10161d;border-bottom:1px solid #1f2b36}
 .dash-card{background:#131d27;border:1px solid #223243;border-radius:12px;padding:12px 14px}
 .dash-label{font-size:11px;color:#6f89a4;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
@@ -284,6 +304,37 @@ button:hover{background:#2e2e2e}
 @media (max-width: 640px){
   #dashboardBar{grid-template-columns:1fr}
 }
+@media (max-width: 1180px){
+  #topbar{padding:10px}
+  #controls{width:210px}
+}
+@media (max-width: 900px){
+  #workspace{flex-direction:column}
+  #controls{width:100%;border-left:none;border-top:1px solid #222}
+  #originalView{padding:12px}
+}
+
+/* ── POPUP PANELS ── */
+.panel-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.56);backdrop-filter:blur(2px);
+  z-index:180;display:none}
+.panel-backdrop.open{display:block}
+.floating-panel{position:fixed;top:76px;right:18px;width:min(420px,calc(100vw - 24px));
+  max-height:calc(100vh - 110px);overflow:auto;background:#171717;border:1px solid #2b2b2b;
+  border-radius:20px;box-shadow:0 30px 70px rgba(0,0,0,.45);z-index:190;padding:18px 18px 16px;display:none}
+.floating-panel.open{display:block}
+.panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
+.panel-head h3{font-size:18px;color:#f1f1f1;font-weight:600}
+.panel-head p{font-size:12px;color:#7d8792;line-height:1.5;margin-top:4px}
+.panel-close{width:34px;height:34px;border-radius:10px;font-size:18px}
+.panel-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.panel-tile{background:#111820;border:1px solid #223243;border-radius:14px;padding:14px;cursor:pointer;transition:all .15s;text-align:left}
+.panel-tile:hover{background:#182330;border-color:#314960}
+.panel-tile strong{display:block;color:#edf5ff;font-size:14px;margin-bottom:6px}
+.panel-tile span{display:block;color:#88a0b8;font-size:12px;line-height:1.5}
+.panel-section{padding-top:12px;margin-top:12px;border-top:1px solid #292929}
+.panel-section h4{font-size:11px;color:#70859b;text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px}
+.compact-field{background:#111;border:1px solid #2a2a2a;border-radius:12px;padding:12px}
+.compact-field .srow:last-child{margin-bottom:0}
 </style>
 </head>
 <body>
@@ -297,16 +348,16 @@ button:hover{background:#2e2e2e}
 
   <!-- Home: two choices -->
   <div id="smHome" class="sm-home">
-    <div class="sm-card" onclick="smShowNew()">
+    <button type="button" id="smNewCard" class="sm-card" onclick="smShowNew()">
       <div class="icon">📚</div>
       <h2>New Class</h2>
       <p>Start a new lesson</p>
-    </div>
-    <div class="sm-card" onclick="smShowPrev()">
+    </button>
+    <button type="button" id="smPrevCard" class="sm-card" onclick="smShowPrev()">
       <div class="icon">📂</div>
       <h2>Previous Classes</h2>
       <p>Resume or review</p>
-    </div>
+    </button>
   </div>
 
   <!-- New class form -->
@@ -349,32 +400,19 @@ button:hover{background:#2e2e2e}
 
 <!-- ═══════════════ TOP BAR ═══════════════ -->
 <div id="topbar">
-  <label>Camera:</label>
-  <select id="camSel" onchange="switchCamera()"></select>
-  <label>Preset:</label>
-  <select id="presetSel" onchange="applyPreset(this.value)">
-    <option value="default">Default</option>
-    <option value="whiteboard">Whiteboard</option>
-    <option value="highcontrast">High Contrast</option>
-    <option value="inverted">Inverted Board</option>
-    <option value="lowglare">Low Glare</option>
-  </select>
-
-  <!-- Home + session info (compact) -->
-  <button onclick="goHome()" title="Go to session picker"
-    style="background:#1d3a6a;color:#7ab4f0;border:1px solid #2a5a9a;
-    border-radius:5px;cursor:pointer;font-size:12px;padding:4px 10px;
-    height:28px;font-weight:600;white-space:nowrap">⌂ Home</button>
-  <span id="sessionInfo" style="font-size:12px;color:#4a7aaa;white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis">No class</span>
-  <button id="lockBtn" onclick="toggleLock()" title="Lock/Unlock" style="display:none;background:#1a2a1a;color:#5a9a5a;border:1px solid #2a4a2a;border-radius:5px;cursor:pointer;font-size:13px;padding:0 8px;height:28px">🔓</button>
-  <button id="newBoardBtn" onclick="confirmNewBoard()" title="Start fresh board"
-    style="display:none;background:#2a1a00;color:#ca8a2a;border:1px solid #4a3a1a;
-    border-radius:5px;cursor:pointer;font-size:12px;padding:0 8px;height:28px">🆕</button>
-  <span id="authUser">{{ current_user.email if current_user else '' }}</span>
+  <div class="top-cluster">
+    <button class="tb-btn primary" onclick="goHome()" title="Go to session picker">Home</button>
+    <div class="status-pill">
+      <span>Class</span>
+      <strong id="sessionInfo">No class</strong>
+    </div>
+    <button id="lockBtn" onclick="toggleLock()" title="Lock/Unlock" style="display:none;background:#1a2a1a;color:#5a9a5a;border:1px solid #2a4a2a;border-radius:10px;cursor:pointer;font-size:13px;padding:0 10px;height:34px">🔓</button>
+    <button id="newBoardBtn" class="tb-btn" onclick="confirmNewBoard()" title="Start fresh board"
+      style="display:none;background:#2a1a00;color:#ca8a2a;border-color:#4a3a1a">New Board</button>
+  </div>
 
   <div class="tb-spacer"></div>
 
-  <!-- 4-way view toggle -->
   <div class="view-seg">
     <button id="btnOrig"     class="active" onclick="setView('orig')"    title="1">📷 Original</button>
     <button id="btnBoard"               onclick="setView('board')"   title="2">🎨 AI Board</button>
@@ -382,13 +420,14 @@ button:hover{background:#2e2e2e}
     <button id="btnGallery"             onclick="setView('gallery')" title="4">🖼️ Gallery</button>
   </div>
 
-  <button class="tb-btn" onclick="window.location.href='/app'" title="Dashboard">Dashboard</button>
-  <button class="tb-btn" onclick="startNewAnalysis()" title="New Analysis">New Analysis</button>
-  <button class="tb-btn" onclick="window.location.href='/history'" title="History">History</button>
-  <button class="tb-btn" onclick="window.location.href='/settings'" title="Settings">Settings</button>
-  <button class="tb-btn" onclick="logoutUser()" title="Logout">Logout</button>
-  <button class="tb-btn" onclick="toggleControls()" title="H">Controls</button>
-  <button class="tb-btn" onclick="toggleFullscreen()" title="F">⛶</button>
+  <div class="tb-spacer"></div>
+
+  <div class="top-cluster">
+    <button class="tb-btn" onclick="togglePanel('aiPanel')" title="AI tools">AI</button>
+    <button class="tb-btn" onclick="togglePanel('cameraPanel')" title="Advanced camera settings">Camera Settings</button>
+    <button class="tb-btn ghost" onclick="togglePanel('menuPanel')" title="Menu">Menu</button>
+    <button class="tb-btn" onclick="toggleFullscreen()" title="F">⛶ Fullscreen</button>
+  </div>
 </div>
 
 <section id="dashboardBar" aria-label="Dashboard summary">
@@ -501,22 +540,117 @@ button:hover{background:#2e2e2e}
 
 <!-- ═══════════════ CONTROLS ═══════════════ -->
 <div id="controls">
+  <div class="essentials-card">
+    <div class="section-title">Essentials</div>
+    <div class="control-stack">
+      <button id="freezeBtn" class="core-btn" onclick="toggleFreeze()">❚❚ Freeze [Space]</button>
+      <button id="captureBtn" class="core-btn" onclick="doCapture()">📷 Snapshot [⌘S]</button>
+      <button class="core-btn" onclick="toggleFullscreen()">⛶ Fullscreen</button>
+    </div>
+  </div>
 
-  <!-- ACTIONS — always visible -->
-  <fieldset style="flex:0 0 auto;min-width:148px">
-    <legend>Actions</legend>
-    <button id="freezeBtn"  class="bigbtn" onclick="toggleFreeze()">❚❚  Freeze  [Space]</button>
-    <button id="captureBtn" class="bigbtn" onclick="doCapture()">📷  Capture  [⌘S]</button>
-  </fieldset>
+  <div id="zoomGroup" class="essentials-card">
+    <div class="control-row" style="justify-content:space-between">
+      <div class="section-title">Zoom</div>
+      <span id="zoomLbl" style="font-size:13px;min-width:38px;text-align:right">1.0×</span>
+    </div>
+    <div class="control-row">
+      <button class="mini-btn" onclick="doZoom(-1)">−</button>
+      <input id="zoomSlider" type="range" min="10" max="100" value="10"
+             oninput="sliderZoom()" style="flex:1;accent-color:#4a6fa5;height:3px">
+      <button class="mini-btn" onclick="doZoom(1)">+</button>
+    </div>
+    <div class="section-title">Move</div>
+    <div class="move-pad">
+      <div></div>
+      <button onclick="doPan(0,-1)">▲</button>
+      <div></div>
+      <button onclick="doPan(-1,0)">◀</button>
+      <button onclick="resetView()" title="Reset">⊙</button>
+      <button onclick="doPan(1,0)">▶</button>
+      <div></div>
+      <button onclick="doPan(0,1)">▼</button>
+      <div></div>
+    </div>
+    <div class="quick-note">Drag to move. Scroll or use +/- to zoom. The camera feed now keeps its natural proportions.</div>
+  </div>
 
-  <!-- AUTO-FREEZE -->
-  <fieldset id="autoFreezeGroup" style="flex:0 0 auto;min-width:130px;border-color:#2a4a2a">
-    <legend>Auto-Freeze</legend>
-    <div style="display:flex;align-items:center;gap:5px;margin-bottom:5px">
-      <label style="font-size:11px;color:#666">Every:</label>
-      <select id="afInterval" onchange="setAutoFreeze()"
-        style="background:#1a1a1a;color:#ccc;border:1px solid #333;
-               border-radius:4px;padding:3px 5px;font-size:11px;flex:1">
+  <div id="fszGroup" class="essentials-card" style="display:none">
+    <div class="section-title">Text Size</div>
+    <div class="fsz-ctrl">
+      <button class="fsz-btn" onclick="chgFont(-2)" style="font-size:17px">A−</button>
+      <span id="fontSizeLbl">20px</span>
+      <button class="fsz-btn" onclick="chgFont(2)"  style="font-size:21px">A+</button>
+    </div>
+  </div>
+
+</div><!-- /controls -->
+
+</div><!-- /workspace -->
+
+<!-- ═══════════════ STATUS ═══════════════ -->
+<div id="statusBar">Ready</div>
+
+<div id="panelBackdrop" class="panel-backdrop" onclick="closePanels()"></div>
+
+<div id="aiPanel" class="floating-panel" aria-hidden="true">
+  <div class="panel-head">
+    <div>
+      <h3>AI Tools</h3>
+      <p>Keep AI actions in one place so the live camera view stays uncluttered.</p>
+    </div>
+    <button class="panel-close" onclick="closePanels()">✕</button>
+  </div>
+  <div class="panel-grid">
+    <button class="panel-tile" onclick="openAiView('board')">
+      <strong>AI Board</strong>
+      <span>Open the cleaned whiteboard view.</span>
+    </button>
+    <button class="panel-tile" onclick="openAiView('analysis')">
+      <strong>AI Analysis</strong>
+      <span>Read or ask questions about the current lesson.</span>
+    </button>
+    <button class="panel-tile" onclick="runTextAnalysisFromPanel()">
+      <strong>Analyse Now</strong>
+      <span>Generate the teaching explanation from the latest frozen frame.</span>
+    </button>
+    <button class="panel-tile" onclick="startNewAnalysisFromPanel()">
+      <strong>Reset Analysis</strong>
+      <span>Clear the current analysis flow and return to the camera.</span>
+    </button>
+  </div>
+</div>
+
+<div id="cameraPanel" class="floating-panel" aria-hidden="true">
+  <div class="panel-head">
+    <div>
+      <h3>Camera Settings</h3>
+      <p>Advanced camera controls live here instead of staying on-screen all the time.</p>
+    </div>
+    <button class="panel-close" onclick="closePanels()">✕</button>
+  </div>
+  <div class="panel-section" style="padding-top:0;margin-top:0;border-top:none">
+    <h4>Camera Source</h4>
+    <div class="control-row">
+      <label for="camSel">Camera</label>
+      <select id="camSel" onchange="switchCamera()" style="flex:1"></select>
+    </div>
+  </div>
+  <div class="panel-section">
+    <h4>Image Preset</h4>
+    <select id="presetSel" onchange="applyPreset(this.value)" style="width:100%">
+      <option value="default">Default</option>
+      <option value="whiteboard">Whiteboard</option>
+      <option value="highcontrast">High Contrast</option>
+      <option value="inverted">Inverted Board</option>
+      <option value="lowglare">Low Glare</option>
+    </select>
+  </div>
+  <div id="autoFreezeGroup" class="panel-section">
+    <h4>Auto-Freeze</h4>
+    <div class="control-row">
+      <label for="afInterval">Every</label>
+      <select id="afInterval" onchange="setAutoFreeze()" style="flex:1">
         <option value="0">Off</option>
         <option value="60">1 min</option>
         <option value="120">2 min</option>
@@ -526,75 +660,69 @@ button:hover{background:#2e2e2e}
     </div>
     <button id="afPauseBtn" onclick="toggleAutoFreezePause()"
       style="display:none;width:100%;background:#1a2a1a;color:#5a8a5a;
-             border:1px solid #2a3a2a;border-radius:5px;cursor:pointer;
-             font-size:11px;padding:4px">⏸ Pause</button>
-    <div id="afStatus" style="font-size:10px;color:#3a5a3a;margin-top:3px;
-      text-align:center;min-height:14px"></div>
-  </fieldset>
-
-  <!-- ZOOM & PAN — Original + AI Board -->
-  <fieldset id="zoomGroup" style="flex:0 0 auto">
-    <legend>Zoom &amp; Pan</legend>
-    <div style="display:flex;align-items:center;gap:5px;margin-bottom:6px">
-      <button class="sq" onclick="doZoom(-1)">−</button>
-      <input id="zoomSlider" type="range" min="10" max="100" value="10"
-             oninput="sliderZoom()" style="flex:1;accent-color:#4a6fa5;height:3px">
-      <button class="sq" onclick="doZoom(1)">+</button>
-      <span id="zoomLbl" style="font-size:13px;min-width:38px;text-align:center">1.0×</span>
-    </div>
-    <div class="dpad">
-      <div></div>
-      <button class="sq" onclick="doPan(0,-1)">▲</button><div></div>
-      <button class="sq" onclick="doPan(-1,0)">◀</button>
-      <button class="sq" onclick="resetView()" title="Reset">⊙</button>
-      <button class="sq" onclick="doPan(1,0)">▶</button>
-      <div></div>
-      <button class="sq" onclick="doPan(0,1)">▼</button><div></div>
-    </div>
-    <div style="font-size:10px;color:#3a3a3a;text-align:center;margin-top:4px">Drag · Scroll to zoom</div>
-  </fieldset>
-
-  <!-- CALIBRATE (Original view only) -->
-  <fieldset id="calibrateGroup" style="flex:0 0 auto;min-width:140px">
-    <legend>Auto-Frame</legend>
+             border:1px solid #2a3a2a;border-radius:10px;cursor:pointer;
+             font-size:11px;padding:8px;margin-top:8px">⏸ Pause</button>
+    <div id="afStatus" style="font-size:11px;color:#5f8664;margin-top:8px;min-height:14px"></div>
+  </div>
+  <div id="calibrateGroup" class="panel-section">
+    <h4>Auto-Frame</h4>
     <button id="calBtn" onclick="calibrateView()"
       style="width:100%;background:#1a2a4a;color:#7ab0e8;
-             border:1px solid #2a4a7a;border-radius:5px;
-             cursor:pointer;font-size:12px;padding:6px 8px;font-weight:600">
+             border:1px solid #2a4a7a;border-radius:10px;
+             cursor:pointer;font-size:12px;padding:10px 12px;font-weight:600">
       📐 Calibrate View
     </button>
-    <div id="calBadge" class="cal-badge">Zoom &amp; pan work normally</div>
-  </fieldset>
-
-  <!-- IMAGE ADJUSTMENTS — Original only -->
-  <fieldset id="imgGroup" style="flex:1">
-    <legend>Image Adjustments</legend>
-    <div class="srow"><label>Brightness</label><input id="brightness" type="range" min="-100" max="100" value="0"   oninput="sv(this,'bV')"><span id="bV"  class="val">0</span></div>
-    <div class="srow"><label>Contrast</label>  <input id="contrast"   type="range" min="50"  max="300" value="100" oninput="sv(this,'cV')"><span id="cV"  class="val">100</span></div>
-    <div class="srow"><label>Saturation</label><input id="saturation" type="range" min="0"   max="200" value="100" oninput="sv(this,'sV')"><span id="sV"  class="val">100</span></div>
-    <div class="srow"><label>Sharpness</label> <input id="sharpness"  type="range" min="0"   max="10"  value="0"   oninput="sv(this,'shV')"><span id="shV" class="val">0</span></div>
-    <div style="display:flex;gap:5px;margin-top:5px">
-      <button id="invertBtn" onclick="toggleInvert()" style="flex:1">Invert [I]</button>
-      <button onclick="resetAll()" style="flex:1">Reset [R]</button>
+    <div id="calBadge" class="cal-badge" style="text-align:left;margin-top:8px">Zoom &amp; pan work normally</div>
+  </div>
+  <div id="imgGroup" class="panel-section">
+    <h4>Image Adjustments</h4>
+    <div class="compact-field">
+      <div class="srow"><label>Brightness</label><input id="brightness" type="range" min="-100" max="100" value="0"   oninput="sv(this,'bV')"><span id="bV"  class="val">0</span></div>
+      <div class="srow"><label>Contrast</label>  <input id="contrast"   type="range" min="50"  max="300" value="100" oninput="sv(this,'cV')"><span id="cV"  class="val">100</span></div>
+      <div class="srow"><label>Saturation</label><input id="saturation" type="range" min="0"   max="200" value="100" oninput="sv(this,'sV')"><span id="sV"  class="val">100</span></div>
+      <div class="srow"><label>Sharpness</label> <input id="sharpness"  type="range" min="0"   max="10"  value="0"   oninput="sv(this,'shV')"><span id="shV" class="val">0</span></div>
+      <div class="control-row" style="margin-top:10px">
+        <button id="invertBtn" onclick="toggleInvert()" class="mini-btn" style="flex:1">Invert [I]</button>
+        <button onclick="resetAll()" class="mini-btn" style="flex:1">Reset [R]</button>
+      </div>
     </div>
-  </fieldset>
+  </div>
+</div>
 
-  <!-- FONT SIZE — AI Analysis only -->
-  <fieldset id="fszGroup" style="display:none;flex:0 0 auto">
-    <legend>Text Size</legend>
-    <div class="fsz-ctrl">
-      <button class="fsz-btn" onclick="chgFont(-2)" style="font-size:17px">A−</button>
-      <span id="fontSizeLbl">20px</span>
-      <button class="fsz-btn" onclick="chgFont(2)"  style="font-size:21px">A+</button>
+<div id="menuPanel" class="floating-panel" aria-hidden="true">
+  <div class="panel-head">
+    <div>
+      <h3>Workspace Menu</h3>
+      <p>Navigation and account actions live here instead of crowding the main bar.</p>
     </div>
-  </fieldset>
-
-</div><!-- /controls -->
-
-</div><!-- /workspace -->
-
-<!-- ═══════════════ STATUS ═══════════════ -->
-<div id="statusBar">Ready</div>
+    <button class="panel-close" onclick="closePanels()">✕</button>
+  </div>
+  <div class="panel-grid">
+    <button class="panel-tile" onclick="window.location.href='/app'">
+      <strong>Dashboard</strong>
+      <span>Open your main account dashboard.</span>
+    </button>
+    <button class="panel-tile" onclick="window.location.href='/history'">
+      <strong>History</strong>
+      <span>Review previous analyses and saves.</span>
+    </button>
+    <button class="panel-tile" onclick="openSettings()">
+      <strong>Prompt Settings</strong>
+      <span>Edit the AI prompts used for board generation and analysis.</span>
+    </button>
+    <button class="panel-tile" onclick="logoutUser()">
+      <strong>Logout</strong>
+      <span>Sign out of VisualAssistCam.</span>
+    </button>
+  </div>
+  <div class="panel-section">
+    <h4>Signed In</h4>
+    <div class="status-pill" style="width:100%;justify-content:space-between">
+      <span>User</span>
+      <strong id="authUser">{{ current_user.email if current_user else '' }}</strong>
+    </div>
+  </div>
+</div>
 
 <!-- ═══════════════ SETTINGS MODAL ═══════════════ -->
 <div id="settingsModal" style="display:none;position:fixed;inset:0;
@@ -843,6 +971,7 @@ function _syncLockBtn() {
 
 // ── Home ─────────────────────────────────────────
 function goHome() {
+  closePanels();
   // Stop auto-freeze before going home
   stopAutoFreeze();
   document.getElementById('sessionModal').style.display = 'flex';
@@ -1289,6 +1418,7 @@ let hasSvg = false;   // track whether we have a previous SVG to show while load
 let view = 'orig';
 let frozen = false, inverted = false, ctrlsShown = true;
 let raf;
+let activePanel = null;
 const csrfToken = {{ csrf_token|tojson }};
 
 // Original zoom / pan
@@ -1337,12 +1467,7 @@ function setView(v) {
   document.getElementById('btnAnalysis').classList.toggle('active',isAnal);
   document.getElementById('btnGallery').classList.toggle('active', isGallery);
 
-  // Show/hide controls
-  document.getElementById('zoomGroup').style.display      = (isOrig||isBoard) ? '' : 'none';
-  document.getElementById('calibrateGroup').style.display = isOrig ? '' : 'none';
-  document.getElementById('imgGroup').style.display       = isOrig ? '' : 'none';
   document.getElementById('fszGroup').style.display       = isAnal ? '' : 'none';
-  // Hide Freeze & Capture in Analysis view (chat input uses Space/Enter)
   document.getElementById('freezeBtn').style.display  = isAnal ? 'none' : '';
   document.getElementById('captureBtn').style.display = isAnal ? 'none' : '';
 
@@ -1351,6 +1476,7 @@ function setView(v) {
   document.getElementById('zoomSlider').value = Math.round(z * 10);
   document.getElementById('zoomLbl').textContent = z.toFixed(1) + '×';
 
+  closePanels();
   if (isOrig) resizeCanvas();
   if (isGallery) loadGallery();
 }
@@ -1398,8 +1524,9 @@ function switchCamera() { startCamera(document.getElementById('camSel').value); 
 
 function resizeCanvas() {
   const va = document.getElementById('originalView');
-  const w  = va.offsetWidth;
-  const h  = va.offsetHeight;
+  const styles = getComputedStyle(va);
+  const w  = va.clientWidth - parseFloat(styles.paddingLeft) - parseFloat(styles.paddingRight);
+  const h  = va.clientHeight - parseFloat(styles.paddingTop) - parseFloat(styles.paddingBottom);
   if (w > 0 && h > 0) { mc.width = w; mc.height = h; }
 }
 
@@ -1585,7 +1712,12 @@ function drawFrame() {
     const maxPX = (vw-srcW)/2, maxPY = (vh-srcH)/2;
     const cpX = Math.max(-maxPX, Math.min(maxPX, panX));
     const cpY = Math.max(-maxPY, Math.min(maxPY, panY));
-    mCtx.drawImage(vid, vw/2-srcW/2+cpX, vh/2-srcH/2+cpY, srcW, srcH, 0, 0, cw, ch);
+    const scale = Math.min(cw / srcW, ch / srcH);
+    const destW = srcW * scale;
+    const destH = srcH * scale;
+    const destX = (cw - destW) / 2;
+    const destY = (ch - destH) / 2;
+    mCtx.drawImage(vid, vw/2-srcW/2+cpX, vh/2-srcH/2+cpY, srcW, srcH, destX, destY, destW, destH);
   }
 
   mCtx.filter = 'none';
@@ -1830,13 +1962,52 @@ function resetAll() {
 // ════════════════════════════════════════════════
 //  UI helpers
 // ════════════════════════════════════════════════
+function togglePanel(panelId) {
+  const panel = document.getElementById(panelId);
+  if (!panel) return;
+  if (activePanel === panelId) {
+    closePanels();
+    return;
+  }
+  closePanels();
+  document.getElementById('panelBackdrop')?.classList.add('open');
+  panel.classList.add('open');
+  panel.setAttribute('aria-hidden', 'false');
+  activePanel = panelId;
+}
+
+function closePanels() {
+  document.getElementById('panelBackdrop')?.classList.remove('open');
+  ['aiPanel', 'cameraPanel', 'menuPanel'].forEach(id => {
+    const panel = document.getElementById(id);
+    if (!panel) return;
+    panel.classList.remove('open');
+    panel.setAttribute('aria-hidden', 'true');
+  });
+  activePanel = null;
+}
+
+function openAiView(targetView) {
+  closePanels();
+  setView(targetView);
+}
+
+function runTextAnalysisFromPanel() {
+  closePanels();
+  runTextAnalysis();
+}
+
+function startNewAnalysisFromPanel() {
+  closePanels();
+  startNewAnalysis();
+}
+
 function toggleControls() {
   ctrlsShown = !ctrlsShown;
-  // Sidebar: flex-column when shown, none when hidden
   document.getElementById('controls').style.display = ctrlsShown ? 'flex' : 'none';
-  // ResizeObserver fires automatically after DOM change
 }
 function toggleFullscreen() {
+  closePanels();
   if (!document.fullscreenElement) document.documentElement.requestFullscreen();
   else document.exitFullscreen();
 }
@@ -1845,6 +2016,7 @@ document.addEventListener('fullscreenchange', () => {
   document.getElementById('topbar').style.display    = fs ? 'none' : '';
   document.getElementById('controls').style.display  = fs ? 'none' : (ctrlsShown ? 'flex' : 'none');
   document.getElementById('statusBar').style.display = fs ? 'none' : '';
+  if (fs) closePanels();
   setTimeout(resizeCanvas, 50);
 });
 function status(msg) { document.getElementById('statusBar').textContent = msg; }
@@ -1897,6 +2069,7 @@ async function loadDashboardSummary() {
 //  Keyboard shortcuts
 // ════════════════════════════════════════════════
 document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && activePanel) { closePanels(); return; }
   if (e.target.tagName==='INPUT' || e.target.tagName==='SELECT' || e.target.tagName==='TEXTAREA') return;
   if ((e.metaKey||e.ctrlKey) && e.key==='s') { e.preventDefault(); doCapture(); return; }
   switch (e.key) {
@@ -2088,6 +2261,7 @@ function chatKeydown(e) {
 //  Settings panel
 // ════════════════════════════════════════════════
 function openSettings() {
+  closePanels();
   document.getElementById('aPromptTA').value = analysisPrompt;
   document.getElementById('bPromptTA').value = boardPrompt;
   document.getElementById('settingsModal').style.display = 'block';
@@ -2106,9 +2280,15 @@ function resetPrompts() {
   document.getElementById('bPromptTA').value = DEFAULT_BOARD_PROMPT;
 }
 
+function bindSessionModalEvents() {
+  document.getElementById('smNewCard')?.addEventListener('click', smShowNew);
+  document.getElementById('smPrevCard')?.addEventListener('click', smShowPrev);
+}
+
 // ════════════════════════════════════════════════
 //  Init
 // ════════════════════════════════════════════════
+bindSessionModalEvents();
 initCameras();
 loadDashboardSummary();
 setView('orig');
