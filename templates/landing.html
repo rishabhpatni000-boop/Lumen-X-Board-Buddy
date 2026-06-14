@@ -698,9 +698,10 @@ code{
       </a>
       <nav class="navlinks" aria-label="Public site">
         <a href="#solution">Solution</a>
+        <a href="#why-lumen-exists">Why Lumen Exists</a>
         <a href="#journey">How it works</a>
         <a href="#founder">Founder</a>
-        <a href="{% if landing_logged_in %}/app{% else %}#enter{% endif %}">{% if landing_logged_in %}Open App{% else %}Sign in{% endif %}</a>
+        <a id="signInLink" href="{% if landing_logged_in %}/app{% else %}#sign-in{% endif %}" data-auth-mode="{% if landing_logged_in %}app{% else %}login{% endif %}">{% if landing_logged_in %}Open App{% else %}Sign in{% endif %}</a>
       </nav>
     </header>
 
@@ -781,7 +782,7 @@ code{
       </div>
     </section>
 
-    <section class="section">
+    <section class="section" id="why-lumen-exists">
       <div class="section-inner">
         <div class="section-head">
           <div>
@@ -813,29 +814,29 @@ code{
             <div class="eyebrow">How it works</div>
             <h2>A simple path from board to understanding.</h2>
           </div>
-          <p>The experience is designed to stay focused on the moment a student needs help most: while the board is still active and the lesson is moving forward.</p>
+          <p>The experience is designed to stay focused on the moment a student needs help most: while the board is still active, the lesson is moving forward, and clarity has to happen quickly without adding friction.</p>
         </div>
 
         <div class="steps-grid">
           <article class="step-card">
             <span class="step-no">01</span>
             <h3>Capture</h3>
-            <p>Use the camera workflow to freeze the board when the right frame appears.</p>
+            <p>Capture the board at the right moment, before details disappear or get replaced by the next part of the lesson.</p>
           </article>
           <article class="step-card">
             <span class="step-no">02</span>
             <h3>Rebuild</h3>
-            <p>Generate a cleaner digital board representation that is easier to inspect.</p>
+            <p>Reconstruct the board into a cleaner digital view that reduces visual noise and makes the written structure easier to follow.</p>
           </article>
           <article class="step-card">
             <span class="step-no">03</span>
             <h3>Explain</h3>
-            <p>Ask for clarification and get structured guidance on what the board content means.</p>
+            <p>Turn the visual content into guided explanation so the student understands not just what was written, but what it means.</p>
           </article>
           <article class="step-card">
             <span class="step-no">04</span>
             <h3>Review</h3>
-            <p>Return to saved sessions later through personal history, not memory alone.</p>
+            <p>Return to saved sessions later through personal history, so revision depends less on memory and more on accessible records.</p>
           </article>
         </div>
       </div>
@@ -934,28 +935,6 @@ code{
       </div>
     </section>
 
-    <section class="section" id="enter">
-      <div class="section-inner">
-        <div class="cta-band">
-          <div class="cta-copy">
-            <div class="eyebrow">Enter the app</div>
-            <h2>Ready to continue into Lumen?</h2>
-            <p>{% if landing_logged_in %}You already have an active session, so you can return directly to the app dashboard from here anytime.{% else %}Sign in to access the protected camera workflow, AI board reconstruction, explanation tools, and your saved session history. The app will take you to <code>/app</code> after authentication.{% endif %}</p>
-          </div>
-          <div class="cta-panel">
-            <h3>Continue to your learning dashboard</h3>
-            <p>Authentication keeps each learner's board captures and history private while opening the full classroom workflow inside the app.</p>
-            <button
-              id="googleBtnBottom"
-              class="primary-cta"
-              data-auth-mode="{% if landing_logged_in %}app{% else %}login{% endif %}"
-              {% if not landing_logged_in and not auth_enabled %}disabled{% endif %}
-            >{% if landing_logged_in %}Continue to Dashboard{% else %}Continue with Google{% endif %}</button>
-            <div class="foot">{% if landing_logged_in %}Use the dashboard when you want to jump back into the classroom workflow, or stay on this home page when you want context, story, or product information.{% else %}If authentication is not configured yet, the sign-in buttons will remain disabled until the required Supabase environment variables are added.{% endif %}</div>
-          </div>
-        </div>
-      </div>
-    </section>
   </div>
 
   <script type="module">
@@ -966,14 +945,22 @@ code{
     const callbackUrl = {{ auth_callback_url|tojson }};
     const nextUrl = {{ next_url|tojson }};
     const statusEl = document.getElementById('status');
+    const signInLink = document.getElementById('signInLink');
     const buttons = [
       document.getElementById('googleBtn'),
-      document.getElementById('googleBtnBottom'),
     ].filter(Boolean);
 
     const goToDashboard = () => {
       window.location.href = nextUrl || '/app';
     };
+
+    if (signInLink && signInLink.dataset.authMode === 'login') {
+      signInLink.addEventListener('click', async (event) => {
+        event.preventDefault();
+        const primaryButton = buttons[0];
+        if (primaryButton) primaryButton.click();
+      });
+    }
 
     if (buttons.length && buttons.every((button) => button.dataset.authMode === 'app')) {
       buttons.forEach((button) => button.addEventListener('click', goToDashboard));
