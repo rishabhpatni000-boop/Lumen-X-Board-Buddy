@@ -70,6 +70,19 @@ create table if not exists public.usage_events (
 create index if not exists usage_events_user_created_idx
     on public.usage_events (user_id, created_at desc);
 
+create table if not exists public.class_sessions (
+    id text primary key,
+    user_id uuid not null references auth.users(id) on delete cascade,
+    subject text,
+    teacher text,
+    created_at timestamptz not null default timezone('utc', now()),
+    locked boolean not null default false,
+    captures jsonb not null default '[]'::jsonb
+);
+
+create index if not exists class_sessions_user_created_idx
+    on public.class_sessions (user_id, created_at desc);
+
 create table if not exists public.user_quota_overrides (
     user_id uuid primary key references auth.users(id) on delete cascade,
     daily_analyses_limit integer,
@@ -94,6 +107,7 @@ create table if not exists public.admin_surveys (
 alter table public.users enable row level security;
 alter table public.analysis_history enable row level security;
 alter table public.usage_events enable row level security;
+alter table public.class_sessions enable row level security;
 alter table public.user_quota_overrides enable row level security;
 alter table public.admin_surveys enable row level security;
 
@@ -145,6 +159,31 @@ create policy "Users can insert their own usage events"
 on public.usage_events
 for insert
 with check (auth.uid() = user_id);
+
+drop policy if exists "Users can view their own class sessions" on public.class_sessions;
+create policy "Users can view their own class sessions"
+on public.class_sessions
+for select
+using (auth.uid() = user_id);
+
+drop policy if exists "Users can insert their own class sessions" on public.class_sessions;
+create policy "Users can insert their own class sessions"
+on public.class_sessions
+for insert
+with check (auth.uid() = user_id);
+
+drop policy if exists "Users can update their own class sessions" on public.class_sessions;
+create policy "Users can update their own class sessions"
+on public.class_sessions
+for update
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+drop policy if exists "Users can delete their own class sessions" on public.class_sessions;
+create policy "Users can delete their own class sessions"
+on public.class_sessions
+for delete
+using (auth.uid() = user_id);
 
 drop policy if exists "Service role manages quota overrides" on public.user_quota_overrides;
 create policy "Service role manages quota overrides"

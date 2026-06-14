@@ -31,6 +31,7 @@ from supabase_integration import (
     count_history_records_this_month,
     clear_auth_session,
     configure_supabase,
+    current_access_token,
     current_user,
     is_admin_user,
     insert_history_record,
@@ -87,7 +88,37 @@ STORAGE.cleanup_temp()
 
 # ── Session helpers ──────────────────────────────────────────────────────────
 
+def _supabase_user_headers():
+    cfg = supabase_config()
+    token = current_access_token()
+    return {
+        "apikey": cfg["anon_key"],
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    }
+
+
+def _use_supabase_session_store() -> bool:
+    cfg = supabase_config()
+    return bool(cfg["url"] and cfg["anon_key"] and current_access_token() and current_user())
+
 def _sessions_list() -> list:
+    if _use_supabase_session_store():
+        try:
+            cfg = supabase_config()
+            resp = requests.get(
+                f"{cfg['url']}/rest/v1/class_sessions",
+                headers=_supabase_user_headers(),
+                params=[
+                    ("select", "id,subject,teacher,created_at,locked,captures"),
+                    ("order", "created_at.desc"),
+                ],
+                timeout=20,
+            )
+            resp.raise_for_status()
+            return resp.json()
+        except Exception:
+            pass
     out = []
     for f in os.listdir(STORAGE.sessions_dir):
         if f.endswith(".json"):
@@ -99,6 +130,24 @@ def _sessions_list() -> list:
     return out
 
 def _session_get(sid: str):
+    if _use_supabase_session_store():
+        try:
+            cfg = supabase_config()
+            resp = requests.get(
+                f"{cfg['url']}/rest/v1/class_sessions",
+                headers=_supabase_user_headers(),
+                params=[
+                    ("select", "id,subject,teacher,created_at,locked,captures"),
+                    ("id", f"eq.{sid}"),
+                    ("limit", "1"),
+                ],
+                timeout=20,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            return data[0] if data else None
+        except Exception:
+            pass
     p = STORAGE.session_json_path(sid)
     if os.path.exists(p):
         with open(p) as f:
@@ -106,6 +155,28 @@ def _session_get(sid: str):
     return None
 
 def _session_save(s: dict):
+    if _use_supabase_session_store():
+        try:
+            cfg = supabase_config()
+            payload = {
+                "id": s["id"],
+                "user_id": (current_user() or {}).get("id"),
+                "subject": s.get("subject"),
+                "teacher": s.get("teacher"),
+                "created_at": s.get("created_at"),
+                "locked": bool(s.get("locked", False)),
+                "captures": s.get("captures", []),
+            }
+            resp = requests.post(
+                f"{cfg['url']}/rest/v1/class_sessions",
+                headers={**_supabase_user_headers(), "Prefer": "resolution=merge-duplicates,return=representation"},
+                json=payload,
+                timeout=20,
+            )
+            resp.raise_for_status()
+            return
+        except Exception:
+            pass
     with open(STORAGE.session_json_path(s["id"]), "w") as f:
         json.dump(s, f, indent=2)
 
@@ -531,7 +602,11 @@ def api_add_capture(sid):
     board_id     = data.get("board_id", 0)
     ts           = datetime.datetime.now()
 
+    using_supabase_sessions = _use_supabase_session_store()
+
     def _delete_old_files(cap):
+        if using_supabase_sessions:
+            return
         for fkey in ("original_file", "aiboard_file"):
             if cap.get(fkey):
                 STORAGE.delete_file("session_images", cap[fkey])
@@ -570,6 +645,8 @@ def api_add_capture(sid):
         raw = data.get(key, "")
         if not raw:
             return None
+        if using_supabase_sessions:
+            return raw
         stored = STORAGE.save_data_url(raw, "session_images", f"{sid}_{cap_id}_{suffix}.png")
         return stored.filename
 
@@ -589,6 +666,19 @@ def api_delete_session(sid):
     s = _session_get(sid)
     if not s:
         return jsonify({"error": "Not found"}), 404
+    if _use_supabase_session_store():
+        try:
+            cfg = supabase_config()
+            resp = requests.delete(
+                f"{cfg['url']}/rest/v1/class_sessions",
+                headers=_supabase_user_headers(),
+                params=[("id", f"eq.{sid}")],
+                timeout=20,
+            )
+            resp.raise_for_status()
+            return jsonify({"ok": True})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
     for cap in s.get("captures", []):
         for fkey in ("original_file", "aiboard_file"):
             if cap.get(fkey):
@@ -609,9 +699,10 @@ def api_delete_capture(sid, cap_id):
     if idx is None:
         return jsonify({"error": "Capture not found"}), 404
     cap = s["captures"].pop(idx)
-    for fkey in ("original_file", "aiboard_file"):
-        if cap.get(fkey):
-            STORAGE.delete_file("session_images", cap[fkey])
+    if not _use_supabase_session_store():
+        for fkey in ("original_file", "aiboard_file"):
+            if cap.get(fkey):
+                STORAGE.delete_file("session_images", cap[fkey])
     _session_save(s)
     return jsonify({"ok": True})
 

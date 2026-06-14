@@ -429,6 +429,9 @@ button:hover{background:#2e2e2e}
   <div class="top-cluster">
     <button class="tb-btn" onclick="togglePanel('aiPanel')" title="AI tools">AI</button>
     <button class="tb-btn" onclick="togglePanel('cameraPanel')" title="Advanced camera settings">Camera Settings</button>
+    {% if is_admin %}
+    <button class="tb-btn primary" onclick="window.location.href='/admin'" title="Admin dashboard">Admin</button>
+    {% endif %}
     <button class="tb-btn ghost" onclick="togglePanel('menuPanel')" title="Menu">Menu</button>
     <button class="tb-btn" onclick="toggleFullscreen()" title="F">⛶ Fullscreen</button>
   </div>
@@ -935,8 +938,9 @@ function smLaunch(session, isResume) {
     if (aiboards.length > 0) {
       const last = aiboards[aiboards.length - 1];
       if (last.aiboard_file) {
+        const boardSrc = captureAssetSrc(last.aiboard_file);
         const sw = document.getElementById('svgWrapper');
-        sw.innerHTML = `<img src="/api/images/${last.aiboard_file}"
+        sw.innerHTML = `<img src="${boardSrc}"
           style="width:100%;height:100%;object-fit:contain;display:block">`;
         hasSvg = true;
         document.getElementById('boardEmpty').style.display  = 'none';
@@ -1263,6 +1267,11 @@ function _capTypeLabel(cap) {
   }
 }
 
+function captureAssetSrc(value) {
+  if (!value) return '';
+  return value.startsWith('data:image/') ? value : `/api/images/${value}`;
+}
+
 async function loadGallery() {
   if (!currentSession) return;
   const grid = document.getElementById('galleryGrid');
@@ -1291,8 +1300,8 @@ async function loadGallery() {
     const d       = new Date(cap.timestamp);
     const dateStr = d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
     const timeStr = d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
-    const origSrc = cap.original_file ? `/api/images/${cap.original_file}` : '';
-    const aiSrc   = cap.aiboard_file  ? `/api/images/${cap.aiboard_file}`  : '';
+    const origSrc = captureAssetSrc(cap.original_file);
+    const aiSrc   = captureAssetSrc(cap.aiboard_file);
     return `
     <div class="gcap-card">
       <!-- 🗑 Delete always visible top-right -->
