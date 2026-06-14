@@ -123,20 +123,30 @@ def _use_supabase_session_store() -> bool:
     cfg = supabase_config()
     return bool(cfg["url"] and cfg["anon_key"] and current_access_token() and current_user())
 
+
+def _session_store_fallback_allowed(error: Exception) -> bool:
+    if isinstance(error, requests.HTTPError) and error.response is not None:
+        return error.response.status_code in (401, 403, 404)
+    return False
+
 def _sessions_list() -> list:
     if _use_supabase_session_store():
-        cfg = supabase_config()
-        resp = requests.get(
-            f"{cfg['url']}/rest/v1/class_sessions",
-            headers=_supabase_user_headers(),
-            params=[
-                ("select", "id,subject,teacher,created_at,locked,captures"),
-                ("order", "created_at.desc"),
-            ],
-            timeout=20,
-        )
-        resp.raise_for_status()
-        return resp.json()
+        try:
+            cfg = supabase_config()
+            resp = requests.get(
+                f"{cfg['url']}/rest/v1/class_sessions",
+                headers=_supabase_user_headers(),
+                params=[
+                    ("select", "id,subject,teacher,created_at,locked,captures"),
+                    ("order", "created_at.desc"),
+                ],
+                timeout=20,
+            )
+            resp.raise_for_status()
+            return resp.json()
+        except Exception as e:
+            if not _session_store_fallback_allowed(e):
+                raise
     out = []
     for f in os.listdir(STORAGE.sessions_dir):
         if f.endswith(".json"):
@@ -149,20 +159,24 @@ def _sessions_list() -> list:
 
 def _session_get(sid: str):
     if _use_supabase_session_store():
-        cfg = supabase_config()
-        resp = requests.get(
-            f"{cfg['url']}/rest/v1/class_sessions",
-            headers=_supabase_user_headers(),
-            params=[
-                ("select", "id,subject,teacher,created_at,locked,captures"),
-                ("id", f"eq.{sid}"),
-                ("limit", "1"),
-            ],
-            timeout=20,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        return data[0] if data else None
+        try:
+            cfg = supabase_config()
+            resp = requests.get(
+                f"{cfg['url']}/rest/v1/class_sessions",
+                headers=_supabase_user_headers(),
+                params=[
+                    ("select", "id,subject,teacher,created_at,locked,captures"),
+                    ("id", f"eq.{sid}"),
+                    ("limit", "1"),
+                ],
+                timeout=20,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            return data[0] if data else None
+        except Exception as e:
+            if not _session_store_fallback_allowed(e):
+                raise
     p = STORAGE.session_json_path(sid)
     if os.path.exists(p):
         with open(p) as f:
@@ -171,16 +185,20 @@ def _session_get(sid: str):
 
 def _session_save(s: dict):
     if _use_supabase_session_store():
-        cfg = supabase_config()
-        payload = _session_payload_for_store(s)
-        resp = requests.post(
-            f"{cfg['url']}/rest/v1/class_sessions",
-            headers={**_supabase_user_headers(), "Prefer": "resolution=merge-duplicates,return=representation"},
-            json=payload,
-            timeout=20,
-        )
-        resp.raise_for_status()
-        return
+        try:
+            cfg = supabase_config()
+            payload = _session_payload_for_store(s)
+            resp = requests.post(
+                f"{cfg['url']}/rest/v1/class_sessions",
+                headers={**_supabase_user_headers(), "Prefer": "resolution=merge-duplicates,return=representation"},
+                json=payload,
+                timeout=20,
+            )
+            resp.raise_for_status()
+            return
+        except Exception as e:
+            if not _session_store_fallback_allowed(e):
+                raise
     with open(STORAGE.session_json_path(s["id"]), "w") as f:
         json.dump(s, f, indent=2)
 
