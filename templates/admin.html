@@ -75,7 +75,6 @@ textarea{min-height:92px;resize:vertical}
     <section class="stats">
       <article class="card"><div class="stat-label">Users</div><div class="stat-value" id="statUsers">0</div></article>
       <article class="card"><div class="stat-label">Admins</div><div class="stat-value" id="statAdmins">0</div></article>
-      <article class="card"><div class="stat-label">Active Surveys</div><div class="stat-value" id="statSurveys">0</div></article>
       <article class="card"><div class="stat-label">Tracked Analyses</div><div class="stat-value" id="statAnalyses">0</div></article>
     </section>
 
@@ -133,52 +132,12 @@ textarea{min-height:92px;resize:vertical}
       </article>
     </section>
 
-    <section class="grid">
-      <article class="card">
-        <h2 class="section-title">Push Feature Survey</h2>
-        <div class="form-grid">
-          <div>
-            <label for="surveyTitle">Title</label>
-            <input id="surveyTitle" type="text" placeholder="Camera fullscreen feedback">
-          </div>
-          <div>
-            <label for="surveyFeature">Feature Key</label>
-            <input id="surveyFeature" type="text" placeholder="fullscreen-ui">
-          </div>
-          <div>
-            <label for="surveyStatus">Status</label>
-            <select id="surveyStatus">
-              <option value="draft">Draft</option>
-              <option value="active">Active</option>
-              <option value="paused">Paused</option>
-            </select>
-          </div>
-          <div>
-            <label for="surveyTargetEmail">Target Email</label>
-            <input id="surveyTargetEmail" type="email" placeholder="Optional specific user">
-          </div>
-        </div>
-        <div style="height:12px"></div>
-        <label for="surveyDescription">Prompt / Survey Description</label>
-        <textarea id="surveyDescription" placeholder="Ask for a rating, feedback, or a short survey about a specific feature."></textarea>
-        <div style="height:12px"></div>
-        <div class="row-actions">
-          <button class="btn primary" onclick="createSurvey()">Create Survey</button>
-        </div>
-        <div id="surveyStatusMsg" class="note" style="margin-top:10px"></div>
-      </article>
-
-      <article class="card">
-        <h2 class="section-title">Recent Surveys</h2>
-        <div id="surveyList" class="note">Loading surveys…</div>
-      </article>
-    </section>
   </main>
 
   <script>
     const csrfToken = {{ csrf_token|tojson }};
     const _nativeFetch = window.fetch.bind(window);
-    let adminState = { users: [], surveys: [], defaults: {} };
+    let adminState = { users: [], defaults: {} };
 
     window.fetch = (input, init = {}) => {
       const method = (init.method || 'GET').toUpperCase();
@@ -260,37 +219,19 @@ textarea{min-height:92px;resize:vertical}
       document.getElementById('quotaNotes').value = override.notes || '';
     }
 
-    function renderSurveys() {
-      const surveys = adminState.surveys || [];
-      document.getElementById('statSurveys').textContent = surveys.filter(item => item.status === 'active').length;
-      document.getElementById('surveyList').innerHTML = surveys.length
-        ? surveys.map(item => `
-            <div style="padding:10px 0;border-bottom:1px solid rgba(126,157,194,.1)">
-              <div><strong>${item.title}</strong> <span class="muted">(${item.status})</span></div>
-              <div class="muted">${item.feature_key || 'no feature key'} · ${item.target_email || 'all users'} · ${formatWhen(item.created_at)}</div>
-            </div>
-          `).join('')
-        : 'No surveys created yet.';
-    }
-
     async function loadOverview() {
       const resp = await fetch('/api/admin/overview');
       const data = await resp.json();
       if (!resp.ok) {
         document.getElementById('userRows').innerHTML =
           `<tr><td colspan="4" class="muted" style="color:#e49a9a">Could not load users: ${data.details || data.error || 'Unknown error'}</td></tr>`;
-        document.getElementById('surveyList').textContent =
-          `Could not load admin data: ${data.details || data.error || 'Unknown error'}`;
         return;
       }
       adminState = data;
       renderUsers();
-      renderSurveys();
-      if ((data.warnings || []).length) {
-        document.getElementById('surveyList').innerHTML =
-          `<div style="color:#e8b07a;margin-bottom:12px">Warnings:<br>${data.warnings.map(w => w.replace(/</g,'&lt;')).join('<br>')}</div>` +
-          document.getElementById('surveyList').innerHTML;
-      }
+      document.getElementById('quotaStatus').textContent = (data.warnings || []).length
+        ? `Warnings: ${data.warnings.join(' | ')}`
+        : '';
     }
 
     async function saveQuotaOverride() {
@@ -309,30 +250,6 @@ textarea{min-height:92px;resize:vertical}
       const data = await resp.json();
       document.getElementById('quotaStatus').textContent = data.ok ? 'Quota override saved.' : (data.error || 'Could not save limits.');
       await loadOverview();
-    }
-
-    async function createSurvey() {
-      const payload = {
-        title: document.getElementById('surveyTitle').value,
-        feature_key: document.getElementById('surveyFeature').value,
-        status: document.getElementById('surveyStatus').value,
-        target_email: document.getElementById('surveyTargetEmail').value,
-        description: document.getElementById('surveyDescription').value
-      };
-      const resp = await fetch('/api/admin/surveys', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(payload)
-      });
-      const data = await resp.json();
-      document.getElementById('surveyStatusMsg').textContent = data.ok ? 'Survey created.' : (data.error || 'Could not create survey.');
-      if (data.ok) {
-        document.getElementById('surveyTitle').value = '';
-        document.getElementById('surveyFeature').value = '';
-        document.getElementById('surveyTargetEmail').value = '';
-        document.getElementById('surveyDescription').value = '';
-        await loadOverview();
-      }
     }
 
     document.getElementById('quotaUser').addEventListener('change', populateQuotaEditor);

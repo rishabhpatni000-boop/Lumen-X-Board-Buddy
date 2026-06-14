@@ -867,17 +867,6 @@ def api_admin_overview():
     if err:
         warnings.append(f"quota_overrides: {err}")
 
-    surveys, err = _admin_try_fetch(
-        lambda: _admin_rest_get("/rest/v1/admin_surveys", [
-            ("select", "id,title,feature_key,status,target_user_id,target_email,created_at"),
-            ("order", "created_at.desc"),
-            ("limit", "20"),
-        ])[0],
-        [],
-    )
-    if err:
-        warnings.append(f"surveys: {err}")
-
     history, err = _admin_try_fetch(
         lambda: _admin_rest_get("/rest/v1/analysis_history", [
             ("select", "user_id,created_at"),
@@ -949,7 +938,6 @@ def api_admin_overview():
     return jsonify({
         "admin_email": (current_user() or {}).get("email", ""),
         "users": users_payload,
-        "surveys": surveys,
         "warnings": warnings,
         "defaults": {
             "daily_analyses": QUOTAS.daily_analyses_limit,
@@ -975,32 +963,6 @@ def api_admin_user_quota(user_id):
     })
     return jsonify({"ok": True, "record": record})
 
-
-@app.route("/api/admin/surveys", methods=["GET", "POST"])
-@write_api_limit
-@admin_required_api
-def api_admin_surveys():
-    if request.method == "GET":
-        data, _ = _admin_rest_get("/rest/v1/admin_surveys", [
-            ("select", "id,title,feature_key,description,status,target_user_id,target_email,created_at"),
-            ("order", "created_at.desc"),
-            ("limit", "100"),
-        ])
-        return jsonify(data)
-
-    data, error_response = require_json_payload()
-    if error_response:
-        return error_response
-    record = _admin_rest_upsert("/rest/v1/admin_surveys", {
-        "title": (data.get("title") or "").strip(),
-        "feature_key": (data.get("feature_key") or "").strip(),
-        "description": (data.get("description") or "").strip(),
-        "status": (data.get("status") or "draft").strip() or "draft",
-        "target_user_id": (data.get("target_user_id") or "").strip() or None,
-        "target_email": (data.get("target_email") or "").strip() or None,
-        "created_by": (current_user() or {}).get("id"),
-    })
-    return jsonify({"ok": True, "record": record})
 
 
 @app.route("/api/history", methods=["GET"])
