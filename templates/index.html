@@ -319,7 +319,7 @@ button:hover{background:#2e2e2e}
 }
 
 /* ── POPUP PANELS ── */
-.panel-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.56);backdrop-filter:blur(2px);
+.panel-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.42);
   z-index:180;display:none}
 .panel-backdrop.open{display:block}
 .floating-panel{position:fixed;top:76px;right:18px;width:min(420px,calc(100vw - 24px));
@@ -1439,6 +1439,7 @@ let frozen = false, inverted = false, ctrlsShown = true;
 let raf;
 let activePanel = null;
 let currentDeviceId = null;
+let lastDrawAt = 0;
 const csrfToken = {{ csrf_token|tojson }};
 
 // Original zoom / pan
@@ -1728,8 +1729,13 @@ function drawWarped(ctx, img, corners, cw, ch, N=4) {
 
 function startLoop() {
   if (raf) cancelAnimationFrame(raf);
-  (function loop() {
-    if (!frozen && vid.readyState >= 2) drawFrame();
+  (function loop(ts = 0) {
+    const fps = activePanel ? 12 : (document.fullscreenElement ? 24 : 20);
+    const minFrameGap = 1000 / fps;
+    if (!frozen && vid.readyState >= 2 && ts - lastDrawAt >= minFrameGap) {
+      drawFrame();
+      lastDrawAt = ts;
+    }
     raf = requestAnimationFrame(loop);
   })();
 }

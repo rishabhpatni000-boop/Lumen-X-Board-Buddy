@@ -104,21 +104,18 @@ def _use_supabase_session_store() -> bool:
 
 def _sessions_list() -> list:
     if _use_supabase_session_store():
-        try:
-            cfg = supabase_config()
-            resp = requests.get(
-                f"{cfg['url']}/rest/v1/class_sessions",
-                headers=_supabase_user_headers(),
-                params=[
-                    ("select", "id,subject,teacher,created_at,locked,captures"),
-                    ("order", "created_at.desc"),
-                ],
-                timeout=20,
-            )
-            resp.raise_for_status()
-            return resp.json()
-        except Exception:
-            pass
+        cfg = supabase_config()
+        resp = requests.get(
+            f"{cfg['url']}/rest/v1/class_sessions",
+            headers=_supabase_user_headers(),
+            params=[
+                ("select", "id,subject,teacher,created_at,locked,captures"),
+                ("order", "created_at.desc"),
+            ],
+            timeout=20,
+        )
+        resp.raise_for_status()
+        return resp.json()
     out = []
     for f in os.listdir(STORAGE.sessions_dir):
         if f.endswith(".json"):
@@ -131,23 +128,20 @@ def _sessions_list() -> list:
 
 def _session_get(sid: str):
     if _use_supabase_session_store():
-        try:
-            cfg = supabase_config()
-            resp = requests.get(
-                f"{cfg['url']}/rest/v1/class_sessions",
-                headers=_supabase_user_headers(),
-                params=[
-                    ("select", "id,subject,teacher,created_at,locked,captures"),
-                    ("id", f"eq.{sid}"),
-                    ("limit", "1"),
-                ],
-                timeout=20,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            return data[0] if data else None
-        except Exception:
-            pass
+        cfg = supabase_config()
+        resp = requests.get(
+            f"{cfg['url']}/rest/v1/class_sessions",
+            headers=_supabase_user_headers(),
+            params=[
+                ("select", "id,subject,teacher,created_at,locked,captures"),
+                ("id", f"eq.{sid}"),
+                ("limit", "1"),
+            ],
+            timeout=20,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return data[0] if data else None
     p = STORAGE.session_json_path(sid)
     if os.path.exists(p):
         with open(p) as f:
@@ -156,27 +150,24 @@ def _session_get(sid: str):
 
 def _session_save(s: dict):
     if _use_supabase_session_store():
-        try:
-            cfg = supabase_config()
-            payload = {
-                "id": s["id"],
-                "user_id": (current_user() or {}).get("id"),
-                "subject": s.get("subject"),
-                "teacher": s.get("teacher"),
-                "created_at": s.get("created_at"),
-                "locked": bool(s.get("locked", False)),
-                "captures": s.get("captures", []),
-            }
-            resp = requests.post(
-                f"{cfg['url']}/rest/v1/class_sessions",
-                headers={**_supabase_user_headers(), "Prefer": "resolution=merge-duplicates,return=representation"},
-                json=payload,
-                timeout=20,
-            )
-            resp.raise_for_status()
-            return
-        except Exception:
-            pass
+        cfg = supabase_config()
+        payload = {
+            "id": s["id"],
+            "user_id": (current_user() or {}).get("id"),
+            "subject": s.get("subject"),
+            "teacher": s.get("teacher"),
+            "created_at": s.get("created_at"),
+            "locked": bool(s.get("locked", False)),
+            "captures": s.get("captures", []),
+        }
+        resp = requests.post(
+            f"{cfg['url']}/rest/v1/class_sessions",
+            headers={**_supabase_user_headers(), "Prefer": "resolution=merge-duplicates,return=representation"},
+            json=payload,
+            timeout=20,
+        )
+        resp.raise_for_status()
+        return
     with open(STORAGE.session_json_path(s["id"]), "w") as f:
         json.dump(s, f, indent=2)
 
@@ -539,7 +530,11 @@ def update_board():
 @read_api_limit
 @login_required_api
 def api_sessions():
-    return jsonify(_sessions_list())
+    try:
+        return jsonify(_sessions_list())
+    except Exception as e:
+        log_warning(SECURITY["logger"], "session_list_failed", error=str(e))
+        return jsonify({"error": "Could not load class sessions", "details": str(e)}), 500
 
 
 @app.route("/api/sessions", methods=["POST"])
@@ -557,35 +552,55 @@ def api_create_session():
         "locked":     False,
         "captures":   [],
     }
-    _session_save(s)
-    return jsonify(s)
+    try:
+        _session_save(s)
+        return jsonify(s)
+    except Exception as e:
+        log_warning(SECURITY["logger"], "session_create_failed", error=str(e))
+        return jsonify({"error": "Could not save class session", "details": str(e)}), 500
 
 
 @app.route("/api/sessions/<sid>", methods=["GET"])
 @read_api_limit
 @login_required_api
 def api_get_session(sid):
-    s = _session_get(sid)
-    return jsonify(s) if s else (jsonify({"error": "Not found"}), 404)
+    try:
+        s = _session_get(sid)
+        return jsonify(s) if s else (jsonify({"error": "Not found"}), 404)
+    except Exception as e:
+        log_warning(SECURITY["logger"], "session_get_failed", session_id=sid, error=str(e))
+        return jsonify({"error": "Could not load class session", "details": str(e)}), 500
 
 
 @app.route("/api/sessions/<sid>/lock", methods=["POST"])
 @write_api_limit
 @login_required_api
 def api_toggle_lock(sid):
-    s = _session_get(sid)
+    try:
+        s = _session_get(sid)
+    except Exception as e:
+        log_warning(SECURITY["logger"], "session_lock_load_failed", session_id=sid, error=str(e))
+        return jsonify({"error": "Could not load class session", "details": str(e)}), 500
     if not s:
         return jsonify({"error": "Not found"}), 404
     s["locked"] = not s.get("locked", False)
-    _session_save(s)
-    return jsonify({"locked": s["locked"]})
+    try:
+        _session_save(s)
+        return jsonify({"locked": s["locked"]})
+    except Exception as e:
+        log_warning(SECURITY["logger"], "session_lock_save_failed", session_id=sid, error=str(e))
+        return jsonify({"error": "Could not update class session", "details": str(e)}), 500
 
 
 @app.route("/api/sessions/<sid>/capture", methods=["POST"])
 @anon_api_quota
 @login_required_api
 def api_add_capture(sid):
-    s = _session_get(sid)
+    try:
+        s = _session_get(sid)
+    except Exception as e:
+        log_warning(SECURITY["logger"], "session_capture_load_failed", session_id=sid, error=str(e))
+        return jsonify({"error": "Could not load class session", "details": str(e)}), 500
     if not s:
         return jsonify({"error": "Not found"}), 404
     if s.get("locked"):
@@ -654,7 +669,11 @@ def api_add_capture(sid):
     cap["aiboard_file"]  = _save_img("aiboard",  "aiboard")
 
     s["captures"].append(cap)
-    _session_save(s)
+    try:
+        _session_save(s)
+    except Exception as e:
+        log_warning(SECURITY["logger"], "session_capture_save_failed", session_id=sid, error=str(e))
+        return jsonify({"error": "Could not save capture to class history", "details": str(e)}), 500
     QUOTAS.record_event("upload", {"route": "/api/sessions/capture", "capture_type": cap_type})
     return jsonify(cap)
 
