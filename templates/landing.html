@@ -698,9 +698,9 @@ code{
       </a>
       <nav class="navlinks" aria-label="Public site">
         <a href="#solution">Solution</a>
-        <a href="#why-lumen-exists">Why Lumen Exists</a>
+        <a href="#solution-changes">What it changes</a>
         <a href="#journey">How it works</a>
-        <a href="#founder">Founder</a>
+        <a href="#founder">Meet the creator</a>
         <a id="signInLink" href="{% if landing_logged_in %}#logout{% else %}#sign-in{% endif %}" data-auth-mode="{% if landing_logged_in %}logout{% else %}login{% endif %}">{% if landing_logged_in %}Logout{% else %}Sign in{% endif %}</a>
       </nav>
     </header>
@@ -708,7 +708,7 @@ code{
     <section class="masthead" id="solution">
       <div class="hero">
         <div class="hero-copy">
-          <div class="eyebrow">Built from lived classroom experience</div>
+          <div class="eyebrow">Solution</div>
           <h1>Turn distant whiteboards into clear learning support.</h1>
           <p class="hero-text">
             Lumen helps students with low vision capture classroom boards, reconstruct the content into something more readable, and understand what happened through guided explanations instead of relying only on fast verbal cues.
@@ -721,7 +721,6 @@ code{
               data-auth-mode="{% if landing_logged_in %}app{% else %}login{% endif %}"
               {% if not landing_logged_in and not auth_enabled %}disabled{% endif %}
             >{% if landing_logged_in %}Open App{% else %}Continue with Google{% endif %}</button>
-            <a href="#founder" class="secondary-cta">Meet the creator</a>
           </div>
           <p id="status" class="status-message">{% if landing_logged_in %}Signed in{% if landing_user and landing_user.email %} as {{ landing_user.email }}{% endif %}. You can continue straight to your dashboard or explore the home page first.{% elif not auth_enabled %}Supabase Auth is not configured yet. Add the required environment variables to enable login.{% endif %}</p>
 
@@ -750,7 +749,7 @@ code{
 
             <div class="visual-row">
               <article class="mini-card">
-                <h3>One flexible workflow</h3>
+                <h3>The full solution in one flow</h3>
                 <ul>
                   <li>See the original board, AI board, and explanation views.</li>
                   <li>Review past captures later instead of losing them after class.</li>
@@ -758,8 +757,8 @@ code{
                 </ul>
               </article>
               <article class="mini-card orange">
-                <h3>Designed for real classrooms</h3>
-                <p>Fast-paced lessons, changing boards, diagrams, and handwritten notes all shaped how this experience was built.</p>
+                <h3>Designed for the real classroom problem</h3>
+                <p>Fast-paced lessons, changing boards, diagrams, and handwritten notes all shaped a solution that can respond in the moment instead of only helping afterward.</p>
               </article>
             </div>
           </div>
@@ -780,29 +779,54 @@ code{
           <p>This is not accessibility as an afterthought. It comes from someone who knows the challenge firsthand.</p>
         </article>
       </div>
-    </section>
 
-    <section class="section" id="why-lumen-exists">
-      <div class="section-inner">
-        <div class="section-head">
+      <div class="section-inner" id="solution-changes" style="padding-top:0">
+        <div class="section-head" style="padding-top:0">
           <div>
-            <div class="eyebrow">Why Lumen exists</div>
-            <h2>A classroom challenge, rethought as a practical tool.</h2>
+            <div class="eyebrow">What it changes</div>
+            <h2>One product, shown through the exact classroom problem it solves.</h2>
           </div>
-          <p>Lumen is meant to bridge the gap between being present in class and being able to fully access what is happening on the board, especially when the lesson pace rises and every missed line matters.</p>
+          <p>The solution is not just about taking a picture. It is about capturing the right moment, making the board easier to read, and helping a student understand and revisit what was taught.</p>
         </div>
 
-        <div class="problem-grid">
-          <article class="story-card problem">
-            <span class="corner-tag">The challenge</span>
-            <h3>Seeing less should not mean learning less.</h3>
-            <p>Even in supportive classrooms, far-away handwritten notes and rapidly changing boards can be difficult to follow for students with low vision. Verbal explanation helps, but it does not always replace what is written, drawn, or erased in front of the class.</p>
+        <div class="visual-grid">
+          <article class="visual-card comparison-card">
+            <div class="art">
+              <img src="{{ url_for('static', filename='images/board-before-after.png') }}" alt="Side-by-side whiteboard comparison showing blurry low-vision appearance on one side and a clean enhanced board on the other">
+            </div>
+            <div class="copy">
+              <h3>From difficult-to-read to far more usable</h3>
+              <p>This comparison shows the heart of the solution: a distant classroom board may appear soft, faint, or fuzzy to a student with albinism, while Lumen works to reconstruct it into something cleaner and easier to study.</p>
+              <div class="comparison-notes">
+                <div class="comparison-note">
+                  <strong>Before</strong>
+                  <span>Blur, weak contrast, and board content that is easy to miss while the lesson keeps moving.</span>
+                </div>
+                <div class="comparison-note">
+                  <strong>After</strong>
+                  <span>A clearer structure that makes equations, notes, and diagrams much easier to revisit and understand.</span>
+                </div>
+              </div>
+            </div>
           </article>
-          <article class="story-card solution">
-            <span class="corner-tag">The solution</span>
-            <h3>Capture, clarify, and understand.</h3>
-            <p>Lumen combines live board capture, AI-enhanced reconstruction, OCR support, and guided explanation into one workflow that helps students stay connected to the lesson rather than catching up after it ends.</p>
-          </article>
+
+          <div class="snapshot-stack">
+            <article class="visual-card">
+              <div class="art">
+                <img src="{{ url_for('static', filename='images/classroom-hero.png') }}" alt="Teacher writing on a classroom whiteboard while students sit at desks">
+              </div>
+              <div class="copy">
+                <h3>Built for the exact classroom scene</h3>
+                <p>The classroom image reflects the real environment where Lumen matters most: students seated at a distance while the board changes quickly in front of them.</p>
+              </div>
+            </article>
+
+            <article class="snapshot-copy">
+              <h3>Why this belongs under solution</h3>
+              <p>These visuals explain both the challenge and the product value in one place, so visitors immediately understand what Lumen does and why it matters.</p>
+              <p>Instead of a separate decorative section, they now strengthen the core solution story directly.</p>
+            </article>
+          </div>
         </div>
       </div>
     </section>
@@ -883,58 +907,6 @@ code{
       </div>
     </section>
 
-    <section class="section">
-      <div class="section-inner">
-        <div class="section-head">
-          <div>
-            <div class="eyebrow">Visual snapshots</div>
-            <h2>A more engaging picture of the experience.</h2>
-          </div>
-          <p>To keep the page from feeling dry, these panels add a classroom mood, a sense of interaction, and a quick visual summary of what Lumen supports.</p>
-        </div>
-
-        <div class="visual-grid">
-          <article class="visual-card comparison-card">
-            <div class="art">
-              <img src="{{ url_for('static', filename='images/board-before-after.png') }}" alt="Side-by-side whiteboard comparison showing blurry low-vision appearance on one side and a clean enhanced board on the other">
-            </div>
-            <div class="copy">
-              <h3>Before and after readability</h3>
-              <p>This comparison shows the problem more honestly: distant board content can look soft and fuzzy to a student with albinism, while Lumen aims to reconstruct it into something far easier to read and revisit.</p>
-              <div class="comparison-notes">
-                <div class="comparison-note">
-                  <strong>Before</strong>
-                  <span>Faint marker contrast, blur from distance, and hard-to-decipher diagrams.</span>
-                </div>
-                <div class="comparison-note">
-                  <strong>After</strong>
-                  <span>Cleaner structure, stronger contrast, and board content that is much easier to understand.</span>
-                </div>
-              </div>
-            </div>
-          </article>
-
-          <div class="snapshot-stack">
-            <article class="visual-card">
-              <div class="art">
-                <img src="{{ url_for('static', filename='images/classroom-hero.png') }}" alt="Teacher writing on a classroom whiteboard while students sit at desks">
-              </div>
-              <div class="copy">
-                <h3>Rooted in a real classroom</h3>
-                <p>The product is meant for the actual scene where accessibility breaks down most often: students seated at a distance while the board keeps changing in front of them.</p>
-              </div>
-            </article>
-
-            <article class="snapshot-copy">
-              <h3>Why these visuals work better</h3>
-              <p>The classroom image now shows the exact environment Lumen is built for instead of a generic decorative graphic.</p>
-              <p>The board comparison gives visitors an immediate sense of both the challenge and the value of the solution in one glance.</p>
-            </article>
-          </div>
-        </div>
-      </div>
-    </section>
-
   </div>
 
   <script type="module">
@@ -944,6 +916,7 @@ code{
     const supabaseAnonKey = {{ supabase_anon_key|tojson }};
     const callbackUrl = {{ auth_callback_url|tojson }};
     const nextUrl = {{ next_url|tojson }};
+    const csrfToken = {{ csrf_token|tojson }};
     const statusEl = document.getElementById('status');
     const signInLink = document.getElementById('signInLink');
     const buttons = [
@@ -962,7 +935,8 @@ code{
         }
       } catch (error) {}
       try {
-        await fetch('/auth/logout', { method: 'POST' });
+        const headers = csrfToken ? { 'X-CSRF-Token': csrfToken } : {};
+        await fetch('/auth/logout', { method: 'POST', headers });
       } catch (error) {}
       window.location.href = '/';
     }

@@ -544,7 +544,6 @@ button:hover{background:#fffdf8}
 <div id="topbar">
   <div class="top-cluster">
     <button class="tb-btn" onclick="window.location.href='/'" title="Go to public landing page">Home</button>
-    <button class="tb-btn" onclick="openClassPicker()" title="Choose a class">Classes</button>
     <div class="status-pill">
       <span>Class</span>
       <strong id="sessionInfo">No class</strong>
@@ -2084,22 +2083,32 @@ async function doCapture() {
   const imgPng = lastOrigPng || (frozen ? mc.toDataURL('image/png') : mc.toDataURL('image/png'));
   if (!imgPng) { status('Nothing to capture — freeze a frame first'); return; }
 
-  // Play camera shutter sound
-  playCameraSound();
-
   const ts = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
   const fn = `capture_${ts}.png`;
+  let savedToDevice = false;
 
   // 1. Save to Downloads folder
   try {
-    await fetch('/save', {
+    const resp = await fetch('/save', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({image: imgPng, filename: fn})
     });
+    if (!resp.ok) throw new Error('Save request was rejected');
+    const payload = await resp.json();
+    if (!payload.ok) throw new Error(payload.error || 'Save failed');
+    savedToDevice = true;
   } catch(e) {
     const a = document.createElement('a');
-    a.download = fn; a.href = imgPng; a.click();
+    a.download = fn;
+    a.href = imgPng;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    savedToDevice = true;
   }
+
+  // Play camera shutter sound only once the capture action completes.
+  if (savedToDevice) playCameraSound();
 
   // 2. Save to gallery as explicit capture (kept permanently)
   if (currentSession) {
