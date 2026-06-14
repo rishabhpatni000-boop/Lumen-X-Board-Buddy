@@ -98,6 +98,27 @@ def _supabase_user_headers():
     }
 
 
+def _capture_for_store(cap: dict) -> dict:
+    stored = dict(cap)
+    for key in ("original_file", "aiboard_file"):
+        value = stored.get(key)
+        if isinstance(value, str) and value.startswith("data:image/"):
+            stored[key] = None
+    return stored
+
+
+def _session_payload_for_store(s: dict) -> dict:
+    return {
+        "id": s["id"],
+        "user_id": (current_user() or {}).get("id"),
+        "subject": s.get("subject"),
+        "teacher": s.get("teacher"),
+        "created_at": s.get("created_at"),
+        "locked": bool(s.get("locked", False)),
+        "captures": [_capture_for_store(cap) for cap in s.get("captures", [])],
+    }
+
+
 def _use_supabase_session_store() -> bool:
     cfg = supabase_config()
     return bool(cfg["url"] and cfg["anon_key"] and current_access_token() and current_user())
@@ -151,15 +172,7 @@ def _session_get(sid: str):
 def _session_save(s: dict):
     if _use_supabase_session_store():
         cfg = supabase_config()
-        payload = {
-            "id": s["id"],
-            "user_id": (current_user() or {}).get("id"),
-            "subject": s.get("subject"),
-            "teacher": s.get("teacher"),
-            "created_at": s.get("created_at"),
-            "locked": bool(s.get("locked", False)),
-            "captures": s.get("captures", []),
-        }
+        payload = _session_payload_for_store(s)
         resp = requests.post(
             f"{cfg['url']}/rest/v1/class_sessions",
             headers={**_supabase_user_headers(), "Prefer": "resolution=merge-duplicates,return=representation"},
@@ -661,7 +674,7 @@ def api_add_capture(sid):
         if not raw:
             return None
         if using_supabase_sessions:
-            return raw
+            return None
         stored = STORAGE.save_data_url(raw, "session_images", f"{sid}_{cap_id}_{suffix}.png")
         return stored.filename
 
@@ -788,14 +801,28 @@ def _admin_rest_upsert(path: str, payload: dict):
     return data[0] if isinstance(data, list) and data else data
 
 
+def _admin_auth_users() -> list[dict]:
+    cfg = supabase_config()
+    resp = requests.get(
+        f"{cfg['url']}/auth/v1/admin/users",
+        headers=supabase_service_headers(),
+        params=[("page", "1"), ("per_page", "500")],
+        timeout=20,
+    )
+    resp.raise_for_status()
+    payload = resp.json() or {}
+    return payload.get("users", [])
+
+
 @app.route("/api/admin/overview", methods=["GET"])
 @read_api_limit
 @admin_required_api
 def api_admin_overview():
-    users, _ = _admin_rest_get("/rest/v1/users", [
+    profile_rows, _ = _admin_rest_get("/rest/v1/users", [
         ("select", "id,email,full_name,created_at"),
         ("order", "created_at.desc"),
     ])
+    auth_users = _admin_auth_users()
     overrides, _ = _admin_rest_get("/rest/v1/user_quota_overrides", [
         ("select", "user_id,daily_analyses_limit,monthly_analyses_limit,daily_upload_limit,notes,updated_at"),
     ])
@@ -815,6 +842,7 @@ def api_admin_overview():
         ("limit", "5000"),
     ])
 
+    profile_map = {item["id"]: item for item in profile_rows}
     override_map = {item["user_id"]: item for item in overrides}
     usage_map = {}
     for item in usage:
@@ -834,7 +862,14 @@ def api_admin_overview():
             entry["last_analysis_at"] = item["created_at"]
 
     users_payload = []
-    for user in users:
+    for auth_user in auth_users:
+        profile = profile_map.get(auth_user["id"], {})
+        user = {
+            "id": auth_user["id"],
+            "email": auth_user.get("email") or profile.get("email"),
+            "full_name": (auth_user.get("user_metadata") or {}).get("full_name") or profile.get("full_name"),
+            "created_at": auth_user.get("created_at") or profile.get("created_at"),
+        }
         override = override_map.get(user["id"], {})
         activity = usage_map.get(user["id"], {})
         hist = history_map.get(user["id"], {})
