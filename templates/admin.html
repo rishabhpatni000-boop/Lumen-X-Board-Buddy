@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Dashboard - VisualAssistCam</title>
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+const supabaseUrl = {{ supabase_url|tojson }};
+const supabaseAnonKey = {{ supabase_anon_key|tojson }};
+window.__vacSupabasePromise = (supabaseUrl && supabaseAnonKey)
+  ? Promise.resolve(createClient(supabaseUrl, supabaseAnonKey))
+  : Promise.resolve(null);
+</script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:linear-gradient(180deg,#071018,#0f1a26 45%,#162537);
+  color:#eef4fb;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.topbar{display:flex;align-items:center;gap:12px;padding:16px 22px;border-bottom:1px solid rgba(126,157,194,.16);
+  background:rgba(8,13,19,.88);position:sticky;top:0;backdrop-filter:blur(10px);z-index:5;flex-wrap:wrap}
+.brand{font-weight:700}
+.chip{padding:8px 12px;border:1px solid rgba(126,157,194,.18);border-radius:999px;color:#9fb4cb;font-size:13px}
+.spacer{flex:1}
+.btn{background:#1a2938;color:#edf4fb;border:1px solid rgba(126,157,194,.18);border-radius:12px;padding:10px 14px;cursor:pointer;font-weight:600}
+.btn.primary{background:#eaf1f7;color:#102130}
+.wrap{max-width:1320px;margin:0 auto;padding:26px 22px 40px}
+.hero{display:flex;justify-content:space-between;gap:20px;align-items:flex-end;flex-wrap:wrap}
+.hero h1{margin:0 0 8px;font-size:38px}
+.hero p{margin:0;color:#9cb1c7;line-height:1.7;max-width:760px}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-top:22px}
+.card{background:#101922;border:1px solid rgba(126,157,194,.12);border-radius:18px;padding:18px}
+.stat-value{font-size:32px;font-weight:700;margin-top:8px}
+.stat-label{font-size:12px;text-transform:uppercase;letter-spacing:.7px;color:#7f98b5}
+.grid{display:grid;grid-template-columns:1.5fr .9fr;gap:18px;margin-top:20px}
+.table-wrap{overflow:auto}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:12px 10px;border-bottom:1px solid rgba(126,157,194,.1);font-size:14px;vertical-align:top}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.7px;color:#7f98b5}
+.muted{color:#91a6bc}
+.admin-badge{display:inline-block;padding:4px 8px;border-radius:999px;background:#243a1e;color:#8ed06d;font-size:11px;font-weight:700}
+.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+label{display:block;font-size:12px;color:#7f98b5;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
+input,textarea,select{width:100%;background:#09111a;color:#eef4fb;border:1px solid rgba(126,157,194,.16);border-radius:12px;padding:10px 12px;font:inherit}
+textarea{min-height:92px;resize:vertical}
+.section-title{margin:0 0 14px;font-size:18px}
+.row-actions{display:flex;gap:8px;flex-wrap:wrap}
+.note{font-size:12px;color:#8ea2b8;line-height:1.6}
+@media (max-width: 1100px){
+  .grid{grid-template-columns:1fr}
+}
+@media (max-width: 760px){
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .form-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">VisualAssistCam Admin</div>
+    <div class="chip" id="adminChip">{{ current_user.email if current_user else '' }}</div>
+    <div class="spacer"></div>
+    <button class="btn" onclick="window.location.href='/app'">Back to App</button>
+    <button class="btn" onclick="window.location.href='/settings'">Settings</button>
+    <button class="btn primary" onclick="logoutUser()">Logout</button>
+  </div>
+
+  <main class="wrap">
+    <section class="hero">
+      <div>
+        <h1>Admin Dashboard</h1>
+        <p>Manage users, quota limits, and product feedback prompts from one place. This dashboard is only visible when the signed-in account matches an approved admin email.</p>
+      </div>
+    </section>
+
+    <section class="stats">
+      <article class="card"><div class="stat-label">Users</div><div class="stat-value" id="statUsers">0</div></article>
+      <article class="card"><div class="stat-label">Admins</div><div class="stat-value" id="statAdmins">0</div></article>
+      <article class="card"><div class="stat-label">Active Surveys</div><div class="stat-value" id="statSurveys">0</div></article>
+      <article class="card"><div class="stat-label">Tracked Analyses</div><div class="stat-value" id="statAnalyses">0</div></article>
+    </section>
+
+    <section class="grid">
+      <article class="card">
+        <h2 class="section-title">Users And Limits</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>User</th>
+                <th>Usage</th>
+                <th>Limits</th>
+                <th>Quota Notes</th>
+              </tr>
+            </thead>
+            <tbody id="userRows">
+              <tr><td colspan="4" class="muted">Loading users…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="card">
+        <h2 class="section-title">Edit User Limits</h2>
+        <div class="note">Choose a user, override their AI and upload limits, then save. Leave a field blank to fall back to the global default.</div>
+        <div style="height:12px"></div>
+        <label for="quotaUser">User</label>
+        <select id="quotaUser"></select>
+        <div style="height:12px"></div>
+        <div class="form-grid">
+          <div>
+            <label for="quotaDaily">Daily AI Analyses</label>
+            <input id="quotaDaily" type="number" min="0" placeholder="Default">
+          </div>
+          <div>
+            <label for="quotaMonthly">Monthly AI Analyses</label>
+            <input id="quotaMonthly" type="number" min="0" placeholder="Default">
+          </div>
+          <div>
+            <label for="quotaUploads">Daily Uploads</label>
+            <input id="quotaUploads" type="number" min="0" placeholder="Default">
+          </div>
+          <div>
+            <label for="quotaNotes">Internal Notes</label>
+            <input id="quotaNotes" type="text" placeholder="Why this override exists">
+          </div>
+        </div>
+        <div style="height:12px"></div>
+        <div class="row-actions">
+          <button class="btn primary" onclick="saveQuotaOverride()">Save Limits</button>
+          <button class="btn" onclick="loadOverview()">Refresh</button>
+        </div>
+        <div id="quotaStatus" class="note" style="margin-top:10px"></div>
+      </article>
+    </section>
+
+    <section class="grid">
+      <article class="card">
+        <h2 class="section-title">Push Feature Survey</h2>
+        <div class="form-grid">
+          <div>
+            <label for="surveyTitle">Title</label>
+            <input id="surveyTitle" type="text" placeholder="Camera fullscreen feedback">
+          </div>
+          <div>
+            <label for="surveyFeature">Feature Key</label>
+            <input id="surveyFeature" type="text" placeholder="fullscreen-ui">
+          </div>
+          <div>
+            <label for="surveyStatus">Status</label>
+            <select id="surveyStatus">
+              <option value="draft">Draft</option>
+              <option value="active">Active</option>
+              <option value="paused">Paused</option>
+            </select>
+          </div>
+          <div>
+            <label for="surveyTargetEmail">Target Email</label>
+            <input id="surveyTargetEmail" type="email" placeholder="Optional specific user">
+          </div>
+        </div>
+        <div style="height:12px"></div>
+        <label for="surveyDescription">Prompt / Survey Description</label>
+        <textarea id="surveyDescription" placeholder="Ask for a rating, feedback, or a short survey about a specific feature."></textarea>
+        <div style="height:12px"></div>
+        <div class="row-actions">
+          <button class="btn primary" onclick="createSurvey()">Create Survey</button>
+        </div>
+        <div id="surveyStatusMsg" class="note" style="margin-top:10px"></div>
+      </article>
+
+      <article class="card">
+        <h2 class="section-title">Recent Surveys</h2>
+        <div id="surveyList" class="note">Loading surveys…</div>
+      </article>
+    </section>
+  </main>
+
+  <script>
+    const csrfToken = {{ csrf_token|tojson }};
+    const _nativeFetch = window.fetch.bind(window);
+    let adminState = { users: [], surveys: [], defaults: {} };
+
+    window.fetch = (input, init = {}) => {
+      const method = (init.method || 'GET').toUpperCase();
+      const headers = new Headers(init.headers || {});
+      if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) && csrfToken) {
+        headers.set('X-CSRF-Token', csrfToken);
+      }
+      return _nativeFetch(input, {...init, headers});
+    };
+
+    async function getSupabaseClient() {
+      return window.__vacSupabasePromise ? await window.__vacSupabasePromise : null;
+    }
+
+    async function logoutUser() {
+      try {
+        const supabase = await getSupabaseClient();
+        if (supabase) await supabase.auth.signOut();
+      } catch (e) {}
+      await fetch('/auth/logout', {method: 'POST'});
+      window.location.href = '/';
+    }
+
+    function formatWhen(value) {
+      if (!value) return '—';
+      return new Date(value).toLocaleString('en-GB');
+    }
+
+    function renderUsers() {
+      const tbody = document.getElementById('userRows');
+      const users = adminState.users || [];
+      document.getElementById('statUsers').textContent = users.length;
+      document.getElementById('statAdmins').textContent = users.filter(u => u.is_admin).length;
+      document.getElementById('statAnalyses').textContent =
+        users.reduce((sum, user) => sum + (user.history_count || 0), 0);
+
+      if (!users.length) {
+        tbody.innerHTML = '<tr><td colspan="4" class="muted">No users found.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = users.map(user => `
+        <tr>
+          <td>
+            <div><strong>${user.full_name || 'Unnamed user'}</strong> ${user.is_admin ? '<span class="admin-badge">Admin</span>' : ''}</div>
+            <div class="muted">${user.email || 'No email'} </div>
+            <div class="muted">Joined ${formatWhen(user.created_at)}</div>
+          </td>
+          <td>
+            <div>${user.history_count || 0} saved analyses</div>
+            <div class="muted">${(user.usage || {}).analysis || 0} AI requests · ${(user.usage || {}).upload || 0} uploads</div>
+            <div class="muted">Last activity: ${formatWhen((user.usage || {}).last_activity || user.last_analysis_at)}</div>
+          </td>
+          <td>
+            <div>Daily AI: ${user.effective_limits.daily_analyses}</div>
+            <div>Monthly AI: ${user.effective_limits.monthly_analyses}</div>
+            <div>Daily uploads: ${user.effective_limits.daily_uploads}</div>
+          </td>
+          <td class="muted">${(user.quota_override || {}).notes || 'No override notes'}</td>
+        </tr>
+      `).join('');
+
+      const sel = document.getElementById('quotaUser');
+      sel.innerHTML = users.map(user =>
+        `<option value="${user.id}">${user.email || user.full_name || user.id}</option>`
+      ).join('');
+      if (users[0]) {
+        sel.value = users[0].id;
+        populateQuotaEditor();
+      }
+    }
+
+    function populateQuotaEditor() {
+      const user = adminState.users.find(item => item.id === document.getElementById('quotaUser').value);
+      const override = (user && user.quota_override) || {};
+      document.getElementById('quotaDaily').value = override.daily_analyses_limit || '';
+      document.getElementById('quotaMonthly').value = override.monthly_analyses_limit || '';
+      document.getElementById('quotaUploads').value = override.daily_upload_limit || '';
+      document.getElementById('quotaNotes').value = override.notes || '';
+    }
+
+    function renderSurveys() {
+      const surveys = adminState.surveys || [];
+      document.getElementById('statSurveys').textContent = surveys.filter(item => item.status === 'active').length;
+      document.getElementById('surveyList').innerHTML = surveys.length
+        ? surveys.map(item => `
+            <div style="padding:10px 0;border-bottom:1px solid rgba(126,157,194,.1)">
+              <div><strong>${item.title}</strong> <span class="muted">(${item.status})</span></div>
+              <div class="muted">${item.feature_key || 'no feature key'} · ${item.target_email || 'all users'} · ${formatWhen(item.created_at)}</div>
+            </div>
+          `).join('')
+        : 'No surveys created yet.';
+    }
+
+    async function loadOverview() {
+      const resp = await fetch('/api/admin/overview');
+      const data = await resp.json();
+      adminState = data;
+      renderUsers();
+      renderSurveys();
+    }
+
+    async function saveQuotaOverride() {
+      const userId = document.getElementById('quotaUser').value;
+      const payload = {
+        daily_analyses_limit: document.getElementById('quotaDaily').value,
+        monthly_analyses_limit: document.getElementById('quotaMonthly').value,
+        daily_upload_limit: document.getElementById('quotaUploads').value,
+        notes: document.getElementById('quotaNotes').value
+      };
+      const resp = await fetch(`/api/admin/users/${userId}/quota`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+      });
+      const data = await resp.json();
+      document.getElementById('quotaStatus').textContent = data.ok ? 'Quota override saved.' : (data.error || 'Could not save limits.');
+      await loadOverview();
+    }
+
+    async function createSurvey() {
+      const payload = {
+        title: document.getElementById('surveyTitle').value,
+        feature_key: document.getElementById('surveyFeature').value,
+        status: document.getElementById('surveyStatus').value,
+        target_email: document.getElementById('surveyTargetEmail').value,
+        description: document.getElementById('surveyDescription').value
+      };
+      const resp = await fetch('/api/admin/surveys', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+      });
+      const data = await resp.json();
+      document.getElementById('surveyStatusMsg').textContent = data.ok ? 'Survey created.' : (data.error || 'Could not create survey.');
+      if (data.ok) {
+        document.getElementById('surveyTitle').value = '';
+        document.getElementById('surveyFeature').value = '';
+        document.getElementById('surveyTargetEmail').value = '';
+        document.getElementById('surveyDescription').value = '';
+        await loadOverview();
+      }
+    }
+
+    document.getElementById('quotaUser').addEventListener('change', populateQuotaEditor);
+    loadOverview();
+  </script>
+</body>
+</html>

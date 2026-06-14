@@ -57,6 +57,10 @@ html,body{height:100%;background:#111;color:#eee;
 #mainCanvas{cursor:grab;display:block;max-width:100%;max-height:100%;
   border-radius:18px;background:#050505;box-shadow:0 18px 50px rgba(0,0,0,.45)}
 #mainCanvas.dragging{cursor:grabbing}
+body.is-fullscreen #workspace,
+body.is-fullscreen #mainArea{background:#000}
+body.is-fullscreen #originalView{padding:0}
+body.is-fullscreen #mainCanvas{border-radius:0;box-shadow:none}
 video{display:none}
 #frozenBadge{display:none;position:absolute;top:10px;left:50%;
   transform:translateX(-50%);background:rgba(120,20,20,.9);color:#fff;
@@ -714,6 +718,12 @@ button:hover{background:#2e2e2e}
       <strong>Logout</strong>
       <span>Sign out of VisualAssistCam.</span>
     </button>
+    {% if is_admin %}
+    <button class="panel-tile" onclick="window.location.href='/admin'">
+      <strong>Use As Admin</strong>
+      <span>Open the admin dashboard for users, credits, and surveys.</span>
+    </button>
+    {% endif %}
   </div>
   <div class="panel-section">
     <h4>Signed In</h4>
@@ -1419,6 +1429,7 @@ let view = 'orig';
 let frozen = false, inverted = false, ctrlsShown = true;
 let raf;
 let activePanel = null;
+let currentDeviceId = null;
 const csrfToken = {{ csrf_token|tojson }};
 
 // Original zoom / pan
@@ -1508,10 +1519,10 @@ async function initCameras() {
 
 async function startCamera(deviceId) {
   if (vid.srcObject) vid.srcObject.getTracks().forEach(t => t.stop());
+  currentDeviceId = deviceId || null;
   try {
     vid.srcObject = await navigator.mediaDevices.getUserMedia({
-      video: { deviceId: deviceId ? {exact:deviceId} : undefined,
-               width:{ideal:1920}, height:{ideal:1080} }
+      video: buildCameraConstraints(deviceId, document.fullscreenElement)
     });
     await vid.play();
     resizeCanvas();
@@ -1521,6 +1532,29 @@ async function startCamera(deviceId) {
 }
 
 function switchCamera() { startCamera(document.getElementById('camSel').value); }
+
+function buildCameraConstraints(deviceId, isFullscreen) {
+  return {
+    deviceId: deviceId ? {exact: deviceId} : undefined,
+    width:  isFullscreen ? {ideal: 3840} : {ideal: 1920},
+    height: isFullscreen ? {ideal: 2160} : {ideal: 1080},
+    aspectRatio: {ideal: window.innerWidth / Math.max(window.innerHeight, 1)},
+    frameRate: {ideal: isFullscreen ? 30 : 24}
+  };
+}
+
+async function optimizeCameraForFullscreen(isFullscreen) {
+  const track = vid.srcObject?.getVideoTracks?.()[0];
+  if (!track) return;
+  try {
+    await track.applyConstraints(buildCameraConstraints(currentDeviceId, isFullscreen));
+    if (vid.readyState >= 2) {
+      status(`${isFullscreen ? 'Fullscreen' : 'Windowed'} — ${vid.videoWidth}×${vid.videoHeight}`);
+    }
+  } catch (e) {
+    console.warn('Could not update fullscreen camera constraints:', e);
+  }
+}
 
 function resizeCanvas() {
   const va = document.getElementById('originalView');
@@ -2011,12 +2045,14 @@ function toggleFullscreen() {
   if (!document.fullscreenElement) document.documentElement.requestFullscreen();
   else document.exitFullscreen();
 }
-document.addEventListener('fullscreenchange', () => {
+document.addEventListener('fullscreenchange', async () => {
   const fs = !!document.fullscreenElement;
+  document.body.classList.toggle('is-fullscreen', fs);
   document.getElementById('topbar').style.display    = fs ? 'none' : '';
   document.getElementById('controls').style.display  = fs ? 'none' : (ctrlsShown ? 'flex' : 'none');
   document.getElementById('statusBar').style.display = fs ? 'none' : '';
   if (fs) closePanels();
+  await optimizeCameraForFullscreen(fs);
   setTimeout(resizeCanvas, 50);
 });
 function status(msg) { document.getElementById('statusBar').textContent = msg; }
@@ -2072,6 +2108,13 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && activePanel) { closePanels(); return; }
   if (e.target.tagName==='INPUT' || e.target.tagName==='SELECT' || e.target.tagName==='TEXTAREA') return;
   if ((e.metaKey||e.ctrlKey) && e.key==='s') { e.preventDefault(); doCapture(); return; }
+  if (document.fullscreenElement) {
+    switch (e.key) {
+      case 'a': case 'A': e.preventDefault(); togglePanel('aiPanel'); return;
+      case 'z': case 'Z': e.preventDefault(); doZoom(1); return;
+      case 'u': case 'U': e.preventDefault(); doZoom(-1); return;
+    }
+  }
   switch (e.key) {
     case '1':          setView('orig');     break;
     case '2':          setView('board');    break;

@@ -16,6 +16,7 @@ import cv2
 import threading
 import webbrowser
 import base64
+import requests
 from concurrent.futures import ThreadPoolExecutor
 
 from dotenv import load_dotenv
@@ -25,16 +26,21 @@ from flask import Flask, request, jsonify, render_template, send_from_directory,
 from werkzeug.utils import secure_filename
 
 from supabase_integration import (
+    admin_required_api,
+    admin_required_page,
     count_history_records_this_month,
     clear_auth_session,
     configure_supabase,
     current_user,
+    is_admin_user,
     insert_history_record,
     list_history_records_paginated,
     login_required_api,
     login_required_page,
     safe_next_url,
     store_session_from_token,
+    supabase_config,
+    supabase_service_headers,
     template_auth_context,
 )
 from services.cache_service import TTLCache, stable_cache_key
@@ -180,6 +186,16 @@ def settings_page():
         "settings.html",
         claude_available=CLAUDE_AVAILABLE,
         quota_snapshot=QUOTAS.quota_snapshot(),
+        **template_auth_context("auth_callback"),
+    )
+
+
+@app.route("/admin")
+@admin_required_page
+def admin_dashboard():
+    return render_template(
+        "admin.html",
+        claude_available=CLAUDE_AVAILABLE,
         **template_auth_context("auth_callback"),
     )
 
@@ -635,6 +651,151 @@ def api_dashboard():
         "remaining_quota": quota_snapshot,
         "recent_activity": recent,
     })
+
+
+def _admin_rest_get(path: str, params=None):
+    cfg = supabase_config()
+    resp = requests.get(
+        f"{cfg['url']}{path}",
+        headers=supabase_service_headers(),
+        params=params or [],
+        timeout=20,
+    )
+    resp.raise_for_status()
+    return resp.json(), resp.headers
+
+
+def _admin_rest_upsert(path: str, payload: dict):
+    cfg = supabase_config()
+    resp = requests.post(
+        f"{cfg['url']}{path}",
+        headers={**supabase_service_headers(), "Prefer": "resolution=merge-duplicates,return=representation"},
+        json=payload,
+        timeout=20,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    return data[0] if isinstance(data, list) and data else data
+
+
+@app.route("/api/admin/overview", methods=["GET"])
+@read_api_limit
+@admin_required_api
+def api_admin_overview():
+    users, _ = _admin_rest_get("/rest/v1/users", [
+        ("select", "id,email,full_name,created_at"),
+        ("order", "created_at.desc"),
+    ])
+    overrides, _ = _admin_rest_get("/rest/v1/user_quota_overrides", [
+        ("select", "user_id,daily_analyses_limit,monthly_analyses_limit,daily_upload_limit,notes,updated_at"),
+    ])
+    surveys, _ = _admin_rest_get("/rest/v1/admin_surveys", [
+        ("select", "id,title,feature_key,status,target_user_id,target_email,created_at"),
+        ("order", "created_at.desc"),
+        ("limit", "20"),
+    ])
+    history, _ = _admin_rest_get("/rest/v1/analysis_history", [
+        ("select", "user_id,created_at"),
+        ("order", "created_at.desc"),
+        ("limit", "5000"),
+    ])
+    usage, _ = _admin_rest_get("/rest/v1/usage_events", [
+        ("select", "user_id,event_type,created_at"),
+        ("order", "created_at.desc"),
+        ("limit", "5000"),
+    ])
+
+    override_map = {item["user_id"]: item for item in overrides}
+    usage_map = {}
+    for item in usage:
+        entry = usage_map.setdefault(item["user_id"], {"analysis": 0, "upload": 0, "last_activity": item.get("created_at")})
+        if item.get("event_type") == "analysis":
+            entry["analysis"] += 1
+        if item.get("event_type") == "upload":
+            entry["upload"] += 1
+        if item.get("created_at") and (not entry["last_activity"] or item["created_at"] > entry["last_activity"]):
+            entry["last_activity"] = item["created_at"]
+
+    history_map = {}
+    for item in history:
+        entry = history_map.setdefault(item["user_id"], {"history_count": 0, "last_analysis_at": item.get("created_at")})
+        entry["history_count"] += 1
+        if item.get("created_at") and (not entry["last_analysis_at"] or item["created_at"] > entry["last_analysis_at"]):
+            entry["last_analysis_at"] = item["created_at"]
+
+    users_payload = []
+    for user in users:
+        override = override_map.get(user["id"], {})
+        activity = usage_map.get(user["id"], {})
+        hist = history_map.get(user["id"], {})
+        users_payload.append({
+            **user,
+            "is_admin": is_admin_user(user),
+            "usage": activity,
+            "history_count": hist.get("history_count", 0),
+            "last_analysis_at": hist.get("last_analysis_at"),
+            "quota_override": override,
+            "effective_limits": {
+                "daily_analyses": override.get("daily_analyses_limit") or QUOTAS.daily_analyses_limit,
+                "monthly_analyses": override.get("monthly_analyses_limit") or QUOTAS.monthly_analyses_limit,
+                "daily_uploads": override.get("daily_upload_limit") or QUOTAS.daily_upload_limit,
+            },
+        })
+
+    return jsonify({
+        "admin_email": (current_user() or {}).get("email", ""),
+        "users": users_payload,
+        "surveys": surveys,
+        "defaults": {
+            "daily_analyses": QUOTAS.daily_analyses_limit,
+            "monthly_analyses": QUOTAS.monthly_analyses_limit,
+            "daily_uploads": QUOTAS.daily_upload_limit,
+        },
+    })
+
+
+@app.route("/api/admin/users/<user_id>/quota", methods=["POST"])
+@write_api_limit
+@admin_required_api
+def api_admin_user_quota(user_id):
+    data, error_response = require_json_payload()
+    if error_response:
+        return error_response
+    record = _admin_rest_upsert("/rest/v1/user_quota_overrides", {
+        "user_id": user_id,
+        "daily_analyses_limit": int(data.get("daily_analyses_limit") or 0) or None,
+        "monthly_analyses_limit": int(data.get("monthly_analyses_limit") or 0) or None,
+        "daily_upload_limit": int(data.get("daily_upload_limit") or 0) or None,
+        "notes": (data.get("notes") or "").strip(),
+    })
+    return jsonify({"ok": True, "record": record})
+
+
+@app.route("/api/admin/surveys", methods=["GET", "POST"])
+@write_api_limit
+@admin_required_api
+def api_admin_surveys():
+    if request.method == "GET":
+        data, _ = _admin_rest_get("/rest/v1/admin_surveys", [
+            ("select", "id,title,feature_key,description,status,target_user_id,target_email,created_at"),
+            ("order", "created_at.desc"),
+            ("limit", "100"),
+        ])
+        return jsonify(data)
+
+    data, error_response = require_json_payload()
+    if error_response:
+        return error_response
+    record = _admin_rest_upsert("/rest/v1/admin_surveys", {
+        "title": (data.get("title") or "").strip(),
+        "feature_key": (data.get("feature_key") or "").strip(),
+        "description": (data.get("description") or "").strip(),
+        "status": (data.get("status") or "draft").strip() or "draft",
+        "target_user_id": (data.get("target_user_id") or "").strip() or None,
+        "target_email": (data.get("target_email") or "").strip() or None,
+        "created_by": (current_user() or {}).get("id"),
+    })
+    return jsonify({"ok": True, "record": record})
 
 
 @app.route("/api/history", methods=["GET"])

@@ -70,9 +70,32 @@ create table if not exists public.usage_events (
 create index if not exists usage_events_user_created_idx
     on public.usage_events (user_id, created_at desc);
 
+create table if not exists public.user_quota_overrides (
+    user_id uuid primary key references auth.users(id) on delete cascade,
+    daily_analyses_limit integer,
+    monthly_analyses_limit integer,
+    daily_upload_limit integer,
+    notes text,
+    updated_at timestamptz not null default timezone('utc', now())
+);
+
+create table if not exists public.admin_surveys (
+    id uuid primary key default gen_random_uuid(),
+    created_by uuid references auth.users(id) on delete set null,
+    target_user_id uuid references auth.users(id) on delete set null,
+    target_email text,
+    title text not null,
+    feature_key text,
+    description text,
+    status text not null default 'draft',
+    created_at timestamptz not null default timezone('utc', now())
+);
+
 alter table public.users enable row level security;
 alter table public.analysis_history enable row level security;
 alter table public.usage_events enable row level security;
+alter table public.user_quota_overrides enable row level security;
+alter table public.admin_surveys enable row level security;
 
 drop policy if exists "Users can view their own profile" on public.users;
 create policy "Users can view their own profile"
@@ -122,3 +145,23 @@ create policy "Users can insert their own usage events"
 on public.usage_events
 for insert
 with check (auth.uid() = user_id);
+
+drop policy if exists "Service role manages quota overrides" on public.user_quota_overrides;
+create policy "Service role manages quota overrides"
+on public.user_quota_overrides
+for all
+using (auth.role() = 'service_role')
+with check (auth.role() = 'service_role');
+
+drop policy if exists "Users can view their own quota override" on public.user_quota_overrides;
+create policy "Users can view their own quota override"
+on public.user_quota_overrides
+for select
+using (auth.uid() = user_id);
+
+drop policy if exists "Service role manages admin surveys" on public.admin_surveys;
+create policy "Service role manages admin surveys"
+on public.admin_surveys
+for all
+using (auth.role() = 'service_role')
+with check (auth.role() = 'service_role');

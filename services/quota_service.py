@@ -35,6 +35,9 @@ class QuotaService:
     def _base_url(self):
         return f"{supabase_config()['url']}/rest/v1/usage_events"
 
+    def _override_url(self):
+        return f"{supabase_config()['url']}/rest/v1/user_quota_overrides"
+
     @staticmethod
     def _today_range():
         today = dt.datetime.utcnow().date()
@@ -97,24 +100,56 @@ class QuotaService:
         data = resp.json()
         return data[0] if isinstance(data, list) and data else data
 
+    def _limits(self):
+        limits = {
+            "daily_analyses": self.daily_analyses_limit,
+            "monthly_analyses": self.monthly_analyses_limit,
+            "daily_uploads": self.daily_upload_limit,
+        }
+        cfg = supabase_config()
+        token = current_access_token()
+        user = current_user()
+        if not cfg["url"] or not cfg["anon_key"] or not token or not user:
+            return limits
+        try:
+            resp = requests.get(
+                self._override_url(),
+                headers=self._headers(),
+                params=[
+                    ("select", "daily_analyses_limit,monthly_analyses_limit,daily_upload_limit"),
+                    ("user_id", f"eq.{user['id']}"),
+                    ("limit", "1"),
+                ],
+                timeout=15,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            override = data[0] if data else {}
+            if override.get("daily_analyses_limit") is not None:
+                limits["daily_analyses"] = override["daily_analyses_limit"]
+            if override.get("monthly_analyses_limit") is not None:
+                limits["monthly_analyses"] = override["monthly_analyses_limit"]
+            if override.get("daily_upload_limit") is not None:
+                limits["daily_uploads"] = override["daily_upload_limit"]
+        except Exception:
+            pass
+        return limits
+
     def quota_snapshot(self):
         today_start, today_end = self._today_range()
         month_start, month_end = self._month_range()
         daily_analyses = self._count("analysis", today_start, today_end)
         monthly_analyses = self._count("analysis", month_start, month_end)
         daily_uploads = self._count("upload", today_start, today_end)
+        limits = self._limits()
         return {
             "daily_analyses": daily_analyses,
             "monthly_analyses": monthly_analyses,
             "daily_uploads": daily_uploads,
-            "daily_remaining": max(0, self.daily_analyses_limit - daily_analyses),
-            "monthly_remaining": max(0, self.monthly_analyses_limit - monthly_analyses),
-            "upload_remaining": max(0, self.daily_upload_limit - daily_uploads),
-            "limits": {
-                "daily_analyses": self.daily_analyses_limit,
-                "monthly_analyses": self.monthly_analyses_limit,
-                "daily_uploads": self.daily_upload_limit,
-            },
+            "daily_remaining": max(0, limits["daily_analyses"] - daily_analyses),
+            "monthly_remaining": max(0, limits["monthly_analyses"] - monthly_analyses),
+            "upload_remaining": max(0, limits["daily_uploads"] - daily_uploads),
+            "limits": limits,
         }
 
     def ensure_analysis_available(self):

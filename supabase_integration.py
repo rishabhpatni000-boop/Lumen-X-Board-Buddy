@@ -8,7 +8,14 @@ from functools import wraps
 from urllib.parse import quote
 
 import requests
-from flask import redirect, request, session, url_for
+from flask import abort, redirect, request, session, url_for
+
+
+ADMIN_EMAILS = {
+    email.strip().lower()
+    for email in os.getenv("VISUALASSISTCAM_ADMIN_EMAILS", "rishabhpatni000@gmail.com").split(",")
+    if email.strip()
+}
 
 
 def configure_supabase(app):
@@ -35,6 +42,11 @@ def auth_enabled() -> bool:
 
 def current_user():
     return session.get("user")
+
+
+def is_admin_user(user: dict | None = None) -> bool:
+    user = user or current_user() or {}
+    return user.get("email", "").strip().lower() in ADMIN_EMAILS
 
 
 def current_access_token():
@@ -78,6 +90,28 @@ def login_required_api(view):
     return wrapped
 
 
+def admin_required_page(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if not is_authenticated():
+            return redirect(login_url_for_request())
+        if not is_admin_user():
+            abort(403)
+        return view(*args, **kwargs)
+    return wrapped
+
+
+def admin_required_api(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if not is_authenticated():
+            return redirect(login_url_for_request())
+        if not is_admin_user():
+            abort(403)
+        return view(*args, **kwargs)
+    return wrapped
+
+
 def fetch_supabase_user(access_token: str):
     cfg = supabase_config()
     if not cfg["url"] or not cfg["anon_key"]:
@@ -104,6 +138,7 @@ def store_session_from_token(access_token: str):
         "email": user.get("email", ""),
         "full_name": (user.get("user_metadata") or {}).get("full_name", ""),
         "avatar_url": (user.get("user_metadata") or {}).get("avatar_url", ""),
+        "is_admin": user.get("email", "").strip().lower() in ADMIN_EMAILS,
     }
     return session["user"]
 
@@ -122,6 +157,19 @@ def template_auth_context(callback_endpoint: str, next_url: str | None = None):
         "auth_callback_url": url_for(callback_endpoint, _external=True),
         "next_url": safe_next_url(next_url),
         "current_user": current_user(),
+        "is_admin": is_admin_user(),
+    }
+
+
+def supabase_service_headers():
+    cfg = supabase_config()
+    service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+    if not cfg["url"] or not service_key:
+        raise RuntimeError("Supabase service role key is not configured")
+    return {
+        "apikey": service_key,
+        "Authorization": f"Bearer {service_key}",
+        "Content-Type": "application/json",
     }
 
 
