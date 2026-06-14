@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-#  VisualAssistCam — Auto-start on Pi boot (optional)
+#  Lumen — Auto-start on Pi boot (optional)
 #  Creates a systemd service so the app starts automatically.
 #  Usage: bash setup_autostart.sh
 # ============================================================
@@ -11,9 +11,9 @@ USER="$(whoami)"
 echo "Setting up auto-start for user: $USER"
 echo "App directory: $APP_DIR"
 
-sudo tee /etc/systemd/system/visualassistcam.service > /dev/null << EOF
+sudo tee /etc/systemd/system/lumen.service > /dev/null << EOF
 [Unit]
-Description=VisualAssistCam — Classroom Whiteboard Assistant
+Description=Lumen — Classroom Whiteboard Assistant
 After=network.target
 
 [Service]
@@ -32,8 +32,8 @@ WantedBy=multi-user.target
 EOF
 
 sudo systemctl daemon-reload
-sudo systemctl enable visualassistcam.service
-sudo systemctl start  visualassistcam.service
+sudo systemctl enable lumen.service
+sudo systemctl start  lumen.service
 
 echo ""
 echo "============================================================"
@@ -43,9 +43,9 @@ echo ""
 echo "  The app will now start automatically on every reboot."
 echo ""
 echo "  Useful commands:"
-echo "    sudo systemctl status  visualassistcam   # check status"
-echo "    sudo systemctl stop    visualassistcam   # stop"
-echo "    sudo systemctl start   visualassistcam   # start"
-echo "    sudo systemctl restart visualassistcam   # restart"
-echo "    sudo journalctl -u visualassistcam -f    # view logs"
+echo "    sudo systemctl status  lumen   # check status"
+echo "    sudo systemctl stop    lumen   # stop"
+echo "    sudo systemctl start   lumen   # start"
+echo "    sudo systemctl restart lumen   # restart"
+echo "    sudo journalctl -u lumen -f    # view logs"
 echo ""

@@ -1,12 +1,14 @@
-# VisualAssistCam — Raspberry Pi 5 requirements
+# Lumen — Raspberry Pi 5 requirements
 # Install with: pip install -r requirements_pi.txt
 
 flask>=3.0.0
+flask-limiter>=3.8.0
 anthropic>=0.50.0
 numpy>=1.24.0
 pillow>=10.0.0
 python-dotenv>=1.0.0
 pyopenssl>=23.0.0          # HTTPS self-signed cert (required for camera from other devices)
+requests>=2.31.0
 
 # OpenCV — headless version (no X11/GUI dependency, lighter on Pi)
 opencv-python-headless>=4.8.0

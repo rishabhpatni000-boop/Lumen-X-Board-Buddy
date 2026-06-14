@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-VisualAssistCam — three-view whiteboard assistant
+Lumen — three-view whiteboard assistant
 Original camera | AI Board (SVG) | AI Analysis (text)
 """
 
@@ -10,18 +10,45 @@ import json
 import uuid
 import time
 import datetime
+import hashlib
 import numpy as np
 import cv2
 import threading
 import webbrowser
-import tempfile
 import base64
+import requests
 from concurrent.futures import ThreadPoolExecutor
 
 from dotenv import load_dotenv
 load_dotenv()
 
-from flask import Flask, request, jsonify, render_template, send_from_directory
+from flask import Flask, request, jsonify, render_template, send_from_directory, redirect, url_for
+from werkzeug.utils import secure_filename
+
+from supabase_integration import (
+    admin_required_api,
+    admin_required_page,
+    count_history_records_this_month,
+    clear_auth_session,
+    configure_supabase,
+    current_access_token,
+    current_user,
+    is_admin_user,
+    insert_history_record,
+    list_history_records_paginated,
+    login_required_api,
+    login_required_page,
+    safe_next_url,
+    store_session_from_token,
+    supabase_config,
+    supabase_service_headers,
+    template_auth_context,
+)
+from services.cache_service import TTLCache, stable_cache_key
+from services.logging_service import log_event, log_warning
+from services.quota_service import QuotaExceeded, QuotaService
+from services.storage_service import StorageService
+from web_security import configure_app_security, decode_image_data_url, require_json_payload
 
 # ── Claude ────────────────────────────────────────────────────────────────────
 try:
@@ -35,6 +62,7 @@ except ImportError:
 app = Flask(__name__, template_folder="templates")
 app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 app.config["TEMPLATES_AUTO_RELOAD"] = True
+configure_supabase(app)
 
 @app.after_request
 def no_cache(response):
@@ -42,57 +70,254 @@ def no_cache(response):
     response.headers["Pragma"] = "no-cache"
     return response
 
-SAVE_DIR     = os.path.expanduser("~/Desktop/VisualAssistCam_Captures")
-SESSIONS_DIR = os.path.expanduser("~/Desktop/VisualAssistCam_Sessions")
-IMAGES_DIR   = os.path.join(SESSIONS_DIR, "images")
-for d in [SAVE_DIR, SESSIONS_DIR, IMAGES_DIR]:
-    os.makedirs(d, exist_ok=True)
+DATA_DIR = os.getenv(
+    "VISUALASSISTCAM_DATA_DIR",
+    os.path.expanduser("~/Desktop/Lumen_Data"),
+)
+
+STORAGE = StorageService(DATA_DIR, {"MAX_IMAGE_BYTES": app.config["MAX_IMAGE_BYTES"]} if "MAX_IMAGE_BYTES" in app.config else {"MAX_IMAGE_BYTES": 5 * 1024 * 1024})
+SECURITY = configure_app_security(app, STORAGE.logs_dir)
+anon_api_quota = SECURITY["anon_api_quota"]
+read_api_limit = SECURITY["read_api_limit"]
+write_api_limit = SECURITY["write_api_limit"]
+QUOTAS = QuotaService()
+ANALYSIS_CACHE = TTLCache(ttl_seconds=int(os.getenv("ANALYSIS_CACHE_TTL", "600")), max_entries=128)
+BOARD_CACHE = TTLCache(ttl_seconds=int(os.getenv("BOARD_CACHE_TTL", "600")), max_entries=128)
+STORAGE.max_image_bytes = app.config["MAX_IMAGE_BYTES"]
+STORAGE.cleanup_temp()
 
 # ── Session helpers ──────────────────────────────────────────────────────────
 
+def _supabase_user_headers():
+    cfg = supabase_config()
+    token = current_access_token()
+    return {
+        "apikey": cfg["anon_key"],
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    }
+
+
+def _capture_for_store(cap: dict) -> dict:
+    stored = dict(cap)
+    for key in ("original_file", "aiboard_file"):
+        value = stored.get(key)
+        if isinstance(value, str) and value.startswith("data:image/"):
+            stored[key] = None
+    return stored
+
+
+def _session_payload_for_store(s: dict) -> dict:
+    return {
+        "id": s["id"],
+        "user_id": (current_user() or {}).get("id"),
+        "subject": s.get("subject"),
+        "teacher": s.get("teacher"),
+        "created_at": s.get("created_at"),
+        "locked": bool(s.get("locked", False)),
+        "captures": [_capture_for_store(cap) for cap in s.get("captures", [])],
+    }
+
+
+def _use_supabase_session_store() -> bool:
+    cfg = supabase_config()
+    return bool(cfg["url"] and cfg["anon_key"] and current_access_token() and current_user())
+
+
+def _session_store_fallback_allowed(error: Exception) -> bool:
+    if isinstance(error, requests.HTTPError) and error.response is not None:
+        return error.response.status_code in (401, 403, 404)
+    return False
+
 def _sessions_list() -> list:
+    if _use_supabase_session_store():
+        try:
+            cfg = supabase_config()
+            resp = requests.get(
+                f"{cfg['url']}/rest/v1/class_sessions",
+                headers=_supabase_user_headers(),
+                params=[
+                    ("select", "id,subject,teacher,created_at,locked,captures"),
+                    ("order", "created_at.desc"),
+                ],
+                timeout=20,
+            )
+            resp.raise_for_status()
+            return resp.json()
+        except Exception as e:
+            if not _session_store_fallback_allowed(e):
+                raise
     out = []
-    for f in os.listdir(SESSIONS_DIR):
+    for f in os.listdir(STORAGE.sessions_dir):
         if f.endswith(".json"):
             try:
-                with open(os.path.join(SESSIONS_DIR, f)) as fp:
+                with open(os.path.join(STORAGE.sessions_dir, f)) as fp:
                     out.append(json.load(fp))
             except Exception:
                 pass
     return out
 
 def _session_get(sid: str):
-    p = os.path.join(SESSIONS_DIR, f"{sid}.json")
+    if _use_supabase_session_store():
+        try:
+            cfg = supabase_config()
+            resp = requests.get(
+                f"{cfg['url']}/rest/v1/class_sessions",
+                headers=_supabase_user_headers(),
+                params=[
+                    ("select", "id,subject,teacher,created_at,locked,captures"),
+                    ("id", f"eq.{sid}"),
+                    ("limit", "1"),
+                ],
+                timeout=20,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            return data[0] if data else None
+        except Exception as e:
+            if not _session_store_fallback_allowed(e):
+                raise
+    p = STORAGE.session_json_path(sid)
     if os.path.exists(p):
         with open(p) as f:
             return json.load(f)
     return None
 
 def _session_save(s: dict):
-    with open(os.path.join(SESSIONS_DIR, f"{s['id']}.json"), "w") as f:
+    if _use_supabase_session_store():
+        try:
+            cfg = supabase_config()
+            payload = _session_payload_for_store(s)
+            resp = requests.post(
+                f"{cfg['url']}/rest/v1/class_sessions",
+                headers={**_supabase_user_headers(), "Prefer": "resolution=merge-duplicates,return=representation"},
+                json=payload,
+                timeout=20,
+            )
+            resp.raise_for_status()
+            return
+        except Exception as e:
+            if not _session_store_fallback_allowed(e):
+                raise
+    with open(STORAGE.session_json_path(s["id"]), "w") as f:
         json.dump(s, f, indent=2)
 
 PORT = 5050
 _pool = ThreadPoolExecutor(max_workers=2)
 
+
+def landing_founder_photo_url():
+    for filename in ("rishabh-founder.jpg", "rishabh-founder.jpeg", "rishabh-founder.png", "rishabh-founder.webp"):
+        photo_path = os.path.join(app.root_path, "static", "images", filename)
+        if os.path.exists(photo_path):
+            return url_for("static", filename=f"images/{filename}")
+    return None
+
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 @app.route("/")
-def index():
-    return render_template("index.html", claude_available=CLAUDE_AVAILABLE)
+def landing():
+    if current_user():
+        return redirect(url_for("app_dashboard"))
+    next_url = safe_next_url(request.args.get("next"))
+    return render_template(
+        "landing.html",
+        claude_available=CLAUDE_AVAILABLE,
+        founder_photo_url=landing_founder_photo_url(),
+        **template_auth_context("auth_callback", next_url=next_url),
+    )
+
+
+@app.route("/auth/callback")
+def auth_callback():
+    return render_template("auth_callback.html", **template_auth_context("auth_callback"))
+
+
+@app.route("/auth/session", methods=["POST"])
+def auth_session():
+    data, error_response = require_json_payload()
+    if error_response:
+        return error_response
+    access_token = data.get("access_token", "").strip()
+    next_url = safe_next_url(data.get("next"))
+    if not access_token:
+        return jsonify({"error": "Missing access token"}), 400
+    try:
+        user = store_session_from_token(access_token)
+        return jsonify({"ok": True, "redirect_to": next_url, "user": user})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 401
+
+
+@app.route("/auth/logout", methods=["POST"])
+def auth_logout():
+    clear_auth_session()
+    return jsonify({"ok": True})
+
+
+@app.route("/app")
+@login_required_page
+def app_dashboard():
+    return render_template(
+        "index.html",
+        claude_available=CLAUDE_AVAILABLE,
+        **template_auth_context("auth_callback"),
+    )
+
+
+@app.route("/camera")
+@login_required_page
+def camera_dashboard():
+    return redirect(url_for("app_dashboard"))
+
+
+@app.route("/history")
+@login_required_page
+def history_page():
+    return render_template(
+        "history.html",
+        claude_available=CLAUDE_AVAILABLE,
+        **template_auth_context("auth_callback"),
+    )
+
+
+@app.route("/settings")
+@login_required_page
+def settings_page():
+    return render_template(
+        "settings.html",
+        claude_available=CLAUDE_AVAILABLE,
+        quota_snapshot=QUOTAS.quota_snapshot(),
+        **template_auth_context("auth_callback"),
+    )
+
+
+@app.route("/admin")
+@admin_required_page
+def admin_dashboard():
+    return render_template(
+        "admin.html",
+        claude_available=CLAUDE_AVAILABLE,
+        **template_auth_context("auth_callback"),
+    )
 
 
 @app.route("/analyze", methods=["POST"])
+@anon_api_quota
+@login_required_api
 def analyze():
-    data = request.get_json(force=True)
-    image_data = data.get("image", "")
-    if not image_data:
-        return jsonify({"svg": "", "analysis": "", "error": "No image"})
+    data, error_response = require_json_payload()
+    if error_response:
+        return error_response
     try:
-        _, encoded = image_data.split(",", 1)
-        image_bytes = base64.b64decode(encoded)
-    except Exception as e:
-        return jsonify({"svg": "", "analysis": "", "error": str(e)})
+        quota_snapshot = QUOTAS.ensure_analysis_available()
+    except QuotaExceeded as e:
+        return jsonify({"svg": "", "analysis": "", "error": str(e), "quota": e.quota_snapshot}), 429
+    try:
+        image_bytes, _ = decode_image_data_url(data.get("image", ""),
+                                               app.config["MAX_IMAGE_BYTES"])
+    except ValueError as e:
+        return jsonify({"svg": "", "analysis": "", "error": str(e)}), 400
 
     if not CLAUDE_AVAILABLE:
         return jsonify({"svg": "", "analysis": "Claude API key not configured.",
@@ -102,17 +327,39 @@ def analyze():
     custom_svg_prompt      = data.get("svg_prompt", None)
     custom_analysis_prompt = data.get("analysis_prompt", None)
 
-    # Run SVG + analysis in parallel
+    cache_key = stable_cache_key("analyze", {
+        "image_sha": hashlib.sha256(image_bytes).hexdigest(),
+        "svg_prompt": custom_svg_prompt or "",
+        "analysis_prompt": custom_analysis_prompt or "",
+    })
+    cached = ANALYSIS_CACHE.get(cache_key)
+    if cached is not None:
+        return jsonify({**cached, "quota": quota_snapshot})
+
     svg_f      = _pool.submit(_gen_svg,      image_bytes, custom_svg_prompt)
     analysis_f = _pool.submit(_gen_analysis, image_bytes, custom_analysis_prompt)
-
-    return jsonify({"svg": svg_f.result(), "analysis": analysis_f.result()})
+    result = {"svg": svg_f.result(), "analysis": analysis_f.result()}
+    ANALYSIS_CACHE.set(cache_key, result)
+    QUOTAS.record_event("analysis", {"session_id": data.get("session_id", ""), "board_id": data.get("board_id")})
+    QUOTAS.record_event("ai_request", {"route": "/analyze"})
+    QUOTAS.record_event("ocr_request", {"route": "/analyze"})
+    log_event(
+        SECURITY["logger"],
+        "analysis_completed",
+        ip=request.remote_addr,
+        user_id=(current_user() or {}).get("id"),
+    )
+    return jsonify({**result, "quota": QUOTAS.quota_snapshot()})
 
 
 @app.route("/chat", methods=["POST"])
+@anon_api_quota
+@login_required_api
 def chat():
     """Continue the lesson conversation with Claude Teacher."""
-    data    = request.get_json(force=True)
+    data, error_response = require_json_payload()
+    if error_response:
+        return error_response
     message = data.get("message", "").strip()
     history = data.get("history", [])   # [{role,content}, ...]
     context = data.get("context", "")   # initial board analysis
@@ -143,6 +390,7 @@ def chat():
             system=system,
             messages=history + [{"role": "user", "content": message}],
         )
+        QUOTAS.record_event("ai_request", {"route": "/chat"})
         return jsonify({"response": resp.content[0].text.strip()})
     except Exception as e:
         print(f"Chat error: {e}")
@@ -150,18 +398,19 @@ def chat():
 
 
 @app.route("/save", methods=["POST"])
+@anon_api_quota
+@login_required_api
 def save():
-    data     = request.get_json(force=True)
+    data, error_response = require_json_payload()
+    if error_response:
+        return error_response
     img_data = data.get("image", "")
-    filename = data.get("filename", "capture.png")
-    if not img_data:
-        return jsonify({"ok": False, "error": "No image"})
     try:
-        _, encoded = img_data.split(",", 1)
-        path = os.path.join(SAVE_DIR, filename)
-        with open(path, "wb") as f:
-            f.write(base64.b64decode(encoded))
-        return jsonify({"ok": True, "path": path})
+        QUOTAS.ensure_upload_available()
+        stored = STORAGE.save_data_url(img_data, "captures", data.get("filename", "capture.png"))
+        QUOTAS.record_event("upload", {"route": "/save", "filename": stored.filename})
+        log_event(SECURITY["logger"], "upload_saved", ip=request.remote_addr, filename=stored.filename)
+        return jsonify({"ok": True, "path": stored.absolute_path})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)})
 
@@ -169,16 +418,16 @@ def save():
 # ── Whiteboard calibration (auto-frame + perspective correction) ──────────────
 
 @app.route("/calibrate", methods=["POST"])
+@anon_api_quota
+@login_required_api
 def calibrate():
     """Detect whiteboard in frame. Returns corners + homography for perspective correction."""
-    data = request.get_json(force=True)
-    img_data = data.get("image", "")
-    if not img_data:
-        return jsonify({"success": False, "error": "No image"})
+    data, error_response = require_json_payload()
+    if error_response:
+        return error_response
     try:
-        _, enc = img_data.split(",", 1)
-        img_bytes = base64.b64decode(enc)
-        nparr = np.frombuffer(img_bytes, np.uint8)
+        image_bytes, _ = decode_image_data_url(data.get("image", ""), app.config["MAX_IMAGE_BYTES"])
+        nparr = np.frombuffer(image_bytes, np.uint8)
         frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         if frame is None:
             return jsonify({"success": False, "error": "Could not decode image"})
@@ -276,9 +525,13 @@ def _order_corners(pts: np.ndarray) -> np.ndarray:
 # ── Board update endpoint (incremental + first-time) ─────────────────────────
 
 @app.route("/update-board", methods=["POST"])
+@anon_api_quota
+@login_required_api
 def update_board():
     """Update the AI Board. First call generates fresh; subsequent calls update incrementally."""
-    data = request.get_json(force=True)
+    data, error_response = require_json_payload()
+    if error_response:
+        return error_response
     img_data     = data.get("image", "")
     previous_svg = data.get("previous_svg", "")
     svg_prompt   = data.get("svg_prompt", None)
@@ -288,30 +541,49 @@ def update_board():
     if not CLAUDE_AVAILABLE:
         return jsonify({"svg": "", "is_new_board": False, "error": "No API key"})
     try:
-        _, enc = img_data.split(",", 1)
-        image_bytes = base64.b64decode(enc)
-    except Exception as e:
+        image_bytes, _ = decode_image_data_url(img_data, app.config["MAX_IMAGE_BYTES"])
+    except ValueError as e:
         return jsonify({"svg": "", "is_new_board": False, "error": str(e)})
+
+    cache_key = stable_cache_key("board", {
+        "image_sha": hashlib.sha256(image_bytes).hexdigest(),
+        "previous_svg": previous_svg[:500],
+        "svg_prompt": svg_prompt or "",
+    })
+    cached = BOARD_CACHE.get(cache_key)
+    if cached is not None:
+        return jsonify(cached)
 
     if previous_svg.strip().startswith("<svg"):
         result = _gen_svg_incremental(image_bytes, previous_svg, svg_prompt)
     else:
         svg = _gen_svg(image_bytes, svg_prompt)
         result = {"svg": svg, "is_new_board": False}
-
+    BOARD_CACHE.set(cache_key, result)
+    QUOTAS.record_event("ai_request", {"route": "/update-board"})
     return jsonify(result)
 
 
 # ── Session API ──────────────────────────────────────────────────────────────
 
 @app.route("/api/sessions", methods=["GET"])
+@read_api_limit
+@login_required_api
 def api_sessions():
-    return jsonify(_sessions_list())
+    try:
+        return jsonify(_sessions_list())
+    except Exception as e:
+        log_warning(SECURITY["logger"], "session_list_failed", error=str(e))
+        return jsonify({"error": "Could not load class sessions", "details": str(e)}), 500
 
 
 @app.route("/api/sessions", methods=["POST"])
+@write_api_limit
+@login_required_api
 def api_create_session():
-    data = request.get_json(force=True)
+    data, error_response = require_json_payload()
+    if error_response:
+        return error_response
     s = {
         "id":         str(uuid.uuid4())[:12],
         "subject":    data.get("subject", "Unknown").strip(),
@@ -320,44 +592,79 @@ def api_create_session():
         "locked":     False,
         "captures":   [],
     }
-    _session_save(s)
-    return jsonify(s)
+    try:
+        _session_save(s)
+        return jsonify(s)
+    except Exception as e:
+        log_warning(SECURITY["logger"], "session_create_failed", error=str(e))
+        return jsonify({"error": "Could not save class session", "details": str(e)}), 500
 
 
 @app.route("/api/sessions/<sid>", methods=["GET"])
+@read_api_limit
+@login_required_api
 def api_get_session(sid):
-    s = _session_get(sid)
-    return jsonify(s) if s else (jsonify({"error": "Not found"}), 404)
+    try:
+        s = _session_get(sid)
+        return jsonify(s) if s else (jsonify({"error": "Not found"}), 404)
+    except Exception as e:
+        log_warning(SECURITY["logger"], "session_get_failed", session_id=sid, error=str(e))
+        return jsonify({"error": "Could not load class session", "details": str(e)}), 500
 
 
 @app.route("/api/sessions/<sid>/lock", methods=["POST"])
+@write_api_limit
+@login_required_api
 def api_toggle_lock(sid):
-    s = _session_get(sid)
+    try:
+        s = _session_get(sid)
+    except Exception as e:
+        log_warning(SECURITY["logger"], "session_lock_load_failed", session_id=sid, error=str(e))
+        return jsonify({"error": "Could not load class session", "details": str(e)}), 500
     if not s:
         return jsonify({"error": "Not found"}), 404
     s["locked"] = not s.get("locked", False)
-    _session_save(s)
-    return jsonify({"locked": s["locked"]})
+    try:
+        _session_save(s)
+        return jsonify({"locked": s["locked"]})
+    except Exception as e:
+        log_warning(SECURITY["logger"], "session_lock_save_failed", session_id=sid, error=str(e))
+        return jsonify({"error": "Could not update class session", "details": str(e)}), 500
 
 
 @app.route("/api/sessions/<sid>/capture", methods=["POST"])
+@anon_api_quota
+@login_required_api
 def api_add_capture(sid):
-    s = _session_get(sid)
+    try:
+        s = _session_get(sid)
+    except Exception as e:
+        log_warning(SECURITY["logger"], "session_capture_load_failed", session_id=sid, error=str(e))
+        return jsonify({"error": "Could not load class session", "details": str(e)}), 500
     if not s:
         return jsonify({"error": "Not found"}), 404
     if s.get("locked"):
         return jsonify({"error": "Session is locked"}), 403
 
-    data         = request.get_json(force=True)
+    data, error_response = require_json_payload()
+    if error_response:
+        return error_response
+    try:
+        QUOTAS.ensure_upload_available()
+    except QuotaExceeded as e:
+        return jsonify({"error": str(e), "quota": e.quota_snapshot}), 429
     cap_type     = data.get("capture_type", "explicit")  # explicit | latest_freeze | aiboard
     board_id     = data.get("board_id", 0)
     ts           = datetime.datetime.now()
 
+    using_supabase_sessions = _use_supabase_session_store()
+
     def _delete_old_files(cap):
+        if using_supabase_sessions:
+            return
         for fkey in ("original_file", "aiboard_file"):
             if cap.get(fkey):
-                try: os.remove(os.path.join(IMAGES_DIR, cap[fkey]))
-                except: pass
+                STORAGE.delete_file("session_images", cap[fkey])
 
     # latest_freeze: keep one per board_id — replace previous freeze from same board
     if cap_type == "latest_freeze":
@@ -391,38 +698,58 @@ def api_add_capture(sid):
 
     def _save_img(key, suffix):
         raw = data.get(key, "")
-        if not raw or "," not in raw:
+        if not raw:
             return None
-        _, enc = raw.split(",", 1)
-        fname = f"{sid}_{cap_id}_{suffix}.png"
-        with open(os.path.join(IMAGES_DIR, fname), "wb") as f:
-            f.write(base64.b64decode(enc))
-        return fname
+        if using_supabase_sessions:
+            return None
+        stored = STORAGE.save_data_url(raw, "session_images", f"{sid}_{cap_id}_{suffix}.png")
+        return stored.filename
 
     cap["original_file"] = _save_img("original", "original")
     cap["aiboard_file"]  = _save_img("aiboard",  "aiboard")
 
     s["captures"].append(cap)
-    _session_save(s)
+    try:
+        _session_save(s)
+    except Exception as e:
+        log_warning(SECURITY["logger"], "session_capture_save_failed", session_id=sid, error=str(e))
+        return jsonify({"error": "Could not save capture to class history", "details": str(e)}), 500
+    QUOTAS.record_event("upload", {"route": "/api/sessions/capture", "capture_type": cap_type})
     return jsonify(cap)
 
 
 @app.route("/api/sessions/<sid>", methods=["DELETE"])
+@write_api_limit
+@login_required_api
 def api_delete_session(sid):
     s = _session_get(sid)
     if not s:
         return jsonify({"error": "Not found"}), 404
+    if _use_supabase_session_store():
+        try:
+            cfg = supabase_config()
+            resp = requests.delete(
+                f"{cfg['url']}/rest/v1/class_sessions",
+                headers=_supabase_user_headers(),
+                params=[("id", f"eq.{sid}")],
+                timeout=20,
+            )
+            resp.raise_for_status()
+            return jsonify({"ok": True})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
     for cap in s.get("captures", []):
         for fkey in ("original_file", "aiboard_file"):
             if cap.get(fkey):
-                try: os.remove(os.path.join(IMAGES_DIR, cap[fkey]))
-                except: pass
-    try: os.remove(os.path.join(SESSIONS_DIR, f"{sid}.json"))
+                STORAGE.delete_file("session_images", cap[fkey])
+    try: os.remove(STORAGE.session_json_path(sid))
     except: pass
     return jsonify({"ok": True})
 
 
 @app.route("/api/sessions/<sid>/captures/<cap_id>", methods=["DELETE"])
+@write_api_limit
+@login_required_api
 def api_delete_capture(sid, cap_id):
     s = _session_get(sid)
     if not s:
@@ -431,15 +758,17 @@ def api_delete_capture(sid, cap_id):
     if idx is None:
         return jsonify({"error": "Capture not found"}), 404
     cap = s["captures"].pop(idx)
-    for fkey in ("original_file", "aiboard_file"):
-        if cap.get(fkey):
-            try: os.remove(os.path.join(IMAGES_DIR, cap[fkey]))
-            except: pass
+    if not _use_supabase_session_store():
+        for fkey in ("original_file", "aiboard_file"):
+            if cap.get(fkey):
+                STORAGE.delete_file("session_images", cap[fkey])
     _session_save(s)
     return jsonify({"ok": True})
 
 
 @app.route("/api/sessions/by-subject/<subject>", methods=["GET"])
+@read_api_limit
+@login_required_api
 def api_by_subject(subject):
     all_s = _sessions_list()
     return jsonify([s for s in all_s
@@ -447,8 +776,253 @@ def api_by_subject(subject):
 
 
 @app.route("/api/images/<filename>")
+@login_required_api
 def api_image(filename):
-    return send_from_directory(IMAGES_DIR, filename)
+    return send_from_directory(STORAGE.images_dir, filename)
+
+
+@app.route("/api/history-images/<filename>")
+@read_api_limit
+@login_required_api
+def api_history_image(filename):
+    return send_from_directory(STORAGE.history_dir, filename)
+
+
+@app.route("/api/dashboard", methods=["GET"])
+@read_api_limit
+@login_required_api
+def api_dashboard():
+    quota_snapshot = QUOTAS.quota_snapshot()
+    recent = QUOTAS.recent_activity(limit=8)
+    total_analyses = list_history_records_paginated(page=1, per_page=1)["total"]
+    return jsonify({
+        "total_analyses": total_analyses,
+        "analyses_this_month": count_history_records_this_month(),
+        "remaining_quota": quota_snapshot,
+        "recent_activity": recent,
+    })
+
+
+def _admin_rest_get(path: str, params=None):
+    cfg = supabase_config()
+    resp = requests.get(
+        f"{cfg['url']}{path}",
+        headers=supabase_service_headers(),
+        params=params or [],
+        timeout=20,
+    )
+    resp.raise_for_status()
+    return resp.json(), resp.headers
+
+
+def _admin_rest_upsert(path: str, payload: dict):
+    cfg = supabase_config()
+    resp = requests.post(
+        f"{cfg['url']}{path}",
+        headers={**supabase_service_headers(), "Prefer": "resolution=merge-duplicates,return=representation"},
+        json=payload,
+        timeout=20,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    return data[0] if isinstance(data, list) and data else data
+
+
+def _admin_auth_users() -> list[dict]:
+    cfg = supabase_config()
+    resp = requests.get(
+        f"{cfg['url']}/auth/v1/admin/users",
+        headers=supabase_service_headers(),
+        params=[("page", "1"), ("per_page", "500")],
+        timeout=20,
+    )
+    resp.raise_for_status()
+    payload = resp.json() or {}
+    return payload.get("users", [])
+
+
+def _admin_try_fetch(fetcher, default):
+    try:
+        return fetcher(), None
+    except Exception as e:
+        return default, str(e)
+
+
+@app.route("/api/admin/overview", methods=["GET"])
+@read_api_limit
+@admin_required_api
+def api_admin_overview():
+    warnings = []
+    profile_rows, err = _admin_try_fetch(
+        lambda: _admin_rest_get("/rest/v1/users", [
+            ("select", "id,email,full_name,created_at"),
+            ("order", "created_at.desc"),
+        ])[0],
+        [],
+    )
+    if err:
+        warnings.append(f"profiles: {err}")
+
+    auth_users, err = _admin_try_fetch(_admin_auth_users, [])
+    if err:
+        warnings.append(f"auth_users: {err}")
+
+    overrides, err = _admin_try_fetch(
+        lambda: _admin_rest_get("/rest/v1/user_quota_overrides", [
+            ("select", "user_id,daily_analyses_limit,monthly_analyses_limit,daily_upload_limit,notes,updated_at"),
+        ])[0],
+        [],
+    )
+    if err:
+        warnings.append(f"quota_overrides: {err}")
+
+    history, err = _admin_try_fetch(
+        lambda: _admin_rest_get("/rest/v1/analysis_history", [
+            ("select", "user_id,created_at"),
+            ("order", "created_at.desc"),
+            ("limit", "5000"),
+        ])[0],
+        [],
+    )
+    if err:
+        warnings.append(f"history: {err}")
+
+    usage, err = _admin_try_fetch(
+        lambda: _admin_rest_get("/rest/v1/usage_events", [
+            ("select", "user_id,event_type,created_at"),
+            ("order", "created_at.desc"),
+            ("limit", "5000"),
+        ])[0],
+        [],
+    )
+    if err:
+        warnings.append(f"usage: {err}")
+
+    profile_map = {item["id"]: item for item in profile_rows}
+    override_map = {item["user_id"]: item for item in overrides}
+    usage_map = {}
+    for item in usage:
+        entry = usage_map.setdefault(item["user_id"], {"analysis": 0, "upload": 0, "last_activity": item.get("created_at")})
+        if item.get("event_type") == "analysis":
+            entry["analysis"] += 1
+        if item.get("event_type") == "upload":
+            entry["upload"] += 1
+        if item.get("created_at") and (not entry["last_activity"] or item["created_at"] > entry["last_activity"]):
+            entry["last_activity"] = item["created_at"]
+
+    history_map = {}
+    for item in history:
+        entry = history_map.setdefault(item["user_id"], {"history_count": 0, "last_analysis_at": item.get("created_at")})
+        entry["history_count"] += 1
+        if item.get("created_at") and (not entry["last_analysis_at"] or item["created_at"] > entry["last_analysis_at"]):
+            entry["last_analysis_at"] = item["created_at"]
+
+    users_payload = []
+    source_users = auth_users or [{"id": row["id"], "email": row.get("email"), "created_at": row.get("created_at"), "user_metadata": {"full_name": row.get("full_name")}} for row in profile_rows]
+    for auth_user in source_users:
+        profile = profile_map.get(auth_user["id"], {})
+        user = {
+            "id": auth_user["id"],
+            "email": auth_user.get("email") or profile.get("email"),
+            "full_name": (auth_user.get("user_metadata") or {}).get("full_name") or profile.get("full_name"),
+            "created_at": auth_user.get("created_at") or profile.get("created_at"),
+        }
+        override = override_map.get(user["id"], {})
+        activity = usage_map.get(user["id"], {})
+        hist = history_map.get(user["id"], {})
+        users_payload.append({
+            **user,
+            "is_admin": is_admin_user(user),
+            "usage": activity,
+            "history_count": hist.get("history_count", 0),
+            "last_analysis_at": hist.get("last_analysis_at"),
+            "quota_override": override,
+            "effective_limits": {
+                "daily_analyses": override.get("daily_analyses_limit") or QUOTAS.daily_analyses_limit,
+                "monthly_analyses": override.get("monthly_analyses_limit") or QUOTAS.monthly_analyses_limit,
+                "daily_uploads": override.get("daily_upload_limit") or QUOTAS.daily_upload_limit,
+            },
+        })
+
+    return jsonify({
+        "admin_email": (current_user() or {}).get("email", ""),
+        "users": users_payload,
+        "warnings": warnings,
+        "defaults": {
+            "daily_analyses": QUOTAS.daily_analyses_limit,
+            "monthly_analyses": QUOTAS.monthly_analyses_limit,
+            "daily_uploads": QUOTAS.daily_upload_limit,
+        },
+    })
+
+
+@app.route("/api/admin/users/<user_id>/quota", methods=["POST"])
+@write_api_limit
+@admin_required_api
+def api_admin_user_quota(user_id):
+    data, error_response = require_json_payload()
+    if error_response:
+        return error_response
+    record = _admin_rest_upsert("/rest/v1/user_quota_overrides", {
+        "user_id": user_id,
+        "daily_analyses_limit": int(data.get("daily_analyses_limit") or 0) or None,
+        "monthly_analyses_limit": int(data.get("monthly_analyses_limit") or 0) or None,
+        "daily_upload_limit": int(data.get("daily_upload_limit") or 0) or None,
+        "notes": (data.get("notes") or "").strip(),
+    })
+    return jsonify({"ok": True, "record": record})
+
+
+
+@app.route("/api/history", methods=["GET"])
+@read_api_limit
+@login_required_api
+def api_history():
+    try:
+        page = max(1, int(request.args.get("page", "1")))
+        per_page = max(1, min(25, int(request.args.get("per_page", "12"))))
+        search = request.args.get("search", "")
+        subject = request.args.get("subject", "")
+        return jsonify(list_history_records_paginated(page=page, per_page=per_page, search=search, subject=subject))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/history", methods=["POST"])
+@write_api_limit
+@login_required_api
+def api_create_history():
+    data, error_response = require_json_payload()
+    if error_response:
+        return error_response
+    try:
+        image_path = None
+        if data.get("image_data", "").strip():
+            QUOTAS.ensure_upload_available()
+            stored = STORAGE.save_data_url(
+                data.get("image_data", "").strip(),
+                "history_uploads",
+                f"history_{uuid.uuid4().hex}.png",
+            )
+            image_path = stored.filename
+            QUOTAS.record_event("upload", {"route": "/api/history", "filename": stored.filename})
+        record = insert_history_record({
+            "subject": data.get("subject", "").strip() or None,
+            "teacher": data.get("teacher", "").strip() or None,
+            "session_id": data.get("session_id", "").strip() or None,
+            "board_id": data.get("board_id"),
+            "topic": data.get("topic", "").strip() or None,
+            "analysis_text": data.get("analysis_text", "").strip(),
+            "ocr_text": data.get("ocr_text", "").strip() or None,
+            "ai_response": data.get("ai_response", "").strip() or data.get("analysis_text", "").strip(),
+            "board_svg": data.get("board_svg", "").strip() or None,
+            "image_path": image_path,
+        })
+        return jsonify(record or {"ok": True})
+    except QuotaExceeded as e:
+        return jsonify({"error": str(e), "quota": e.quota_snapshot}), 429
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # ── Claude functions ──────────────────────────────────────────────────────────
@@ -639,7 +1213,7 @@ def _open_browser():
 
 if __name__ == "__main__":
     print(f"\n{'='*50}")
-    print("  VisualAssistCam")
+    print("  Lumen")
     print(f"  Claude AI : {'✓ enabled' if CLAUDE_AVAILABLE else '✗ not configured'}")
     print(f"  Browser   : http://localhost:{PORT}")
     print("  Quit      : Ctrl+C")

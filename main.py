@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-VisualAssistCam — Low-vision classroom assistant
+Lumen — Low-vision classroom assistant
 Camera feed with zoom, pan, image enhancement, freeze-frame, and OCR.
 """
 
@@ -47,7 +47,7 @@ _FONT_PATHS = [
 
 OCR_AVAILABLE = VISION_AVAILABLE or TESSERACT_AVAILABLE
 
-SAVE_DIR = os.path.expanduser("~/Desktop/VisualAssistCam_Captures")
+SAVE_DIR = os.path.expanduser("~/Desktop/Lumen_Captures")
 os.makedirs(SAVE_DIR, exist_ok=True)
 
 
@@ -273,7 +273,7 @@ PRESETS = {
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("VisualAssistCam")
+        self.setWindowTitle("Lumen")
         self.setMinimumSize(1100, 750)
 
         self.proc = ImageProcessor()
@@ -1047,7 +1047,7 @@ class MainWindow(QMainWindow):
 
 def main():
     app = QApplication(sys.argv)
-    app.setApplicationName("VisualAssistCam")
+    app.setApplicationName("Lumen")
 
     window = MainWindow()
 

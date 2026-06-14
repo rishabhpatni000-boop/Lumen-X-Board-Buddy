@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Something Went Wrong - Lumen</title>
+<style>
+body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;
+  background:linear-gradient(160deg,#0a1118,#142332);color:#edf3f8;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.card{max-width:600px;background:#121b24;border:1px solid rgba(126,157,194,.18);
+  border-radius:24px;padding:32px}
+h1{margin:0 0 12px;font-size:34px}
+p{margin:0 0 18px;line-height:1.7;color:#a9b9ca}
+a{display:inline-block;background:#eaf1f7;color:#132133;text-decoration:none;font-weight:700;
+  padding:12px 16px;border-radius:12px}
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Something went wrong</h1>
+    <p>{{ message or "Lumen hit an unexpected error. The issue has been logged so it can be investigated." }}</p>
+    <a href="/">Back to the landing page</a>
+  </div>
+</body>
+</html>

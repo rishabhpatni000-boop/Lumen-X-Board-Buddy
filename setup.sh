@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "=== VisualAssistCam Setup ==="
+echo "=== Lumen Setup ==="
 
 # Check for Homebrew
 if ! command -v brew &>/dev/null; then

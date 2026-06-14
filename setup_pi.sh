@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-#  VisualAssistCam — Raspberry Pi 5 Setup Script
+#  Lumen — Raspberry Pi 5 Setup Script
 #  Run this ONCE after copying files to the Pi.
 #  Usage: bash setup_pi.sh
 # ============================================================
@@ -8,7 +8,7 @@ set -e
 
 echo ""
 echo "============================================================"
-echo "  VisualAssistCam — Raspberry Pi 5 Setup"
+echo "  Lumen — Raspberry Pi 5 Setup"
 echo "============================================================"
 
 # ── 1. System packages ────────────────────────────────────────
@@ -56,7 +56,7 @@ echo "[4/5] Generating self-signed SSL certificate for HTTPS..."
 if [ ! -f "cert.pem" ]; then
     openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem \
         -days 3650 -nodes \
-        -subj "/C=IN/ST=Maharashtra/L=Mumbai/O=VisualAssistCam/CN=raspberrypi.local" \
+        -subj "/C=IN/ST=Maharashtra/L=Mumbai/O=Lumen/CN=raspberrypi.local" \
         2>/dev/null
     echo "  ✓ SSL certificate created (valid 10 years)."
 else

@@ -1,0 +1,39 @@
+services:
+  - type: web
+    name: lumen
+    env: python
+    plan: starter
+    buildCommand: pip install -r requirements_web.txt
+    startCommand: gunicorn app:app --workers 2 --threads 4 --timeout 120 --bind 0.0.0.0:$PORT
+    autoDeploy: true
+    disk:
+      name: lumen-data
+      mountPath: /var/data
+      sizeGB: 5
+    envVars:
+      - key: SESSION_COOKIE_SECURE
+        value: "true"
+      - key: TRUST_PROXY_COUNT
+        value: "1"
+      - key: VISUALASSISTCAM_DATA_DIR
+        value: /var/data/lumen
+      - key: MAX_IMAGE_BYTES
+        value: "5242880"
+      - key: MAX_REQUEST_BYTES
+        value: "8388608"
+      - key: DAILY_ANALYSES_LIMIT
+        value: "20"
+      - key: MONTHLY_ANALYSES_LIMIT
+        value: "200"
+      - key: DAILY_UPLOAD_LIMIT
+        value: "30"
+      - key: FLASK_SECRET_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
