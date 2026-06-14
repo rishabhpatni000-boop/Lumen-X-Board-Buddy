@@ -111,6 +111,14 @@ def _session_save(s: dict):
 PORT = 5050
 _pool = ThreadPoolExecutor(max_workers=2)
 
+
+def landing_founder_photo_url():
+    for filename in ("rishabh-founder.jpg", "rishabh-founder.jpeg", "rishabh-founder.png", "rishabh-founder.webp"):
+        photo_path = os.path.join(app.root_path, "static", "images", filename)
+        if os.path.exists(photo_path):
+            return url_for("static", filename=f"images/{filename}")
+    return None
+
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 @app.route("/")
@@ -121,6 +129,7 @@ def landing():
     return render_template(
         "landing.html",
         claude_available=CLAUDE_AVAILABLE,
+        founder_photo_url=landing_founder_photo_url(),
         **template_auth_context("auth_callback", next_url=next_url),
     )
 

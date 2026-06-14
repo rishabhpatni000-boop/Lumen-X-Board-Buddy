@@ -5,113 +5,947 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Lumen</title>
 <style>
+:root{
+  --bg:#f4efe7;
+  --bg-strong:#e7d8c4;
+  --ink:#14212f;
+  --ink-soft:#506172;
+  --card:#fffaf3;
+  --card-strong:#f5ebdc;
+  --line:rgba(20,33,47,.12);
+  --accent:#1e5d72;
+  --accent-2:#df8f47;
+  --accent-3:#7fbb8b;
+  --accent-4:#b3473a;
+  --shadow:0 26px 70px rgba(38,34,28,.12);
+}
 *{box-sizing:border-box;margin:0;padding:0}
-body{min-height:100vh;background:
-  radial-gradient(circle at top left,rgba(56,90,138,.35),transparent 30%),
-  radial-gradient(circle at bottom right,rgba(34,88,74,.28),transparent 32%),
-  linear-gradient(160deg,#081018,#0f1822 48%,#121e29);
-  color:#ecf2f8;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-  padding:24px}
-.page{width:min(1120px,100%);margin:0 auto}
-.shell{width:100%;display:grid;grid-template-columns:1.15fr .85fr;
-  background:rgba(9,15,22,.78);border:1px solid rgba(126,157,194,.2);
-  border-radius:28px;overflow:hidden;box-shadow:0 30px 90px rgba(0,0,0,.35)}
-.topnav{display:flex;justify-content:space-between;align-items:center;padding:0 0 18px 0;gap:16px;flex-wrap:wrap}
-.brand{font-size:14px;font-weight:700;letter-spacing:.5px;color:#d7e4f2}
-.navlinks{display:flex;gap:16px;flex-wrap:wrap}
-.navlinks a{color:#8eaed3;text-decoration:none;font-size:14px}
-.hero{padding:64px 58px 56px}
-.hero h1{font-size:54px;line-height:1;letter-spacing:-1.8px;margin-bottom:18px}
-.hero p{font-size:19px;line-height:1.7;color:#b6c6d7;max-width:620px}
-.eyebrow{display:inline-flex;align-items:center;gap:10px;font-size:12px;
-  letter-spacing:1.6px;text-transform:uppercase;color:#8eaed3;margin-bottom:22px}
-.eyebrow:before{content:"";width:36px;height:1px;background:#5d7ea6}
-.panel{padding:42px 36px;background:rgba(14,24,34,.78);border-left:1px solid rgba(126,157,194,.16);
-  display:flex;flex-direction:column;justify-content:center}
-.card{background:#111b27;border:1px solid rgba(126,157,194,.18);border-radius:22px;
-  padding:28px 24px}
-.card h2{font-size:22px;margin-bottom:10px}
-.card p{color:#9cb1c7;line-height:1.7;font-size:15px}
-.benefits{margin:22px 0 28px;display:grid;gap:12px}
-.benefit{padding:14px 15px;border-radius:16px;background:#0d1721;border:1px solid rgba(126,157,194,.14)}
-.benefit strong{display:block;font-size:14px;margin-bottom:4px;color:#ecf2f8}
-.benefit span{color:#8ea3ba;font-size:14px;line-height:1.5}
-.cta{width:100%;border:none;border-radius:16px;padding:16px 18px;font-size:16px;
-  font-weight:700;cursor:pointer;background:linear-gradient(135deg,#f7fafc,#dbe7f4);color:#142334}
-.cta:disabled{cursor:not-allowed;opacity:.55}
-.foot{margin-top:14px;font-size:12px;color:#6f8195;line-height:1.6}
-.status{margin-top:14px;font-size:13px;color:#ca8a2a;min-height:20px}
-.sections{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:16px}
-.section{background:rgba(9,15,22,.72);border:1px solid rgba(126,157,194,.16);border-radius:22px;padding:18px}
-.section h3{font-size:18px;margin-bottom:8px}
-.section p{color:#9cb1c7;line-height:1.7;font-size:14px}
-@media (max-width:880px){
-  .shell{grid-template-columns:1fr}
-  .panel{border-left:none;border-top:1px solid rgba(126,157,194,.16)}
-  .hero{padding:42px 28px 28px}
-  .hero h1{font-size:40px}
-  .sections{grid-template-columns:1fr}
+html{scroll-behavior:smooth}
+body{
+  min-height:100vh;
+  color:var(--ink);
+  font-family:Georgia,"Times New Roman",serif;
+  background:
+    radial-gradient(circle at top left,rgba(223,143,71,.28),transparent 26%),
+    radial-gradient(circle at 88% 22%,rgba(30,93,114,.16),transparent 24%),
+    linear-gradient(180deg,#fbf6ef 0%,#f4efe7 48%,#efe6d8 100%);
+}
+a{color:inherit}
+.page{
+  width:min(1180px,calc(100% - 32px));
+  margin:0 auto;
+  padding:22px 0 42px;
+}
+.topbar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  flex-wrap:wrap;
+  margin-bottom:22px;
+}
+.brand{
+  display:inline-flex;
+  align-items:center;
+  gap:12px;
+  text-decoration:none;
+}
+.brand-mark{
+  width:42px;
+  height:42px;
+  border-radius:14px;
+  background:linear-gradient(145deg,#1e5d72,#2d7d92);
+  color:#fefbf6;
+  display:grid;
+  place-items:center;
+  font-family:"Trebuchet MS",sans-serif;
+  font-size:18px;
+  font-weight:700;
+  box-shadow:0 14px 28px rgba(30,93,114,.22);
+}
+.brand-copy strong{
+  display:block;
+  font-family:"Trebuchet MS",sans-serif;
+  letter-spacing:.08em;
+  font-size:13px;
+  text-transform:uppercase;
+}
+.brand-copy span{
+  color:var(--ink-soft);
+  font-size:13px;
+}
+.navlinks{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+}
+.navlinks a{
+  text-decoration:none;
+  padding:10px 14px;
+  border-radius:999px;
+  background:rgba(255,250,243,.72);
+  border:1px solid var(--line);
+  color:var(--ink-soft);
+  font-size:13px;
+}
+.masthead{
+  position:relative;
+  overflow:hidden;
+  background:rgba(255,250,243,.76);
+  border:1px solid rgba(20,33,47,.08);
+  border-radius:34px;
+  box-shadow:var(--shadow);
+}
+.masthead:before,
+.masthead:after{
+  content:"";
+  position:absolute;
+  border-radius:999px;
+  pointer-events:none;
+}
+.masthead:before{
+  width:240px;
+  height:240px;
+  top:-80px;
+  right:-70px;
+  background:rgba(223,143,71,.14);
+}
+.masthead:after{
+  width:320px;
+  height:320px;
+  bottom:-160px;
+  left:-110px;
+  background:rgba(127,187,139,.18);
+}
+.hero{
+  position:relative;
+  display:grid;
+  grid-template-columns:1.03fr .97fr;
+  gap:26px;
+  padding:42px;
+}
+.hero-copy,.hero-visual{position:relative;z-index:1}
+.eyebrow{
+  display:inline-flex;
+  align-items:center;
+  gap:10px;
+  color:var(--accent);
+  font-family:"Trebuchet MS",sans-serif;
+  font-size:12px;
+  font-weight:700;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  margin-bottom:18px;
+}
+.eyebrow:before{
+  content:"";
+  width:34px;
+  height:2px;
+  border-radius:999px;
+  background:var(--accent-2);
+}
+.hero h1{
+  font-size:clamp(2.8rem,5vw,4.9rem);
+  line-height:.95;
+  letter-spacing:-.06em;
+  max-width:10ch;
+  margin-bottom:18px;
+}
+.hero-text{
+  max-width:58ch;
+  color:var(--ink-soft);
+  font-size:18px;
+  line-height:1.75;
+}
+.hero-actions{
+  display:flex;
+  gap:12px;
+  flex-wrap:wrap;
+  margin:30px 0 16px;
+}
+.primary-cta,.secondary-cta{
+  border:none;
+  border-radius:18px;
+  padding:16px 22px;
+  font-size:16px;
+  font-weight:700;
+  cursor:pointer;
+  text-decoration:none;
+  transition:transform .16s ease,box-shadow .16s ease,background .16s ease;
+}
+.primary-cta{
+  background:linear-gradient(135deg,#1e5d72,#2f7d91);
+  color:#fdfbf7;
+  box-shadow:0 18px 35px rgba(30,93,114,.24);
+}
+.primary-cta:hover:not(:disabled),
+.secondary-cta:hover{
+  transform:translateY(-1px);
+}
+.primary-cta:disabled{
+  cursor:not-allowed;
+  opacity:.55;
+}
+.secondary-cta{
+  background:#fff8ef;
+  color:var(--ink);
+  border:1px solid rgba(20,33,47,.12);
+}
+.status-message{
+  min-height:24px;
+  color:#9a632d;
+  font-size:14px;
+}
+.hero-notes{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:12px;
+  margin-top:22px;
+}
+.note-card{
+  background:rgba(255,250,243,.88);
+  border:1px solid rgba(20,33,47,.08);
+  border-radius:20px;
+  padding:16px;
+}
+.note-card strong{
+  display:block;
+  margin-bottom:8px;
+  font-family:"Trebuchet MS",sans-serif;
+  font-size:13px;
+  letter-spacing:.04em;
+  text-transform:uppercase;
+}
+.note-card p{
+  color:var(--ink-soft);
+  font-size:14px;
+  line-height:1.65;
+}
+.hero-visual{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.visual-stack{
+  width:min(100%,520px);
+  display:grid;
+  gap:16px;
+}
+.scene-card{
+  background:linear-gradient(160deg,#163243,#21485e 56%,#275a72);
+  border-radius:30px;
+  padding:18px;
+  color:#f4f8fb;
+  box-shadow:0 24px 50px rgba(21,48,63,.24);
+}
+.scene-card img{
+  width:100%;
+  height:auto;
+  display:block;
+  border-radius:22px;
+  object-fit:cover;
+  min-height:320px;
+  box-shadow:0 18px 40px rgba(8,20,28,.26);
+}
+.visual-row{
+  display:grid;
+  grid-template-columns:1.15fr .85fr;
+  gap:16px;
+}
+.mini-card{
+  background:#fff8ef;
+  border:1px solid rgba(20,33,47,.1);
+  border-radius:24px;
+  padding:18px;
+}
+.mini-card h3{
+  font-size:19px;
+  margin-bottom:10px;
+}
+.mini-card p,
+.mini-card li{
+  color:var(--ink-soft);
+  line-height:1.6;
+}
+.mini-card ul{
+  list-style:none;
+  display:grid;
+  gap:10px;
+}
+.mini-card li{
+  padding-left:18px;
+  position:relative;
+}
+.mini-card li:before{
+  content:"";
+  position:absolute;
+  left:0;
+  top:.62em;
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:var(--accent-2);
+}
+.mini-card.orange{background:linear-gradient(180deg,#fff4e8,#fce3cb)}
+.stat-pill{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:8px 12px;
+  border-radius:999px;
+  background:rgba(255,255,255,.16);
+  font-family:"Trebuchet MS",sans-serif;
+  font-size:12px;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  margin-bottom:14px;
+}
+.impact-strip{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:14px;
+  margin:18px 42px 0;
+  padding-bottom:40px;
+}
+.impact-card{
+  background:rgba(255,248,239,.74);
+  border:1px solid rgba(20,33,47,.08);
+  border-radius:22px;
+  padding:18px;
+}
+.impact-card strong{
+  display:block;
+  font-size:17px;
+  margin-bottom:8px;
+}
+.impact-card p{
+  color:var(--ink-soft);
+  line-height:1.65;
+}
+.section{
+  margin-top:22px;
+  background:rgba(255,250,243,.72);
+  border:1px solid rgba(20,33,47,.08);
+  border-radius:32px;
+  box-shadow:var(--shadow);
+  overflow:hidden;
+}
+.section-inner{
+  padding:34px 34px 38px;
+}
+.section-head{
+  display:flex;
+  justify-content:space-between;
+  gap:16px;
+  flex-wrap:wrap;
+  align-items:end;
+  margin-bottom:24px;
+}
+.section-head h2{
+  font-size:clamp(2rem,3vw,2.8rem);
+  line-height:1.02;
+  letter-spacing:-.04em;
+}
+.section-head p{
+  max-width:56ch;
+  color:var(--ink-soft);
+  line-height:1.7;
+}
+.problem-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:18px;
+}
+.story-card{
+  min-height:240px;
+  border-radius:28px;
+  padding:26px;
+  position:relative;
+  overflow:hidden;
+}
+.story-card.problem{
+  background:linear-gradient(180deg,#fff7ef,#f8ead6);
+}
+.story-card.solution{
+  background:linear-gradient(180deg,#eef7f8,#dceff2);
+}
+.story-card h3{
+  font-size:28px;
+  margin-bottom:14px;
+}
+.story-card p{
+  color:var(--ink-soft);
+  font-size:16px;
+  line-height:1.8;
+  max-width:40ch;
+}
+.story-card .corner-tag{
+  position:absolute;
+  top:18px;
+  right:18px;
+  border-radius:999px;
+  padding:8px 11px;
+  background:rgba(255,255,255,.72);
+  font-family:"Trebuchet MS",sans-serif;
+  font-size:11px;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+}
+.steps-grid{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:16px;
+}
+.step-card{
+  background:linear-gradient(180deg,#fffaf3,#f7ecdf);
+  border:1px solid rgba(20,33,47,.08);
+  border-radius:24px;
+  padding:20px;
+}
+.step-no{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:42px;
+  height:42px;
+  border-radius:14px;
+  background:var(--ink);
+  color:#fff8ef;
+  font-family:"Trebuchet MS",sans-serif;
+  font-size:14px;
+  margin-bottom:16px;
+}
+.step-card h3{
+  font-size:22px;
+  margin-bottom:10px;
+}
+.step-card p{
+  color:var(--ink-soft);
+  line-height:1.7;
+}
+.founder-grid{
+  display:grid;
+  grid-template-columns:.9fr 1.1fr;
+  gap:22px;
+  align-items:stretch;
+}
+.portrait-card{
+  background:linear-gradient(160deg,#1b4357,#285e74 58%,#2f6f84);
+  border-radius:30px;
+  padding:22px;
+  color:#f7fbff;
+  min-height:100%;
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+}
+.portrait-frame{
+  border-radius:24px;
+  overflow:hidden;
+  background:rgba(255,255,255,.1);
+  min-height:420px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  position:relative;
+}
+.portrait-frame img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+}
+.portrait-placeholder{
+  width:100%;
+  height:100%;
+  min-height:420px;
+  background:
+    radial-gradient(circle at top,rgba(255,255,255,.18),transparent 32%),
+    linear-gradient(180deg,rgba(255,255,255,.14),rgba(255,255,255,.06));
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:14px;
+  text-align:center;
+  padding:24px;
+}
+.portrait-monogram{
+  width:110px;
+  height:110px;
+  border-radius:50%;
+  background:rgba(255,250,243,.92);
+  color:var(--accent);
+  display:grid;
+  place-items:center;
+  font-family:"Trebuchet MS",sans-serif;
+  font-size:34px;
+  font-weight:700;
+}
+.portrait-placeholder strong{
+  font-size:21px;
+}
+.portrait-placeholder p{
+  max-width:22ch;
+  color:rgba(247,251,255,.84);
+  line-height:1.65;
+}
+.portrait-card .caption{
+  margin-top:16px;
+  color:rgba(247,251,255,.84);
+  line-height:1.7;
+}
+.founder-story{
+  background:linear-gradient(180deg,#fffaf3,#f5e9db);
+  border:1px solid rgba(20,33,47,.08);
+  border-radius:30px;
+  padding:26px;
+}
+.founder-story h3{
+  font-size:30px;
+  margin-bottom:16px;
+}
+.founder-story p{
+  color:var(--ink-soft);
+  line-height:1.86;
+  margin-bottom:14px;
+  font-size:16px;
+}
+.founder-quote{
+  margin-top:18px;
+  padding:18px 20px;
+  border-left:4px solid var(--accent-2);
+  background:rgba(255,255,255,.58);
+  border-radius:18px;
+}
+.founder-quote strong{
+  display:block;
+  margin-bottom:8px;
+  font-family:"Trebuchet MS",sans-serif;
+  font-size:12px;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+  color:var(--accent);
+}
+.visual-grid{
+  display:grid;
+  grid-template-columns:1.02fr .98fr;
+  gap:16px;
+}
+.visual-card{
+  border-radius:28px;
+  overflow:hidden;
+  background:#fff8ef;
+  border:1px solid rgba(20,33,47,.08);
+}
+.visual-card .art{
+  padding:18px;
+  min-height:220px;
+}
+.visual-card .copy{
+  padding:0 18px 20px;
+}
+.visual-card h3{
+  font-size:22px;
+  margin-bottom:8px;
+}
+.visual-card p{
+  color:var(--ink-soft);
+  line-height:1.7;
+}
+.art img{
+  display:block;
+  width:100%;
+  height:auto;
+  border-radius:20px;
+  object-fit:cover;
+}
+.comparison-card{
+  background:linear-gradient(180deg,#f5ecdf,#f8f1e8);
+}
+.comparison-card .art{
+  padding:16px;
+}
+.comparison-card .copy p{
+  margin-bottom:10px;
+}
+.comparison-notes{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-top:8px;
+}
+.comparison-note{
+  background:rgba(255,255,255,.56);
+  border:1px solid rgba(20,33,47,.08);
+  border-radius:16px;
+  padding:12px;
+}
+.comparison-note strong{
+  display:block;
+  margin-bottom:6px;
+  font-family:"Trebuchet MS",sans-serif;
+  font-size:12px;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  color:var(--accent);
+}
+.comparison-note span{
+  color:var(--ink-soft);
+  line-height:1.55;
+  font-size:14px;
+}
+.snapshot-stack{
+  display:grid;
+  gap:16px;
+}
+.snapshot-copy{
+  background:linear-gradient(180deg,#fffaf3,#f7ecdf);
+  border:1px solid rgba(20,33,47,.08);
+  border-radius:24px;
+  padding:18px;
+}
+.snapshot-copy h3{
+  font-size:22px;
+  margin-bottom:10px;
+}
+.snapshot-copy p{
+  color:var(--ink-soft);
+  line-height:1.7;
+  margin-bottom:10px;
+}
+.snapshot-copy p:last-child{
+  margin-bottom:0;
+}
+.cta-band{
+  display:grid;
+  grid-template-columns:1.05fr .95fr;
+  gap:18px;
+  align-items:center;
+}
+.cta-copy h2{
+  font-size:clamp(2.1rem,3.2vw,3rem);
+  line-height:1;
+  letter-spacing:-.04em;
+  margin-bottom:12px;
+}
+.cta-copy p{
+  color:var(--ink-soft);
+  line-height:1.8;
+  max-width:54ch;
+}
+.cta-panel{
+  background:linear-gradient(180deg,#173849,#214a60);
+  color:#f6fbff;
+  border-radius:28px;
+  padding:24px;
+}
+.cta-panel h3{
+  font-size:24px;
+  margin-bottom:10px;
+}
+.cta-panel p{
+  color:rgba(246,251,255,.8);
+  line-height:1.75;
+  margin-bottom:18px;
+}
+.cta-panel .primary-cta{width:100%}
+.cta-panel .foot{
+  margin-top:14px;
+  color:rgba(246,251,255,.65);
+  font-size:12px;
+  line-height:1.6;
+}
+code{
+  background:rgba(20,33,47,.08);
+  border-radius:8px;
+  padding:2px 6px;
+  font-family:"SFMono-Regular",Consolas,monospace;
+  font-size:.92em;
+}
+@media (max-width:1040px){
+  .hero,
+  .founder-grid,
+  .cta-band,
+  .problem-grid,
+  .visual-grid{grid-template-columns:1fr}
+  .steps-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .impact-strip{grid-template-columns:1fr;margin:18px 24px 0;padding-bottom:28px}
+  .hero-notes{grid-template-columns:1fr}
+}
+@media (max-width:720px){
+  .page{width:min(100% - 20px,1180px);padding-top:14px}
+  .hero{padding:26px 20px}
+  .section-inner{padding:24px 20px 26px}
+  .steps-grid{grid-template-columns:1fr}
+  .visual-row{grid-template-columns:1fr}
+  .comparison-notes{grid-template-columns:1fr}
+  .portrait-frame,.portrait-placeholder{min-height:300px}
+  .navlinks{width:100%}
+  .navlinks a{flex:1;text-align:center}
 }
 </style>
 </head>
 <body>
   <div class="page">
-    <div class="topnav">
-      <div class="brand">Lumen</div>
+    <header class="topbar">
+      <a class="brand" href="/">
+        <span class="brand-mark">L</span>
+        <span class="brand-copy">
+          <strong>Lumen</strong>
+          <span>Accessible classroom vision support</span>
+        </span>
+      </a>
       <nav class="navlinks" aria-label="Public site">
-        <a href="#about">About</a>
-        <a href="#privacy">Privacy</a>
-        <a href="#contact">Contact</a>
+        <a href="#solution">Solution</a>
+        <a href="#journey">How it works</a>
+        <a href="#founder">Founder</a>
+        <a href="#enter">Sign in</a>
       </nav>
-    </div>
-    <div class="shell">
-      <section class="hero">
-        <div class="eyebrow">Accessible Classroom Capture</div>
-        <h1>Lumen</h1>
-        <p>Lumen turns live classroom whiteboards into readable digital notes, guided lesson explanations, and structured study history for each signed-in learner.</p>
-      </section>
-      <aside class="panel">
-        <div class="card">
-          <h2>Continue to your learning dashboard</h2>
-          <p>Sign in with Google to access the protected camera workflow, AI board reconstruction, OCR-assisted analysis, and your personal history.</p>
-          <div class="benefits">
-            <div class="benefit">
-              <strong>Protected access</strong>
-              <span>The classroom tools stay hidden until authentication succeeds.</span>
-            </div>
-            <div class="benefit">
-              <strong>Personal history</strong>
-              <span>Each analysis is stored under your account so only you can view it later.</span>
-            </div>
-            <div class="benefit">
-              <strong>Accessibility first</strong>
-              <span>Readable layout, keyboard-friendly controls, and responsive sections support visually impaired learners.</span>
-            </div>
+    </header>
+
+    <section class="masthead" id="solution">
+      <div class="hero">
+        <div class="hero-copy">
+          <div class="eyebrow">Built from lived classroom experience</div>
+          <h1>Turn distant whiteboards into clear learning support.</h1>
+          <p class="hero-text">
+            Lumen helps students with low vision capture classroom boards, reconstruct the content into something more readable, and understand what happened through guided explanations instead of relying only on fast verbal cues.
+          </p>
+
+          <div class="hero-actions">
+            <button id="googleBtn" class="primary-cta" {% if not auth_enabled %}disabled{% endif %}>Continue with Google</button>
+            <a href="#founder" class="secondary-cta">Meet the creator</a>
           </div>
-          <button id="googleBtn" class="cta" {% if not auth_enabled %}disabled{% endif %}>
-            Continue with Google
-          </button>
-          <div id="status" class="status">{% if not auth_enabled %}Supabase Auth is not configured yet. Add the required environment variables to enable login.{% endif %}</div>
-          <div class="foot">
-            After authentication you will be redirected to the dashboard at <code>/app</code>.
+          <p id="status" class="status-message">{% if not auth_enabled %}Supabase Auth is not configured yet. Add the required environment variables to enable login.{% endif %}</p>
+
+          <div class="hero-notes">
+            <article class="note-card">
+              <strong>Capture the moment</strong>
+              <p>Freeze the board before the content disappears and keep the important parts in view.</p>
+            </article>
+            <article class="note-card">
+              <strong>Make it clearer</strong>
+              <p>Transform messy, far-away writing into a cleaner digital version with AI support.</p>
+            </article>
+            <article class="note-card">
+              <strong>Ask what it means</strong>
+              <p>Turn board content into explanations, follow-up questions, and a reviewable study history.</p>
+            </article>
           </div>
         </div>
-      </aside>
-    </div>
-    <div class="sections">
-      <section id="about" class="section">
-        <h3>About</h3>
-        <p>Lumen is designed to help students capture classroom content, transform whiteboards into cleaner digital representations, and revisit analyses in a safer, authenticated environment.</p>
-      </section>
-      <section id="privacy" class="section">
-        <h3>Privacy</h3>
-        <p>Authentication is handled with Supabase and Google Sign-In. Analysis history is stored per user with row-level security so users can only access their own records.</p>
-      </section>
-      <section id="contact" class="section">
-        <h3>Contact</h3>
-        <p>This is a placeholder for a production support or contact channel. Add your real support email or help desk link before public launch.</p>
-      </section>
-    </div>
+
+        <div class="hero-visual" aria-hidden="true">
+          <div class="visual-stack">
+            <div class="scene-card">
+              <div class="stat-pill">Classroom board to guided understanding</div>
+              <img src="{{ url_for('static', filename='images/classroom-hero.png') }}" alt="Students seated in a classroom while a teacher writes on the whiteboard">
+            </div>
+
+            <div class="visual-row">
+              <article class="mini-card">
+                <h3>One flexible workflow</h3>
+                <ul>
+                  <li>See the original board, AI board, and explanation views.</li>
+                  <li>Review past captures later instead of losing them after class.</li>
+                  <li>Keep the experience tied to each learner's own account.</li>
+                </ul>
+              </article>
+              <article class="mini-card orange">
+                <h3>Designed for real classrooms</h3>
+                <p>Fast-paced lessons, changing boards, diagrams, and handwritten notes all shaped how this experience was built.</p>
+              </article>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="impact-strip">
+        <article class="impact-card">
+          <strong>More independence</strong>
+          <p>Students can revisit board work without needing to depend entirely on what they managed to hear in the moment.</p>
+        </article>
+        <article class="impact-card">
+          <strong>Less information loss</strong>
+          <p>Important equations, annotations, and diagrams can be preserved before they vanish from the board.</p>
+        </article>
+        <article class="impact-card">
+          <strong>Built from lived need</strong>
+          <p>This is not accessibility as an afterthought. It comes from someone who knows the challenge firsthand.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-inner">
+        <div class="section-head">
+          <div>
+            <div class="eyebrow">Why Lumen exists</div>
+            <h2>A classroom challenge, rethought as a practical tool.</h2>
+          </div>
+          <p>Lumen is meant to bridge the gap between being present in class and being able to fully access what is happening on the board, especially when the lesson pace rises and every missed line matters.</p>
+        </div>
+
+        <div class="problem-grid">
+          <article class="story-card problem">
+            <span class="corner-tag">The challenge</span>
+            <h3>Seeing less should not mean learning less.</h3>
+            <p>Even in supportive classrooms, far-away handwritten notes and rapidly changing boards can be difficult to follow for students with low vision. Verbal explanation helps, but it does not always replace what is written, drawn, or erased in front of the class.</p>
+          </article>
+          <article class="story-card solution">
+            <span class="corner-tag">The solution</span>
+            <h3>Capture, clarify, and understand.</h3>
+            <p>Lumen combines live board capture, AI-enhanced reconstruction, OCR support, and guided explanation into one workflow that helps students stay connected to the lesson rather than catching up after it ends.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="journey">
+      <div class="section-inner">
+        <div class="section-head">
+          <div>
+            <div class="eyebrow">How it works</div>
+            <h2>A simple path from board to understanding.</h2>
+          </div>
+          <p>The experience is designed to stay focused on the moment a student needs help most: while the board is still active and the lesson is moving forward.</p>
+        </div>
+
+        <div class="steps-grid">
+          <article class="step-card">
+            <span class="step-no">01</span>
+            <h3>Capture</h3>
+            <p>Use the camera workflow to freeze the board when the right frame appears.</p>
+          </article>
+          <article class="step-card">
+            <span class="step-no">02</span>
+            <h3>Rebuild</h3>
+            <p>Generate a cleaner digital board representation that is easier to inspect.</p>
+          </article>
+          <article class="step-card">
+            <span class="step-no">03</span>
+            <h3>Explain</h3>
+            <p>Ask for clarification and get structured guidance on what the board content means.</p>
+          </article>
+          <article class="step-card">
+            <span class="step-no">04</span>
+            <h3>Review</h3>
+            <p>Return to saved sessions later through personal history, not memory alone.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="founder">
+      <div class="section-inner">
+        <div class="section-head">
+          <div>
+            <div class="eyebrow">Founder story</div>
+            <h2>Built by Rishabh Patni, for the classroom he knows firsthand.</h2>
+          </div>
+          <p>This section is ready for Rishabh's photograph. As soon as an image is placed in <code>static/images/rishabh-founder.jpg</code>, it will appear here automatically.</p>
+        </div>
+
+        <div class="founder-grid">
+          <aside class="portrait-card">
+            <div class="portrait-frame">
+              {% if founder_photo_url %}
+              <img src="{{ founder_photo_url }}" alt="Rishabh Patni, creator of Lumen">
+              {% else %}
+              <div class="portrait-placeholder">
+                <div class="portrait-monogram">RP</div>
+                <strong>Rishabh Patni</strong>
+                <p>Grade 9 student, builder, and creator of an accessibility tool shaped by lived low-vision experience.</p>
+              </div>
+              {% endif %}
+            </div>
+            <p class="caption">A founder section built around a real story of persistence, problem-solving, and designing with empathy from the inside out.</p>
+          </aside>
+
+          <article class="founder-story">
+            <h3>From daily classroom difficulty to a working solution.</h3>
+            <p>Rishabh Patni is a Grade 9 student living with albinism and low vision. Over the years, and especially as academic pressure increased in the higher grades, he often found it difficult to clearly grasp what was happening on the classroom board in real time.</p>
+            <p>Even with helpful schools and supportive teachers, there were still moments when the lesson moved faster than accessibility could keep up. Like many students with low vision, he often had to depend heavily on spoken cues and memory, even when the most important information was visual.</p>
+            <p>That challenge pushed him to start exploring what kinds of tools already existed. He discovered that some devices and solutions were available elsewhere, but many of them were far too expensive to be practical.</p>
+            <p>So he asked a different question: what if he built one himself? That question turned into Lumen, a live working app shaped by the real problems he faces in class and by a clear understanding of what would genuinely make learning easier.</p>
+            <div class="founder-quote">
+              <strong>Why this matters</strong>
+              <p>Because Lumen is built by someone with low vision, it is grounded not just in technical possibility, but in firsthand understanding of what the classroom challenge actually feels like and what needs solving most.</p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-inner">
+        <div class="section-head">
+          <div>
+            <div class="eyebrow">Visual snapshots</div>
+            <h2>A more engaging picture of the experience.</h2>
+          </div>
+          <p>To keep the page from feeling dry, these panels add a classroom mood, a sense of interaction, and a quick visual summary of what Lumen supports.</p>
+        </div>
+
+        <div class="visual-grid">
+          <article class="visual-card comparison-card">
+            <div class="art">
+              <img src="{{ url_for('static', filename='images/board-before-after.png') }}" alt="Side-by-side whiteboard comparison showing blurry low-vision appearance on one side and a clean enhanced board on the other">
+            </div>
+            <div class="copy">
+              <h3>Before and after readability</h3>
+              <p>This comparison shows the problem more honestly: distant board content can look soft and fuzzy to a student with albinism, while Lumen aims to reconstruct it into something far easier to read and revisit.</p>
+              <div class="comparison-notes">
+                <div class="comparison-note">
+                  <strong>Before</strong>
+                  <span>Faint marker contrast, blur from distance, and hard-to-decipher diagrams.</span>
+                </div>
+                <div class="comparison-note">
+                  <strong>After</strong>
+                  <span>Cleaner structure, stronger contrast, and board content that is much easier to understand.</span>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <div class="snapshot-stack">
+            <article class="visual-card">
+              <div class="art">
+                <img src="{{ url_for('static', filename='images/classroom-hero.png') }}" alt="Teacher writing on a classroom whiteboard while students sit at desks">
+              </div>
+              <div class="copy">
+                <h3>Rooted in a real classroom</h3>
+                <p>The product is meant for the actual scene where accessibility breaks down most often: students seated at a distance while the board keeps changing in front of them.</p>
+              </div>
+            </article>
+
+            <article class="snapshot-copy">
+              <h3>Why these visuals work better</h3>
+              <p>The classroom image now shows the exact environment Lumen is built for instead of a generic decorative graphic.</p>
+              <p>The board comparison gives visitors an immediate sense of both the challenge and the value of the solution in one glance.</p>
+            </article>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="enter">
+      <div class="section-inner">
+        <div class="cta-band">
+          <div class="cta-copy">
+            <div class="eyebrow">Enter the app</div>
+            <h2>Ready to continue into Lumen?</h2>
+            <p>Sign in to access the protected camera workflow, AI board reconstruction, explanation tools, and your saved session history. The app will take you to <code>/app</code> after authentication.</p>
+          </div>
+          <div class="cta-panel">
+            <h3>Continue to your learning dashboard</h3>
+            <p>Authentication keeps each learner's board captures and history private while opening the full classroom workflow inside the app.</p>
+            <button id="googleBtnBottom" class="primary-cta" {% if not auth_enabled %}disabled{% endif %}>Continue with Google</button>
+            <div class="foot">If authentication is not configured yet, the sign-in buttons will remain disabled until the required Supabase environment variables are added.</div>
+          </div>
+        </div>
+      </div>
+    </section>
   </div>
 
   <script type="module">
@@ -122,12 +956,15 @@ body{min-height:100vh;background:
     const callbackUrl = {{ auth_callback_url|tojson }};
     const nextUrl = {{ next_url|tojson }};
     const statusEl = document.getElementById('status');
-    const button = document.getElementById('googleBtn');
+    const buttons = [
+      document.getElementById('googleBtn'),
+      document.getElementById('googleBtnBottom'),
+    ].filter(Boolean);
 
-    if (button && supabaseUrl && supabaseAnonKey) {
+    if (buttons.length && supabaseUrl && supabaseAnonKey) {
       const supabase = createClient(supabaseUrl, supabaseAnonKey);
-      button.addEventListener('click', async () => {
-        statusEl.textContent = 'Redirecting to Google…';
+      const signIn = async () => {
+        if (statusEl) statusEl.textContent = 'Redirecting to Google...';
         const redirectTo = `${callbackUrl}?next=${encodeURIComponent(nextUrl || '/app')}`;
         const { error } = await supabase.auth.signInWithOAuth({
           provider: 'google',
@@ -136,10 +973,11 @@ body{min-height:100vh;background:
             queryParams: { prompt: 'select_account' },
           },
         });
-        if (error) {
+        if (error && statusEl) {
           statusEl.textContent = error.message;
         }
-      });
+      };
+      buttons.forEach((button) => button.addEventListener('click', signIn));
     }
   </script>
 </body>
