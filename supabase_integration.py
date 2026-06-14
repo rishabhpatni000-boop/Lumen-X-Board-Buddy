@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Supabase auth and history helpers for VisualAssistCam."""
+"""Supabase auth and history helpers for Lumen."""
 
 from __future__ import annotations
 

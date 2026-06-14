@@ -1,6 +1,6 @@
-# VisualAssistCam
+# Lumen
 
-VisualAssistCam is an accessibility-focused classroom assistant that captures whiteboard content, reconstructs it into a cleaner AI board, explains lessons in plain language, and stores per-user history behind Google Sign-In.
+Lumen is an accessibility-focused classroom assistant that captures whiteboard content, reconstructs it into a cleaner AI board, explains lessons in plain language, and stores per-user history behind Google Sign-In.
 
 ## Current Flow
 
@@ -26,8 +26,8 @@ Visitor -> Landing Page -> Google Sign-In -> Dashboard -> Analysis Features -> H
 ## Local Setup
 
 1. Create a Python virtual environment.
-2. Install [requirements_web.txt](/Users/rishabhpatni/Downloads/VisualAssistCam/requirements_web.txt).
-3. Copy [.env.example](/Users/rishabhpatni/Downloads/VisualAssistCam/.env.example) to `.env`.
+2. Install [requirements_web.txt](/Users/rishabhpatni/Downloads/Lumen/requirements_web.txt).
+3. Copy [.env.example](/Users/rishabhpatni/Downloads/Lumen/.env.example) to `.env`.
 4. Configure Supabase and Anthropic values.
 5. Start the app with:
 
@@ -44,11 +44,11 @@ bash run.sh
 
 ## Important Docs
 
-- [ARCHITECTURE.md](/Users/rishabhpatni/Downloads/VisualAssistCam/ARCHITECTURE.md)
-- [PRODUCTION_READINESS.md](/Users/rishabhpatni/Downloads/VisualAssistCam/PRODUCTION_READINESS.md)
-- [SUPABASE_SETUP.md](/Users/rishabhpatni/Downloads/VisualAssistCam/SUPABASE_SETUP.md)
-- [DEPLOYMENT.md](/Users/rishabhpatni/Downloads/VisualAssistCam/DEPLOYMENT.md)
+- [ARCHITECTURE.md](/Users/rishabhpatni/Downloads/Lumen/ARCHITECTURE.md)
+- [PRODUCTION_READINESS.md](/Users/rishabhpatni/Downloads/Lumen/PRODUCTION_READINESS.md)
+- [SUPABASE_SETUP.md](/Users/rishabhpatni/Downloads/Lumen/SUPABASE_SETUP.md)
+- [DEPLOYMENT.md](/Users/rishabhpatni/Downloads/Lumen/DEPLOYMENT.md)
 
 ## Raspberry Pi
 
-See [README_PI.md](/Users/rishabhpatni/Downloads/VisualAssistCam/README_PI.md) for the Pi-specific setup flow.
+See [README_PI.md](/Users/rishabhpatni/Downloads/Lumen/README_PI.md) for the Pi-specific setup flow.

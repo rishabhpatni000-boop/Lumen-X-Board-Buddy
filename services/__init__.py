@@ -1,1 +1,1 @@
-"""Shared application services for VisualAssistCam."""
+"""Shared application services for Lumen."""

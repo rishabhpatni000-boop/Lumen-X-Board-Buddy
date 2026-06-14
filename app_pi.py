@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-VisualAssistCam — Raspberry Pi 5 version
+Lumen — Raspberry Pi 5 version
 All features identical to the Mac version.
 
 Key differences from app.py (Mac):
   • Listens on 0.0.0.0 so any device on the network can connect
   • Uses HTTPS (self-signed cert via pyOpenSSL) — required for camera
     access from non-localhost devices in Chrome / Firefox
-  • Data stored in ~/VisualAssistCam/ instead of ~/Desktop/
+  • Data stored in ~/Lumen/ instead of ~/Desktop/
   • No browser auto-launch (Pi may be headless)
   • Shows the Pi's network IP on startup so students know the URL
 """
@@ -71,7 +71,7 @@ def no_cache(response):
     return response
 
 # ── Data directories (Pi-friendly paths, no Desktop) ─────────────────────────
-DATA_DIR = os.getenv("VISUALASSISTCAM_DATA_DIR", os.path.expanduser("~/VisualAssistCam"))
+DATA_DIR = os.getenv("VISUALASSISTCAM_DATA_DIR", os.path.expanduser("~/Lumen"))
 
 STORAGE = StorageService(DATA_DIR, {"MAX_IMAGE_BYTES": app.config["MAX_IMAGE_BYTES"]} if "MAX_IMAGE_BYTES" in app.config else {"MAX_IMAGE_BYTES": 5 * 1024 * 1024})
 SECURITY = configure_app_security(app, STORAGE.logs_dir)
@@ -755,7 +755,7 @@ if __name__ == "__main__":
             print("     Run setup_pi.sh or: pip install pyopenssl\n")
 
     print(f"\n{'='*56}")
-    print("  VisualAssistCam  —  Raspberry Pi 5")
+    print("  Lumen  —  Raspberry Pi 5")
     print(f"{'='*56}")
     print(f"  Claude AI   : {'✓ enabled' if CLAUDE_AVAILABLE else '✗ not configured — edit .env'}")
     print(f"  Data stored : {BASE_DIR}")

@@ -25,7 +25,7 @@ Protected API routes include:
 ## Local web deployment
 
 1. Create a virtual environment.
-2. Install [requirements_web.txt](/Users/rishabhpatni/Downloads/VisualAssistCam/requirements_web.txt).
+2. Install [requirements_web.txt](/Users/rishabhpatni/Downloads/Lumen/requirements_web.txt).
 3. Copy `.env.example` to `.env` and set:
    - `FLASK_SECRET_KEY`
    - `SUPABASE_URL`
@@ -109,7 +109,7 @@ Without a persistent disk, uploaded files and session JSON files will be lost on
 
 Before first deploy:
 
-1. Run [supabase_schema.sql](/Users/rishabhpatni/Downloads/VisualAssistCam/supabase_schema.sql) in Supabase.
+1. Run [supabase_schema.sql](/Users/rishabhpatni/Downloads/Lumen/supabase_schema.sql) in Supabase.
 2. Configure Google Auth in Supabase.
 3. Add your Render callback URL to Supabase redirect URLs:
 

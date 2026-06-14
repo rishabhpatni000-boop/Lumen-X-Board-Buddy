@@ -1,4 +1,4 @@
-# VisualAssistCam — Raspberry Pi 5 Setup Guide
+# Lumen — Raspberry Pi 5 Setup Guide
 
 ## What you need
 
@@ -24,11 +24,11 @@ Install **Raspberry Pi OS (64-bit, Bookworm)** using Raspberry Pi Imager.
 ## Step 2 — Copy files to the Pi
 
 **Option A — USB drive:**
-Copy the entire `VisualAssistCam` folder to the Pi's home directory (`/home/pi/`).
+Copy the entire `Lumen` folder to the Pi's home directory (`/home/pi/`).
 
 **Option B — SSH from Mac:**
 ```bash
-scp -r /Users/snehal/Claude/VisualAssistCam pi@raspberrypi.local:~/
+scp -r /Users/snehal/Claude/Lumen pi@raspberrypi.local:~/
 ```
 
 ---
@@ -38,7 +38,7 @@ scp -r /Users/snehal/Claude/VisualAssistCam pi@raspberrypi.local:~/
 Open a terminal on the Pi and run:
 
 ```bash
-cd ~/VisualAssistCam
+cd ~/Lumen
 bash setup_pi.sh
 ```
 
@@ -53,7 +53,7 @@ This will:
 ## Step 4 — Add your API key
 
 ```bash
-nano ~/VisualAssistCam/.env
+nano ~/Lumen/.env
 ```
 
 Change `paste-your-key-here` to your actual Anthropic API key (starts with `sk-ant-`).
@@ -64,7 +64,7 @@ Save: `Ctrl+X` → `Y` → `Enter`
 ## Step 5 — Start the app
 
 ```bash
-cd ~/VisualAssistCam
+cd ~/Lumen
 bash run_pi.sh
 ```
 
@@ -72,10 +72,10 @@ The terminal will show something like:
 
 ```
 ====================================================
-  VisualAssistCam  —  Raspberry Pi 5
+  Lumen  —  Raspberry Pi 5
 ====================================================
   Claude AI   : ✓ enabled
-  Data stored : /home/pi/VisualAssistCam
+  Data stored : /home/pi/Lumen
 ====================================================
   📱 Open on THIS Pi  : https://localhost:5050
   📱 Open on ANY device on the same WiFi:
@@ -105,7 +105,7 @@ On any phone, tablet, or laptop **on the same WiFi**:
 So the app starts automatically whenever the Pi is powered on:
 
 ```bash
-bash ~/VisualAssistCam/setup_autostart.sh
+bash ~/Lumen/setup_autostart.sh
 ```
 
 After this, just plug in the Pi and it's ready within 30 seconds.
@@ -124,9 +124,9 @@ After this, just plug in the Pi and it's ready within 30 seconds.
 
 | Type | Location on Pi |
 |---|---|
-| Captured photos | `~/VisualAssistCam/captures/` |
-| Session data | `~/VisualAssistCam/sessions/` |
-| Gallery images | `~/VisualAssistCam/sessions/images/` |
+| Captured photos | `~/Lumen/captures/` |
+| Session data | `~/Lumen/sessions/` |
+| Gallery images | `~/Lumen/sessions/images/` |
 
 ---
 

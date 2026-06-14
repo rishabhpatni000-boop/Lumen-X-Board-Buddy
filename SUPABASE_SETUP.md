@@ -13,7 +13,7 @@ This repository now expects Supabase for Google authentication and persistent pe
 
 Open the Supabase SQL editor and run:
 
-- [supabase_schema.sql](/Users/rishabhpatni/Downloads/VisualAssistCam/supabase_schema.sql)
+- [supabase_schema.sql](/Users/rishabhpatni/Downloads/Lumen/supabase_schema.sql)
 
 This creates:
 
@@ -52,7 +52,7 @@ If you use HTTPS on Raspberry Pi, include the exact HTTPS callback URL.
 
 ## 5. Environment variables
 
-Copy [.env.example](/Users/rishabhpatni/Downloads/VisualAssistCam/.env.example) to `.env` and fill in:
+Copy [.env.example](/Users/rishabhpatni/Downloads/Lumen/.env.example) to `.env` and fill in:
 
 - `FLASK_SECRET_KEY`
 - `SUPABASE_URL`

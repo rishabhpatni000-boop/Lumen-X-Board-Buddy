@@ -1,4 +1,4 @@
-# VisualAssistCam — Raspberry Pi 5 requirements
+# Lumen — Raspberry Pi 5 requirements
 # Install with: pip install -r requirements_pi.txt
 
 flask>=3.0.0

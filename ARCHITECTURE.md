@@ -1,8 +1,8 @@
-# VisualAssistCam Architecture
+# Lumen Architecture
 
 ## Overview
 
-VisualAssistCam is now structured as an authenticated Flask web application with a preserved camera/OCR/Claude workflow and a separate legacy macOS PyQt application.
+Lumen is now structured as an authenticated Flask web application with a preserved camera/OCR/Claude workflow and a separate legacy macOS PyQt application.
 
 Primary production web flow:
 

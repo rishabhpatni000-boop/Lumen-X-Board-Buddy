@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Shared security helpers for the Flask-based VisualAssistCam servers."""
+"""Shared security helpers for the Flask-based Lumen servers."""
 
 import base64
 import binascii

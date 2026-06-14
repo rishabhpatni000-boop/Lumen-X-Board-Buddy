@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-VisualAssistCam — three-view whiteboard assistant
+Lumen — three-view whiteboard assistant
 Original camera | AI Board (SVG) | AI Analysis (text)
 """
 
@@ -72,7 +72,7 @@ def no_cache(response):
 
 DATA_DIR = os.getenv(
     "VISUALASSISTCAM_DATA_DIR",
-    os.path.expanduser("~/Desktop/VisualAssistCam_Data"),
+    os.path.expanduser("~/Desktop/Lumen_Data"),
 )
 
 STORAGE = StorageService(DATA_DIR, {"MAX_IMAGE_BYTES": app.config["MAX_IMAGE_BYTES"]} if "MAX_IMAGE_BYTES" in app.config else {"MAX_IMAGE_BYTES": 5 * 1024 * 1024})
@@ -1204,7 +1204,7 @@ def _open_browser():
 
 if __name__ == "__main__":
     print(f"\n{'='*50}")
-    print("  VisualAssistCam")
+    print("  Lumen")
     print(f"  Claude AI : {'✓ enabled' if CLAUDE_AVAILABLE else '✗ not configured'}")
     print(f"  Browser   : http://localhost:{PORT}")
     print("  Quit      : Ctrl+C")

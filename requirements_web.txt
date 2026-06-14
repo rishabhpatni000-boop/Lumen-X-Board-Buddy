@@ -1,4 +1,4 @@
-# VisualAssistCam — Flask web app requirements
+# Lumen — Flask web app requirements
 # Install with: pip install -r requirements_web.txt
 
 flask>=3.0.0
