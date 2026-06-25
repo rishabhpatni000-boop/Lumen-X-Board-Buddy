@@ -37,6 +37,34 @@ Protected API routes include:
 bash run.sh
 ```
 
+## Custom domain deployment
+
+The app does not need to stay on Render. Any host that can run Flask/Gunicorn over HTTPS will work as long as the domain, OAuth callback, and storage settings are updated together.
+
+Minimum production requirements for a real domain such as `app.visualassistcam.com`:
+
+1. Serve the app behind HTTPS.
+2. Point the DNS record for the chosen domain to your host.
+3. Set the final callback URL in Supabase:
+
+```text
+https://app.visualassistcam.com/auth/callback
+```
+
+4. Add the same URL in Supabase `Authentication -> URL Configuration`.
+5. Set these production env vars on the host:
+   - `SESSION_COOKIE_SECURE=true`
+   - `TRUST_PROXY_COUNT=1` (or the correct proxy hop count)
+   - `VISUALASSISTCAM_DATA_DIR=/path/to/persistent/storage`
+6. Use persistent storage for captures, session JSON, and logs, or replace local storage with object storage such as S3 or Supabase Storage.
+7. Start the app with a production server such as:
+
+```bash
+gunicorn app:app --workers 2 --threads 4 --timeout 120 --bind 0.0.0.0:$PORT
+```
+
+If you want both apex and `www` or a separate app subdomain, add each exact HTTPS callback URL to Supabase.
+
 ## Render deployment
 
 ### 1. Prepare the repository
@@ -117,7 +145,7 @@ Before first deploy:
 https://your-render-service.onrender.com/auth/callback
 ```
 
-If you later buy and connect `visualassistcam.com`, also add:
+If you later move to your own domain, also add:
 
 ```text
 https://visualassistcam.com/auth/callback

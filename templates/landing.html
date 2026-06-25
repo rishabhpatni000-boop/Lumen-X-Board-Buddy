@@ -78,6 +78,7 @@ a{color:inherit}
   display:flex;
   gap:10px;
   flex-wrap:wrap;
+  align-items:flex-start;
 }
 .navlinks a{
   text-decoration:none;
@@ -87,6 +88,16 @@ a{color:inherit}
   border:1px solid var(--line);
   color:var(--ink-soft);
   font-size:13px;
+}
+.auth-nav{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+.auth-note{
+  font-size:12px;
+  color:var(--ink-soft);
+  padding:0 14px;
 }
 .masthead{
   position:relative;
@@ -201,25 +212,6 @@ a{color:inherit}
   grid-template-columns:repeat(3,minmax(0,1fr));
   gap:12px;
   margin-top:22px;
-}
-.note-card{
-  background:rgba(255,250,243,.88);
-  border:1px solid rgba(20,33,47,.08);
-  border-radius:20px;
-  padding:16px;
-}
-.note-card strong{
-  display:block;
-  margin-bottom:8px;
-  font-family:"Trebuchet MS",sans-serif;
-  font-size:13px;
-  letter-spacing:.04em;
-  text-transform:uppercase;
-}
-.note-card p{
-  color:var(--ink-soft);
-  font-size:14px;
-  line-height:1.65;
 }
 .hero-visual{
   display:flex;
@@ -425,7 +417,7 @@ a{color:inherit}
 }
 .founder-grid{
   display:grid;
-  grid-template-columns:.9fr 1.1fr;
+  grid-template-columns:.84fr 1.16fr;
   gap:22px;
   align-items:stretch;
 }
@@ -443,7 +435,7 @@ a{color:inherit}
   border-radius:24px;
   overflow:hidden;
   background:rgba(255,255,255,.1);
-  min-height:420px;
+  min-height:360px;
   display:flex;
   align-items:center;
   justify-content:center;
@@ -453,6 +445,7 @@ a{color:inherit}
   width:100%;
   height:100%;
   object-fit:cover;
+  object-position:center 18%;
   display:block;
 }
 .portrait-placeholder{
@@ -494,6 +487,20 @@ a{color:inherit}
   margin-top:16px;
   color:rgba(247,251,255,.84);
   line-height:1.7;
+}
+.portrait-badge{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  margin-top:16px;
+  padding:10px 14px;
+  border-radius:999px;
+  background:rgba(255,255,255,.12);
+  color:#f7fbff;
+  font-family:"Trebuchet MS",sans-serif;
+  font-size:12px;
+  letter-spacing:.08em;
+  text-transform:uppercase;
 }
 .founder-story{
   background:linear-gradient(180deg,#fffaf3,#f5e9db);
@@ -701,7 +708,12 @@ code{
         <a href="#solution-changes">What it changes</a>
         <a href="#journey">How it works</a>
         <a href="#founder">Meet the creator</a>
-        <a id="signInLink" href="{% if landing_logged_in %}#logout{% else %}#sign-in{% endif %}" data-auth-mode="{% if landing_logged_in %}logout{% else %}login{% endif %}">{% if landing_logged_in %}Logout{% else %}Sign in{% endif %}</a>
+        <div class="auth-nav">
+          <a id="signInLink" href="{% if landing_logged_in %}#logout{% else %}#sign-in{% endif %}" data-auth-mode="{% if landing_logged_in %}logout{% else %}login{% endif %}">{% if landing_logged_in %}Logout{% else %}Sign in{% endif %}</a>
+          {% if landing_logged_in and landing_user and landing_user.email %}
+          <div class="auth-note">Signed in as {{ landing_user.email }}</div>
+          {% endif %}
+        </div>
       </nav>
     </header>
 
@@ -722,22 +734,7 @@ code{
               {% if not landing_logged_in and not auth_enabled %}disabled{% endif %}
             >{% if landing_logged_in %}Open App{% else %}Continue with Google{% endif %}</button>
           </div>
-          <p id="status" class="status-message">{% if landing_logged_in %}Signed in{% if landing_user and landing_user.email %} as {{ landing_user.email }}{% endif %}. You can continue straight to your dashboard or explore the home page first.{% elif not auth_enabled %}Supabase Auth is not configured yet. Add the required environment variables to enable login.{% endif %}</p>
-
-          <div class="hero-notes">
-            <article class="note-card">
-              <strong>Capture the moment</strong>
-              <p>Freeze the board before the content disappears and keep the important parts in view.</p>
-            </article>
-            <article class="note-card">
-              <strong>Make it clearer</strong>
-              <p>Transform messy, far-away writing into a cleaner digital version with AI support.</p>
-            </article>
-            <article class="note-card">
-              <strong>Ask what it means</strong>
-              <p>Turn board content into explanations, follow-up questions, and a reviewable study history.</p>
-            </article>
-          </div>
+          <p id="status" class="status-message">{% if not landing_logged_in and not auth_enabled %}Supabase Auth is not configured yet. Add the required environment variables to enable login.{% endif %}</p>
         </div>
 
         <div class="hero-visual" aria-hidden="true">
@@ -746,37 +743,22 @@ code{
               <div class="stat-pill">Classroom board to guided understanding</div>
               <img src="{{ url_for('static', filename='images/classroom-hero.png') }}" alt="Students seated in a classroom while a teacher writes on the whiteboard">
             </div>
-
-            <div class="visual-row">
-              <article class="mini-card">
-                <h3>The full solution in one flow</h3>
-                <ul>
-                  <li>See the original board, AI board, and explanation views.</li>
-                  <li>Review past captures later instead of losing them after class.</li>
-                  <li>Keep the experience tied to each learner's own account.</li>
-                </ul>
-              </article>
-              <article class="mini-card orange">
-                <h3>Designed for the real classroom problem</h3>
-                <p>Fast-paced lessons, changing boards, diagrams, and handwritten notes all shaped a solution that can respond in the moment instead of only helping afterward.</p>
-              </article>
-            </div>
           </div>
         </div>
       </div>
 
       <div class="impact-strip">
         <article class="impact-card">
-          <strong>More independence</strong>
-          <p>Students can revisit board work without needing to depend entirely on what they managed to hear in the moment.</p>
+          <strong>Capture before it disappears</strong>
+          <p>Freeze the board at the right moment so fast-moving classroom content is not lost while the lesson continues.</p>
         </article>
         <article class="impact-card">
-          <strong>Less information loss</strong>
-          <p>Important equations, annotations, and diagrams can be preserved before they vanish from the board.</p>
+          <strong>Rebuild what is hard to see</strong>
+          <p>Turn faint, distant, or messy writing into a cleaner board view that is easier to read and revisit calmly.</p>
         </article>
         <article class="impact-card">
-          <strong>Built from lived need</strong>
-          <p>This is not accessibility as an afterthought. It comes from someone who knows the challenge firsthand.</p>
+          <strong>Explain what it means</strong>
+          <p>Pair each board with guided explanation and saved class history so understanding does not depend on memory alone.</p>
         </article>
       </div>
 
@@ -873,7 +855,7 @@ code{
             <div class="eyebrow">Founder story</div>
             <h2>Built by Rishabh Patni, for the classroom he knows firsthand.</h2>
           </div>
-          <p>This section is ready for Rishabh's photograph. As soon as an image is placed in <code>static/images/rishabh-founder.jpg</code>, it will appear here automatically.</p>
+          <p>A founder story shaped by lived classroom experience, practical constraints, and the decision to build a better answer instead of waiting for one.</p>
         </div>
 
         <div class="founder-grid">
@@ -889,7 +871,8 @@ code{
               </div>
               {% endif %}
             </div>
-            <p class="caption">A founder section built around a real story of persistence, problem-solving, and designing with empathy from the inside out.</p>
+            <div class="portrait-badge">Student founder · lived low-vision context</div>
+            <p class="caption">A tighter portrait crop keeps the focus on the person behind the product while the surrounding layout carries the story with more intention.</p>
           </aside>
 
           <article class="founder-story">

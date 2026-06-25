@@ -50,6 +50,7 @@
 - Consolidate shared Flask logic into a single factory or shared route module.
 - Add automated tests for auth flow, quotas, and history access control.
 - Add a background cleanup job for stale temporary/history files if upload volume grows.
+- Standardize one canonical production domain and keep Supabase callback URLs aligned with it before switching hosts away from Render.
 
 ## Monitoring Concerns
 

@@ -30,6 +30,23 @@ window.__vacSupabasePromise = (supabaseUrl && supabaseAnonKey)
   --accent-soft-2:#fff0e4;
   --shadow:0 24px 60px rgba(38,34,28,.12);
 }
+body.dark-theme{
+  --bg:#151b20;
+  --bg-strong:#10161b;
+  --ink:#ecf1f5;
+  --ink-soft:#a8b6c2;
+  --surface:#1f272e;
+  --surface-strong:#263039;
+  --surface-soft:#202a32;
+  --line:rgba(236,241,245,.12);
+  --line-strong:rgba(236,241,245,.18);
+  --accent:#9ab8d6;
+  --accent-2:#d7a27d;
+  --accent-3:#b9c8df;
+  --accent-soft:#202933;
+  --accent-soft-2:#2c2924;
+  --shadow:0 28px 70px rgba(0,0,0,.34);
+}
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;color:var(--ink);
   font-family:Georgia,"Times New Roman",serif;
@@ -39,6 +56,12 @@ body{
     radial-gradient(circle at top left,rgba(223,143,71,.24),transparent 24%),
     radial-gradient(circle at 88% 20%,rgba(30,93,114,.13),transparent 22%),
     linear-gradient(180deg,#fbf6ef 0%,#f4efe7 52%,#efe6d8 100%);
+}
+body.dark-theme{
+  background:
+    radial-gradient(circle at top left,rgba(215,162,125,.18),transparent 24%),
+    radial-gradient(circle at 88% 20%,rgba(154,184,214,.12),transparent 24%),
+    linear-gradient(180deg,#11171c 0%,#151b20 52%,#0e1317 100%);
 }
 
 /* ── TOP BAR ── */
@@ -59,6 +82,7 @@ body{
 .tb-btn.primary{background:linear-gradient(135deg,#9aa8c6,#7f8fb2);border-color:#8f9fbc;color:#fdfbf7}
 .tb-btn.primary:hover{background:linear-gradient(135deg,#a6b2cd,#8798ba)}
 .tb-btn.ghost{background:transparent}
+.tb-btn.toggle-on{background:linear-gradient(135deg,#27465a,#335c74);border-color:#4d7087;color:#fdfbf7}
 .status-pill{display:flex;align-items:center;gap:8px;background:rgba(255,250,243,.92);border:1px solid var(--line);
   border-radius:999px;padding:0 12px;height:34px;min-width:0}
 .status-pill strong{font-size:12px;color:var(--ink);font-weight:600;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -175,11 +199,13 @@ video{display:none}
 /* ── WORKSPACE: video left, controls right ── */
 #workspace{flex:1;display:flex;flex-direction:row;min-height:0;overflow:hidden}
 #mainArea{flex:1;position:relative;overflow:hidden;background:#0a0a0a;min-width:0}
+body.dark-theme #mainArea{background:#06090c}
 
 /* ── CONTROLS sidebar ── */
 #controls{width:250px;flex-shrink:0;display:flex;flex-direction:column;
   gap:10px;padding:14px 12px;background:rgba(255,250,243,.76);border-left:1px solid var(--line);
   overflow-y:auto;overflow-x:hidden}
+#controls.hidden{display:none}
 fieldset{border:1px solid var(--line-strong);border-radius:6px;
   padding:5px 7px 7px;min-width:0;width:100%}
 legend{font-size:10px;color:#7a6855;padding:0 3px;letter-spacing:.2px}
@@ -236,18 +262,27 @@ button:hover{background:#fffdf8}
 #fontSizeLbl{font-size:12px;color:#888;min-width:30px;text-align:center}
 
 /* ── SESSION MODAL ── */
-#sessionModal{position:fixed;inset:0;background:
-  radial-gradient(circle at top left,rgba(223,143,71,.18),transparent 24%),
-  radial-gradient(circle at 88% 18%,rgba(30,93,114,.14),transparent 20%),
-  linear-gradient(180deg,#17303e,#132532 52%,#0f1b25);
-  z-index:500;display:flex;align-items:center;justify-content:center;flex-direction:column;
-  padding:20px}
+#sessionModal{position:fixed;inset:0;background:rgba(9,14,18,.46);
+  z-index:500;display:none;align-items:center;justify-content:center;flex-direction:column;
+  padding:20px;backdrop-filter:blur(12px)}
+#sessionModal.open{display:flex}
+.sm-shell{
+  width:min(980px,100%);
+  max-height:min(86vh,900px);
+  overflow:auto;
+  background:linear-gradient(180deg,rgba(18,40,53,.98),rgba(13,28,39,.98));
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:34px;
+  box-shadow:0 34px 80px rgba(0,0,0,.38);
+  padding:22px;
+}
 .sm-logo{text-align:center;margin-bottom:36px}
 .sm-logo h1{font-size:30px;color:#fffaf3;font-weight:300;letter-spacing:2px}
 .sm-logo p{color:#d6c2a8;font-size:13px;margin-top:6px}
-.sm-toolbar{width:min(960px,100%);display:flex;justify-content:flex-end;margin-bottom:16px}
+.sm-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}
 .sm-home-link{background:rgba(255,250,243,.92);color:var(--ink);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:10px 16px;cursor:pointer;font-family:"Trebuchet MS",sans-serif;font-size:13px;font-weight:600;box-shadow:0 14px 28px rgba(0,0,0,.12)}
 .sm-home-link:hover{background:#fffdf8}
+.sm-close{width:42px;height:42px;border-radius:14px;font-size:20px;padding:0}
 .sm-hero{
   width:min(960px,100%);
   display:grid;
@@ -318,6 +353,40 @@ button:hover{background:#fffdf8}
   line-height:1.65;
 }
 .sm-home{display:flex;gap:20px;flex-wrap:wrap;justify-content:center}
+.workspace-empty{
+  position:absolute;
+  inset:18px;
+  z-index:4;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  pointer-events:none;
+}
+.workspace-empty-card{
+  width:min(560px,100%);
+  background:rgba(255,250,243,.9);
+  border:1px solid rgba(20,33,47,.08);
+  border-radius:30px;
+  box-shadow:var(--shadow);
+  padding:28px;
+  text-align:center;
+  pointer-events:auto;
+}
+.workspace-empty-card h2{
+  font-size:32px;
+  line-height:1;
+  margin-bottom:12px;
+}
+.workspace-empty-card p{
+  color:var(--ink-soft);
+  line-height:1.75;
+  margin-bottom:18px;
+}
+.workspace-empty-card .primary-cta{
+  height:48px;
+  padding:0 22px;
+}
+body.dark-theme .workspace-empty-card{background:rgba(31,39,46,.92)}
 .sm-card{background:#fffaf3;border:1px solid rgba(255,255,255,.08);border-radius:20px;
   padding:32px 36px;text-align:center;cursor:pointer;min-width:200px;
   transition:all .2s}
@@ -459,9 +528,11 @@ button:hover{background:#fffdf8}
 <body>
 
 <!-- ═══════════════ SESSION MODAL ═══════════════ -->
-<div id="sessionModal">
+<div id="sessionModal" aria-hidden="true">
+  <div class="sm-shell">
   <div class="sm-toolbar">
     <button class="sm-home-link" onclick="window.location.href='/'">Home</button>
+    <button class="tb-btn sm-close" onclick="closeClassPicker()" aria-label="Close start class dialog">✕</button>
   </div>
   <div class="sm-logo">
     <h1>Lumen</h1>
@@ -539,11 +610,13 @@ button:hover{background:#fffdf8}
     </div>
   </div>
 </div>
+</div>
 
 <!-- ═══════════════ TOP BAR ═══════════════ -->
 <div id="topbar">
   <div class="top-cluster">
     <button class="tb-btn" onclick="window.location.href='/'" title="Go to public landing page">Home</button>
+    <button id="startClassBtn" class="tb-btn primary" onclick="openClassPicker()" title="Start or switch a class">Start a class</button>
     <div class="status-pill">
       <span>Class</span>
       <strong id="sessionInfo">No class</strong>
@@ -565,9 +638,10 @@ button:hover{background:#fffdf8}
   <div class="tb-spacer"></div>
 
   <div class="top-cluster">
+    <button id="themeToggleBtn" class="tb-btn" onclick="toggleTheme()" title="Switch to a darker or lighter background">Dark mode</button>
+    <button id="controlsToggleBtn" class="tb-btn" onclick="toggleControls()" title="Show or hide the right panel">Hide Panel</button>
     <button class="tb-btn ghost" onclick="togglePanel('settingsPanel')" title="Open settings">Settings</button>
     <button class="tb-btn" onclick="toggleFullscreen()" title="F">⛶ Fullscreen</button>
-    <button class="tb-btn primary" onclick="openClassPicker()" title="Return to the app landing page">Back</button>
   </div>
 </div>
 
@@ -598,6 +672,13 @@ button:hover{background:#fffdf8}
 
 <!-- ═══════════════ MAIN AREA ═══════════════ -->
 <div id="mainArea">
+  <div id="workspaceEmpty" class="workspace-empty">
+    <div class="workspace-empty-card">
+      <h2>Start class when you are ready.</h2>
+      <p>The live board stays off until you choose a new or existing class. Once you do, Lumen opens the camera and saves snapshots directly into that class gallery.</p>
+      <button class="tb-btn primary" type="button" onclick="openClassPicker()" style="height:48px;padding:0 22px">Start a class</button>
+    </div>
+  </div>
 
   <!-- ORIGINAL -->
   <div id="originalView">
@@ -752,10 +833,6 @@ button:hover{background:#fffdf8}
     </div>
     <button class="panel-close" onclick="closePanels()">✕</button>
   </div>
-  <div class="panel-user">
-    <div class="panel-user-label">Signed in as</div>
-    <span class="panel-user-value" id="authUser">{{ current_user.email if current_user else '' }}</span>
-  </div>
   <div class="panel-section" style="padding-top:0;margin-top:0;border-top:none">
     <h4>Camera Source</h4>
     <div class="control-row">
@@ -831,6 +908,10 @@ button:hover{background:#fffdf8}
         <strong>Logout</strong>
         <span>Sign out and return to the public landing page.</span>
       </button>
+      <div class="panel-user">
+        <div class="panel-user-label">Signed in as</div>
+        <span class="panel-user-value" id="authUser">{{ current_user.email if current_user else '' }}</span>
+      </div>
     </div>
   </div>
 </div>
@@ -1057,14 +1138,19 @@ async function smResumeSession(sid) {
 function smLaunch(session, isResume) {
   currentSession = session;
   boardId = 0;   // reset board counter for new/resumed session
-  document.getElementById('sessionModal').style.display = 'none';
+  closeClassPicker();
 
   // Update topbar
   document.getElementById('sessionInfo').textContent =
     `${session.subject}${session.teacher ? ' · ' + session.teacher : ''}`;
+  document.getElementById('startClassBtn').textContent = 'Change class';
   const lockBtn = document.getElementById('lockBtn');
   lockBtn.style.display = '';
   _syncLockBtn();
+  document.getElementById('workspaceEmpty').style.display = 'none';
+  ensureCameraReady().catch((error) => {
+    status('Camera error: ' + error.message);
+  });
 
   // On resume: restore the last AI Board so the student sees it immediately
   if (isResume && session.captures.length > 0) {
@@ -1122,8 +1208,17 @@ function openClassPicker() {
   closePanels();
   // Stop auto-freeze before going home
   stopAutoFreeze();
-  document.getElementById('sessionModal').style.display = 'flex';
+  stopCamera();
+  document.getElementById('workspaceEmpty').style.display = 'flex';
+  document.getElementById('sessionModal').classList.add('open');
+  document.getElementById('sessionModal').setAttribute('aria-hidden', 'false');
   _smSessions = [];  // force refresh next time
+  smBack();
+}
+
+function closeClassPicker() {
+  document.getElementById('sessionModal').classList.remove('open');
+  document.getElementById('sessionModal').setAttribute('aria-hidden', 'true');
 }
 
 // ── New Board (within same class) ────────────────
@@ -1316,9 +1411,22 @@ async function svgToPngDataUrl(svgString) {
 }
 
 // ── Camera shutter sound ──────────────────────────
+let shutterAudioContext = null;
+
+function getShutterAudioContext() {
+  const AudioCtor = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtor) return null;
+  if (!shutterAudioContext || shutterAudioContext.state === 'closed') {
+    shutterAudioContext = new AudioCtor();
+  }
+  return shutterAudioContext;
+}
+
 function playCameraSound() {
   try {
-    const actx = new (window.AudioContext || window.webkitAudioContext)();
+    const actx = getShutterAudioContext();
+    if (!actx) return;
+    if (actx.state === 'suspended') actx.resume();
     const now  = actx.currentTime;
     const sr   = actx.sampleRate;
     // Mechanical click: noise burst + short tone
@@ -1335,7 +1443,17 @@ function playCameraSound() {
     f.type = 'highpass'; f.frequency.value = 600;
     src.connect(f); f.connect(g); g.connect(actx.destination);
     src.start(now);
-    setTimeout(() => actx.close(), 300);
+    const osc = actx.createOscillator();
+    const og = actx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(880, now);
+    og.gain.setValueAtTime(0.001, now);
+    og.gain.exponentialRampToValueAtTime(0.08, now + 0.004);
+    og.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+    osc.connect(og);
+    og.connect(actx.destination);
+    osc.start(now);
+    osc.stop(now + 0.055);
   } catch(e) {}
 }
 
@@ -1574,6 +1692,8 @@ let raf;
 let activePanel = null;
 let currentDeviceId = null;
 let lastDrawAt = 0;
+let cameraReady = false;
+let currentTheme = 'light';
 const csrfToken = {{ csrf_token|tojson }};
 
 // Original zoom / pan
@@ -1658,7 +1778,13 @@ async function initCameras() {
     sel.appendChild(o);
   });
   sel.selectedIndex = best;
-  await startCamera(cams[best]?.deviceId);
+  currentDeviceId = cams[best]?.deviceId || null;
+  cameraReady = true;
+}
+
+async function ensureCameraReady() {
+  if (!cameraReady) await initCameras();
+  await startCamera(document.getElementById('camSel').value || currentDeviceId);
 }
 
 async function startCamera(deviceId) {
@@ -1676,6 +1802,16 @@ async function startCamera(deviceId) {
 }
 
 function switchCamera() { startCamera(document.getElementById('camSel').value); }
+
+function stopCamera() {
+  if (vid.srcObject) {
+    vid.srcObject.getTracks().forEach(t => t.stop());
+    vid.srcObject = null;
+  }
+  cameraReady = false;
+  currentDeviceId = null;
+  mCtx.clearRect(0, 0, mc.width, mc.height);
+}
 
 function buildCameraConstraints(deviceId, isFullscreen) {
   return {
@@ -1919,6 +2055,11 @@ function cssFilter() {
 //  Freeze → trigger Claude
 // ════════════════════════════════════════════════
 function toggleFreeze() {
+  if (!currentSession || !vid.srcObject) {
+    openClassPicker();
+    status('Start a class to begin live board capture');
+    return;
+  }
   // Block freeze if session is locked
   if (!frozen && currentSession?.locked) {
     status('🔒 Session is locked — click 🔒 Locked button to unlock first');
@@ -2079,47 +2220,28 @@ function chgFont(delta) {
 //  Capture (works from any view)
 // ════════════════════════════════════════════════
 async function doCapture() {
+  if (!currentSession) {
+    openClassPicker();
+    toast('Start a class first so the capture can be saved to its gallery');
+    status('Start a class before capturing');
+    return;
+  }
   // Use the last frozen frame (or current canvas if live)
   const imgPng = lastOrigPng || (frozen ? mc.toDataURL('image/png') : mc.toDataURL('image/png'));
   if (!imgPng) { status('Nothing to capture — freeze a frame first'); return; }
 
   const ts = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
   const fn = `capture_${ts}.png`;
-  let savedToDevice = false;
-
-  // 1. Save to Downloads folder
-  try {
-    const resp = await fetch('/save', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({image: imgPng, filename: fn})
-    });
-    if (!resp.ok) throw new Error('Save request was rejected');
-    const payload = await resp.json();
-    if (!payload.ok) throw new Error(payload.error || 'Save failed');
-    savedToDevice = true;
-  } catch(e) {
-    const a = document.createElement('a');
-    a.download = fn;
-    a.href = imgPng;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    savedToDevice = true;
+  playCameraSound();
+  const saved = await _saveCapture(imgPng, '', `Capture ${ts.slice(0,16).replace('T',' ')}`, 'explicit');
+  if (!saved) {
+    toast('Capture failed to save to the gallery');
+    status('Capture failed');
+    return;
   }
-
-  // Play camera shutter sound only once the capture action completes.
-  if (savedToDevice) playCameraSound();
-
-  // 2. Save to gallery as explicit capture (kept permanently)
-  if (currentSession) {
-    await _saveCapture(imgPng, '', `Capture ${ts.slice(0,16).replace('T',' ')}`, 'explicit');
-    if (view === 'gallery') loadGallery();
-    toast('📷 Captured & saved to gallery');
-  } else {
-    toast('📷 Captured — start a session to save to gallery');
-  }
-
-  status(`📷 Captured: ${fn}`);
+  if (view === 'gallery') loadGallery();
+  toast('📷 Captured & saved to gallery');
+  status(`📷 Saved to gallery: ${fn}`);
 }
 
 // ════════════════════════════════════════════════
@@ -2191,7 +2313,29 @@ function toggleCollapse(cardId) {
 
 function toggleControls() {
   ctrlsShown = !ctrlsShown;
-  document.getElementById('controls').style.display = ctrlsShown ? 'flex' : 'none';
+  updateControlsVisibility();
+}
+
+function updateControlsVisibility() {
+  const controls = document.getElementById('controls');
+  controls.classList.toggle('hidden', !ctrlsShown);
+  if (!document.fullscreenElement) {
+    controls.style.display = ctrlsShown ? 'flex' : 'none';
+  }
+  document.getElementById('controlsToggleBtn').textContent = ctrlsShown ? 'Hide Panel' : 'Show Panel';
+}
+
+function applyTheme(theme) {
+  currentTheme = theme === 'dark' ? 'dark' : 'light';
+  document.body.classList.toggle('dark-theme', currentTheme === 'dark');
+  const btn = document.getElementById('themeToggleBtn');
+  btn.textContent = currentTheme === 'dark' ? 'Light mode' : 'Dark mode';
+  btn.classList.toggle('toggle-on', currentTheme === 'dark');
+  localStorage.setItem('vac-theme', currentTheme);
+}
+
+function toggleTheme() {
+  applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
 }
 function toggleFullscreen() {
   closePanels();
@@ -2484,11 +2628,11 @@ function bindSessionModalEvents() {
 //  Init
 // ════════════════════════════════════════════════
 bindSessionModalEvents();
-initCameras();
+applyTheme(localStorage.getItem('vac-theme') || 'light');
 loadDashboardSummary();
 setView('orig');
-// Show session picker on load; camera starts in background
-// (modal is visible by default via CSS display:flex)
+updateControlsVisibility();
+openClassPicker();
 </script>
 </body>
 </html>
