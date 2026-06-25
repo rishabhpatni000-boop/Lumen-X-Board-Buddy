@@ -279,16 +279,11 @@ button:hover{background:#fffdf8}
 .sm-logo{text-align:center;margin-bottom:36px}
 .sm-logo h1{font-size:30px;color:#fffaf3;font-weight:300;letter-spacing:2px}
 .sm-logo p{color:#d6c2a8;font-size:13px;margin-top:6px}
-.sm-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}
-.sm-home-link{background:rgba(255,250,243,.92);color:var(--ink);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:10px 16px;cursor:pointer;font-family:"Trebuchet MS",sans-serif;font-size:13px;font-weight:600;box-shadow:0 14px 28px rgba(0,0,0,.12)}
-.sm-home-link:hover{background:#fffdf8}
+.sm-toolbar{display:flex;justify-content:flex-end;align-items:center;gap:12px;margin-bottom:16px}
 .sm-close{width:42px;height:42px;border-radius:14px;font-size:20px;padding:0}
 .sm-hero{
   width:min(960px,100%);
-  display:grid;
-  grid-template-columns:1.08fr .92fr;
-  gap:18px;
-  align-items:stretch;
+  display:block;
   margin-bottom:28px;
 }
 .sm-hero-card{
@@ -330,27 +325,6 @@ button:hover{background:#fffdf8}
   color:rgba(255,250,243,.84);
   line-height:1.65;
   max-width:34ch;
-}
-.sm-side{
-  display:grid;
-  gap:14px;
-}
-.sm-side-card{
-  background:rgba(255,250,243,.92);
-  border:1px solid rgba(255,255,255,.1);
-  border-radius:22px;
-  padding:18px 20px;
-  box-shadow:0 18px 42px rgba(0,0,0,.14);
-}
-.sm-side-card strong{
-  display:block;
-  color:var(--ink);
-  font-size:17px;
-  margin-bottom:8px;
-}
-.sm-side-card p{
-  color:var(--ink-soft);
-  line-height:1.65;
 }
 .sm-home{display:flex;gap:20px;flex-wrap:wrap;justify-content:center}
 .workspace-empty{
@@ -523,6 +497,143 @@ body.dark-theme .workspace-empty-card{background:rgba(31,39,46,.92)}
 .panel-user-label{font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:.6px;font-family:"Trebuchet MS",sans-serif}
 .panel-user-value{display:block;margin-top:6px;font-size:15px;font-weight:600;color:var(--ink)}
 .panel-actions{display:grid;gap:10px}
+body.dark-theme #topbar,
+body.dark-theme #statusBar,
+body.dark-theme #dashboardBar,
+body.dark-theme #galleryHeader,
+body.dark-theme #analyseBarWrapper,
+body.dark-theme #suggestedQs,
+body.dark-theme #chatInputArea{
+  background:rgba(24,31,37,.94) !important;
+}
+body.dark-theme #topbar select,
+body.dark-theme .tb-btn,
+body.dark-theme .status-pill,
+body.dark-theme .view-seg,
+body.dark-theme .essentials-card,
+body.dark-theme .gcap-card,
+body.dark-theme .dash-card,
+body.dark-theme .floating-panel,
+body.dark-theme .compact-field,
+body.dark-theme .panel-user,
+body.dark-theme .panel-tile,
+body.dark-theme .panel-tile.danger,
+body.dark-theme .workspace-empty-card,
+body.dark-theme #mainCanvas,
+body.dark-theme .cmsg.teacher,
+body.dark-theme .q-chip,
+body.dark-theme #chatInput,
+body.dark-theme .prev-card,
+body.dark-theme .sort-btn,
+body.dark-theme .sm-card,
+body.dark-theme .sm-input,
+body.dark-theme .sm-btn-secondary{
+  background:var(--surface) !important;
+  color:var(--ink) !important;
+  border-color:var(--line-strong) !important;
+}
+body.dark-theme .tb-btn:hover,
+body.dark-theme .panel-tile:hover,
+body.dark-theme .sort-btn:hover:not(.active),
+body.dark-theme .sm-card:hover,
+body.dark-theme .sm-btn-secondary:hover,
+body.dark-theme .q-chip:hover{
+  background:var(--surface-strong) !important;
+}
+body.dark-theme #controls{
+  background:rgba(17,22,27,.96);
+}
+body.dark-theme #galleryView,
+body.dark-theme #aiAnalysisView,
+body.dark-theme #aiBoardView{
+  background:linear-gradient(180deg,#11171c,#0d1216) !important;
+}
+body.dark-theme #mainCanvas,
+body.dark-theme .gcap-thumbs,
+body.dark-theme .gcap-no-img{
+  background:#0f1519 !important;
+}
+body.dark-theme .cmsg.student{
+  background:#2a3b47 !important;
+  color:#eef4f7 !important;
+}
+body.dark-theme .cmsg.teacher em,
+body.dark-theme #statusBar,
+body.dark-theme #galleryHeader span,
+body.dark-theme .gcap-meta,
+body.dark-theme .gcap-empty,
+body.dark-theme .prev-date,
+body.dark-theme .prev-count,
+body.dark-theme .quick-note,
+body.dark-theme .cal-badge,
+body.dark-theme #fontSizeLbl,
+body.dark-theme #suggestedQs p,
+body.dark-theme .dash-sub,
+body.dark-theme .panel-head p,
+body.dark-theme .panel-tile span,
+body.dark-theme .srow label,
+body.dark-theme .srow .val,
+body.dark-theme #analyseBarWrapper span,
+body.dark-theme .sm-logo p,
+body.dark-theme .sm-meta,
+body.dark-theme .sm-card p,
+body.dark-theme .workspace-empty-card p{
+  color:var(--ink-soft) !important;
+}
+body.dark-theme .cmsg.teacher code{
+  background:#2d3640 !important;
+  color:#f3d8b8 !important;
+}
+body.dark-theme .gcap-dl,
+body.dark-theme #lockBtn,
+body.dark-theme #freezeBtn,
+body.dark-theme #captureBtn,
+body.dark-theme #calBtn,
+body.dark-theme #afPauseBtn{
+  background:var(--surface-strong) !important;
+  color:var(--ink) !important;
+  border-color:var(--line-strong) !important;
+}
+body.dark-theme #freezeBtn.frozen{
+  background:#4a2f35 !important;
+  color:#f5e8ea !important;
+  border-color:#7d565d !important;
+}
+body.dark-theme #invertBtn.on,
+body.dark-theme .panel-tile.danger strong,
+body.dark-theme .gcap-del{
+  color:#f0b8b0 !important;
+}
+body.dark-theme .gcap-del{
+  background:rgba(24,31,37,.95) !important;
+  border-color:rgba(240,184,176,.28) !important;
+}
+body.dark-theme .gcap-del:hover{
+  background:#8a4742 !important;
+  color:#fff !important;
+  border-color:#8a4742 !important;
+}
+body.dark-theme .activity-pill{
+  background:var(--surface-strong) !important;
+  color:var(--ink-soft) !important;
+  border-color:var(--line-strong) !important;
+}
+body.dark-theme #newBoardBtn,
+body.dark-theme #analyseNowBtn,
+body.dark-theme #settingsModal > div,
+body.dark-theme #settingsModal textarea,
+body.dark-theme #settingsModal button,
+body.dark-theme .panel-close{
+  background:var(--surface) !important;
+  color:var(--ink) !important;
+  border-color:var(--line-strong) !important;
+}
+body.dark-theme #analyseNowBtn,
+body.dark-theme .sm-btn-primary,
+body.dark-theme .tb-btn.primary,
+body.dark-theme .view-seg button.active{
+  color:#f7fbff !important;
+}
 </style>
 </head>
 <body>
@@ -531,7 +642,6 @@ body.dark-theme .workspace-empty-card{background:rgba(31,39,46,.92)}
 <div id="sessionModal" aria-hidden="true">
   <div class="sm-shell">
   <div class="sm-toolbar">
-    <button class="sm-home-link" onclick="window.location.href='/'">Home</button>
     <button class="tb-btn sm-close" onclick="closeClassPicker()" aria-label="Close start class dialog">✕</button>
   </div>
   <div class="sm-logo">
@@ -545,16 +655,6 @@ body.dark-theme .workspace-empty-card{background:rgba(31,39,46,.92)}
       <div class="sm-hero-copy">
         <strong>Enter the class with more clarity.</strong>
         <p>Start a fresh lesson or return to a previous one without losing the visual context, board flow, or guided support that Lumen builds around each class.</p>
-      </div>
-    </div>
-    <div class="sm-side">
-      <div class="sm-side-card">
-        <strong>Built for real classroom pace</strong>
-        <p>Capture the board before it changes, rebuild it into something more readable, and keep the lesson moving without needing to catch up later.</p>
-      </div>
-      <div class="sm-side-card">
-        <strong>Your classes stay organised</strong>
-        <p>Start a new class when the lesson begins, or reopen a previous class when you want to review, continue, or compare what happened earlier.</p>
       </div>
     </div>
   </div>
