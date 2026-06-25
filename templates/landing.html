@@ -80,7 +80,8 @@ a{color:inherit}
   flex-wrap:wrap;
   align-items:flex-start;
 }
-.navlinks a{
+.navlinks > a,
+.auth-nav > a{
   text-decoration:none;
   padding:10px 14px;
   border-radius:999px;
@@ -93,11 +94,16 @@ a{color:inherit}
   display:flex;
   flex-direction:column;
   gap:6px;
+  align-items:flex-start;
+  max-width:156px;
 }
 .auth-note{
   font-size:12px;
   color:var(--ink-soft);
-  padding:0 14px;
+  padding:0 12px;
+  line-height:1.35;
+  max-width:100%;
+  overflow-wrap:anywhere;
 }
 .masthead{
   position:relative;
@@ -172,7 +178,7 @@ a{color:inherit}
   display:flex;
   gap:12px;
   flex-wrap:wrap;
-  margin:30px 0 16px;
+  margin:30px 0 8px;
 }
 .primary-cta,.secondary-cta{
   border:none;
@@ -296,8 +302,8 @@ a{color:inherit}
   display:grid;
   grid-template-columns:repeat(3,minmax(0,1fr));
   gap:14px;
-  margin:18px 42px 0;
-  padding-bottom:40px;
+  margin:10px 42px 0;
+  padding-bottom:34px;
 }
 .impact-card{
   background:rgba(255,248,239,.74);
@@ -417,27 +423,23 @@ a{color:inherit}
 }
 .founder-grid{
   display:grid;
-  grid-template-columns:.84fr 1.16fr;
-  gap:22px;
-  align-items:stretch;
+  grid-template-columns:minmax(260px,.78fr) minmax(0,1.22fr);
+  gap:26px;
+  align-items:start;
 }
 .portrait-card{
-  background:linear-gradient(160deg,#1b4357,#285e74 58%,#2f6f84);
+  background:linear-gradient(160deg,#1a4256,#27596f 58%,#2d6a81);
   border-radius:30px;
-  padding:22px;
+  padding:18px;
   color:#f7fbff;
-  min-height:100%;
-  display:flex;
-  flex-direction:column;
-  justify-content:space-between;
+  align-self:start;
+  box-shadow:0 24px 52px rgba(25,53,69,.22);
 }
 .portrait-frame{
-  border-radius:24px;
+  border-radius:26px;
   overflow:hidden;
-  background:rgba(255,255,255,.1);
-  min-height:320px;
-  max-height:340px;
-  aspect-ratio:4 / 5;
+  background:#d7c6b0;
+  aspect-ratio:4 / 5.1;
   display:flex;
   align-items:center;
   justify-content:center;
@@ -447,7 +449,7 @@ a{color:inherit}
   width:100%;
   height:100%;
   object-fit:cover;
-  object-position:center 12%;
+  object-position:center 10%;
   display:block;
 }
 .portrait-placeholder{
@@ -489,7 +491,8 @@ a{color:inherit}
   background:linear-gradient(180deg,#fffaf3,#f5e9db);
   border:1px solid rgba(20,33,47,.08);
   border-radius:30px;
-  padding:26px;
+  padding:28px 30px;
+  box-shadow:0 18px 40px rgba(38,34,28,.08);
 }
 .founder-story h3{
   font-size:30px;
@@ -715,7 +718,7 @@ code{
               class="primary-cta"
               data-auth-mode="{% if landing_logged_in %}app{% else %}login{% endif %}"
               {% if not landing_logged_in and not auth_enabled %}disabled{% endif %}
-            >{% if landing_logged_in %}Open App{% else %}Continue with Google{% endif %}</button>
+            >{% if landing_logged_in %}Start{% else %}Log In{% endif %}</button>
           </div>
           <p id="status" class="status-message">{% if not landing_logged_in and not auth_enabled %}Supabase Auth is not configured yet. Add the required environment variables to enable login.{% endif %}</p>
         </div>

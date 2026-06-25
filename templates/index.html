@@ -267,24 +267,24 @@ button:hover{background:#fffdf8}
   padding:20px;backdrop-filter:blur(12px)}
 #sessionModal.open{display:flex}
 .sm-shell{
-  width:min(980px,100%);
-  max-height:min(86vh,900px);
+  width:min(920px,100%);
+  max-height:min(82vh,760px);
   overflow:auto;
   background:linear-gradient(180deg,rgba(18,40,53,.98),rgba(13,28,39,.98));
   border:1px solid rgba(255,255,255,.08);
   border-radius:34px;
   box-shadow:0 34px 80px rgba(0,0,0,.38);
-  padding:22px;
+  padding:18px 18px 20px;
 }
-.sm-logo{text-align:center;margin-bottom:36px}
+.sm-logo{text-align:center;margin-bottom:20px}
 .sm-logo h1{font-size:30px;color:#fffaf3;font-weight:300;letter-spacing:2px}
-.sm-logo p{color:#d6c2a8;font-size:13px;margin-top:6px}
-.sm-toolbar{display:flex;justify-content:flex-end;align-items:center;gap:12px;margin-bottom:16px}
+.sm-logo p{color:#d6c2a8;font-size:13px;margin-top:4px}
+.sm-toolbar{display:flex;justify-content:flex-end;align-items:center;gap:12px;margin-bottom:10px}
 .sm-close{width:42px;height:42px;border-radius:14px;font-size:20px;padding:0}
 .sm-hero{
   width:min(960px,100%);
   display:block;
-  margin-bottom:28px;
+  margin-bottom:18px;
 }
 .sm-hero-card{
   position:relative;
@@ -292,7 +292,7 @@ button:hover{background:#fffdf8}
   background:rgba(255,250,243,.1);
   border:1px solid rgba(255,255,255,.14);
   border-radius:28px;
-  min-height:240px;
+  min-height:190px;
   box-shadow:0 24px 60px rgba(0,0,0,.2);
 }
 .sm-hero-card img{
@@ -311,20 +311,21 @@ button:hover{background:#fffdf8}
   position:absolute;
   left:22px;
   right:22px;
-  bottom:20px;
+  bottom:16px;
   z-index:1;
 }
 .sm-hero-copy strong{
   display:block;
   color:#fffaf3;
-  font-size:28px;
+  font-size:26px;
   line-height:1;
-  margin-bottom:10px;
+  margin-bottom:8px;
 }
 .sm-hero-copy p{
   color:rgba(255,250,243,.84);
-  line-height:1.65;
+  line-height:1.5;
   max-width:34ch;
+  font-size:14px;
 }
 .sm-home{display:flex;gap:20px;flex-wrap:wrap;justify-content:center}
 .workspace-empty{
@@ -362,22 +363,22 @@ button:hover{background:#fffdf8}
 }
 body.dark-theme .workspace-empty-card{background:rgba(31,39,46,.92)}
 .sm-card{background:#fffaf3;border:1px solid rgba(255,255,255,.08);border-radius:20px;
-  padding:32px 36px;text-align:center;cursor:pointer;min-width:200px;
+  padding:24px 28px;text-align:center;cursor:pointer;min-width:200px;
   transition:all .2s}
 .sm-card{appearance:none;color:inherit;font:inherit}
 .sm-card:hover{background:#fffdf8;border-color:rgba(223,143,71,.34);transform:translateY(-2px)}
-.sm-card .icon{font-size:44px;margin-bottom:12px}
+.sm-card .icon{font-size:40px;margin-bottom:10px}
 .sm-card h2{font-size:18px;color:var(--ink);margin-bottom:6px}
 .sm-card p{font-size:13px;color:var(--ink-soft)}
 .sm-panel{display:none;width:100%;max-width:520px}
-.sm-panel h2{font-size:20px;color:#fffaf3;margin-bottom:20px}
+.sm-panel h2{font-size:20px;color:#fffaf3;margin-bottom:14px}
 .sm-input{width:100%;background:#fffaf3;color:var(--ink);border:1px solid rgba(255,255,255,.14);
   border-radius:8px;padding:12px 16px;font-size:16px;margin-bottom:12px;outline:none}
 .sm-input:focus{border-color:rgba(223,143,71,.44)}
 .sm-input::placeholder{color:#85735f}
-.sm-meta{color:#d8c7b2;font-size:13px;margin-bottom:20px;padding:10px 14px;
+.sm-meta{color:#d8c7b2;font-size:13px;margin-bottom:14px;padding:10px 14px;
   background:rgba(255,255,255,.08);border-radius:6px;border:1px solid rgba(255,255,255,.1)}
-.sm-btns{display:flex;gap:10px;margin-top:4px}
+.sm-btns{display:flex;gap:10px;margin-top:2px}
 .sm-btn-primary{flex:1;background:linear-gradient(135deg,#9aa8c6,#7f8fb2);color:#fff;border:none;border-radius:8px;
   padding:14px;font-size:16px;font-weight:600;cursor:pointer}
 .sm-btn-primary:hover{background:linear-gradient(135deg,#a6b2cd,#8798ba)}
@@ -385,13 +386,13 @@ body.dark-theme .workspace-empty-card{background:rgba(31,39,46,.92)}
   border-radius:8px;padding:14px 18px;font-size:14px;cursor:pointer}
 .sm-btn-secondary:hover{background:#fffdf8}
 /* Previous classes */
-.sort-btns{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.sort-btns{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
 .sort-btn{background:#fffaf3;color:var(--accent);border:1px solid rgba(255,255,255,.12);
   border-radius:20px;padding:6px 14px;font-size:13px;cursor:pointer;transition:all .15s}
 .sort-btn.active{background:linear-gradient(135deg,#9aa8c6,#7f8fb2);color:#fff;border-color:#8f9fbc}
 .sort-btn:hover:not(.active){background:#fffdf8}
 #prevGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
-  gap:12px;max-height:380px;overflow-y:auto;margin-bottom:16px}
+  gap:12px;max-height:300px;overflow-y:auto;margin-bottom:14px}
 .prev-card{background:#fffaf3;border:1px solid rgba(255,255,255,.12);border-radius:16px;
   padding:16px;cursor:pointer;transition:all .15s}
 .prev-card:hover{background:#fffdf8;border-color:rgba(223,143,71,.3)}
@@ -511,6 +512,7 @@ body.dark-theme .tb-btn,
 body.dark-theme .status-pill,
 body.dark-theme .view-seg,
 body.dark-theme .essentials-card,
+body.dark-theme .collapse-toggle,
 body.dark-theme .gcap-card,
 body.dark-theme .dash-card,
 body.dark-theme .floating-panel,
@@ -533,6 +535,7 @@ body.dark-theme .sm-btn-secondary{
   border-color:var(--line-strong) !important;
 }
 body.dark-theme .tb-btn:hover,
+body.dark-theme .collapse-toggle:hover,
 body.dark-theme .panel-tile:hover,
 body.dark-theme .sort-btn:hover:not(.active),
 body.dark-theme .sm-card:hover,
@@ -589,10 +592,18 @@ body.dark-theme #lockBtn,
 body.dark-theme #freezeBtn,
 body.dark-theme #captureBtn,
 body.dark-theme #calBtn,
-body.dark-theme #afPauseBtn{
+body.dark-theme #afPauseBtn,
+body.dark-theme .move-pad button,
+body.dark-theme .mini-btn,
+body.dark-theme .fsz-btn{
   background:var(--surface-strong) !important;
   color:var(--ink) !important;
   border-color:var(--line-strong) !important;
+}
+body.dark-theme #zoomLbl,
+body.dark-theme .collapse-icon,
+body.dark-theme .section-title{
+  color:var(--accent) !important;
 }
 body.dark-theme #freezeBtn.frozen{
   background:#4a2f35 !important;
@@ -862,11 +873,16 @@ body.dark-theme .view-seg button.active{
 
 <!-- ═══════════════ CONTROLS ═══════════════ -->
 <div id="controls">
-  <div class="essentials-card">
-    <div class="section-title">Essentials</div>
-    <div class="control-stack">
-      <button id="freezeBtn" class="core-btn" onclick="toggleFreeze()">❚❚ Freeze [Space]</button>
-      <button id="captureBtn" class="core-btn" onclick="doCapture()">📷 Snapshot [⌘S]</button>
+  <div id="essentialsGroup" class="essentials-card collapse-card">
+    <button class="collapse-toggle" onclick="toggleCollapse('essentialsGroup')" aria-expanded="true">
+      <span class="section-title">Essentials</span>
+      <span class="collapse-icon">▾</span>
+    </button>
+    <div class="collapse-body">
+      <div class="control-stack">
+        <button id="freezeBtn" class="core-btn" onclick="toggleFreeze()">❚❚ Freeze [Space]</button>
+        <button id="captureBtn" class="core-btn" onclick="doCapture()">📷 Snapshot [⌘S]</button>
+      </div>
     </div>
   </div>
 
@@ -1512,6 +1528,7 @@ async function svgToPngDataUrl(svgString) {
 
 // ── Camera shutter sound ──────────────────────────
 let shutterAudioContext = null;
+const SHUTTER_SOUND_DATA_URL = 'data:audio/wav;base64,UklGRjQEAABXQVZFZm10IBAAAAABAAEAIlYAAESsAAACABAAZGF0YRAEAACBhYqOkI+MiYaCgH99fHx8fYKEj5SWkYqCgXx7fX+ChI2Sl5iVkYeAfXt7foKEjpOWl5WNhYB7en2AgoOLk5mblYyCfHt8foCEjI+Ul5mWj4mAfHl8f4OEjJORlY+JhH98e3x/hoSOk5iWk4yGgHx8fH2ChIuTl5iUjYSAfHt8foKEj5OWl5SOhoB8e3x/g4SMk5GVj4mEf3x7fH+GhI6TmJaTjIaAfHx8fYKEi5OXmJSNhIB8e3x+goSPk5aXlI6GgHx7fH+Dg4yTkZWPiYR/fHt8f4aEjpOYlpOMhoB8fHx9goSLk5eYlI2EgHx7fH6ChI+TlpeUjoaAfHt8f4ODjJORlY+JhH98e3x/hoSOk5iWk4yGgHx8fH2ChIuTl5iUjYSAfHt8foKEj5OWl5SOhoB8e3x/g4SMk5GVj4mEf3x7fH+GhI6TmJaTjIaAfHx8fYKEi5OXmJSNhIB8e3x+goSPk5aXlI6GgHx7fH+DhIyTkZWPiYR/fHt8f4aEjpOYlpOMhoB8fHx9goSLk5eYlI2Eg==';
 
 function getShutterAudioContext() {
   const AudioCtor = window.AudioContext || window.webkitAudioContext;
@@ -1522,44 +1539,54 @@ function getShutterAudioContext() {
   return shutterAudioContext;
 }
 
-function playCameraSound() {
+async function playCameraSound() {
   try {
     const actx = getShutterAudioContext();
-    if (!actx) return;
-    if (actx.state === 'suspended') actx.resume();
-    const now  = actx.currentTime;
-    const sr   = actx.sampleRate;
-    // Mechanical click: noise burst + short tone
-    const buf  = actx.createBuffer(1, Math.floor(sr * 0.07), sr);
-    const d    = buf.getChannelData(0);
-    for (let i = 0; i < d.length; i++) {
-      d[i] = (Math.random()*2-1) * Math.exp(-i/(d.length*0.12));
+    if (actx) {
+      if (actx.state === 'suspended') await actx.resume();
+      const now  = actx.currentTime;
+      const sr   = actx.sampleRate;
+      // Mechanical click: noise burst + short tone
+      const buf  = actx.createBuffer(1, Math.floor(sr * 0.07), sr);
+      const d    = buf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) {
+        d[i] = (Math.random()*2-1) * Math.exp(-i/(d.length*0.12));
+      }
+      const src = actx.createBufferSource();
+      src.buffer = buf;
+      const g = actx.createGain();
+      g.gain.setValueAtTime(0.5, now);
+      const f = actx.createBiquadFilter();
+      f.type = 'highpass'; f.frequency.value = 600;
+      src.connect(f); f.connect(g); g.connect(actx.destination);
+      src.start(now);
+      const osc = actx.createOscillator();
+      const og = actx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(880, now);
+      og.gain.setValueAtTime(0.001, now);
+      og.gain.exponentialRampToValueAtTime(0.08, now + 0.004);
+      og.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+      osc.connect(og);
+      og.connect(actx.destination);
+      osc.start(now);
+      osc.stop(now + 0.055);
+      return;
     }
-    const src = actx.createBufferSource();
-    src.buffer = buf;
-    const g = actx.createGain();
-    g.gain.setValueAtTime(0.5, now);
-    const f = actx.createBiquadFilter();
-    f.type = 'highpass'; f.frequency.value = 600;
-    src.connect(f); f.connect(g); g.connect(actx.destination);
-    src.start(now);
-    const osc = actx.createOscillator();
-    const og = actx.createGain();
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(880, now);
-    og.gain.setValueAtTime(0.001, now);
-    og.gain.exponentialRampToValueAtTime(0.08, now + 0.004);
-    og.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
-    osc.connect(og);
-    og.connect(actx.destination);
-    osc.start(now);
-    osc.stop(now + 0.055);
+    const audio = new Audio(SHUTTER_SOUND_DATA_URL);
+    audio.volume = 0.6;
+    await audio.play().catch(() => {});
   } catch(e) {}
 }
 
 // ── Session saves (three types) ───────────────────
 async function _saveCapture(origPng, aiboardPng, topic, capType) {
-  if (!currentSession || currentSession.locked) return;
+  if (!currentSession) return null;
+  if (currentSession.locked) {
+    toast('Unlock the class before saving a snapshot');
+    status('Session is locked');
+    return null;
+  }
   try {
     const r = await fetch(`/api/sessions/${currentSession.id}/capture`, {
       method: 'POST', headers: {'Content-Type':'application/json'},
@@ -1572,6 +1599,9 @@ async function _saveCapture(origPng, aiboardPng, topic, capType) {
       })
     });
     const cap = await r.json();
+    if (!r.ok) {
+      throw new Error(cap.details || cap.error || 'Could not save capture');
+    }
     // Keep local list in sync
     if (capType === 'latest_freeze') {
       const idx = currentSession.captures.findIndex(c => c.capture_type === 'latest_freeze');
@@ -1586,6 +1616,8 @@ async function _saveCapture(origPng, aiboardPng, topic, capType) {
     return cap;
   } catch(e) {
     console.error('Save failed:', e);
+    toast(`Save failed: ${e.message}`, 4000);
+    return null;
   }
 }
 
@@ -2326,13 +2358,21 @@ async function doCapture() {
     status('Start a class before capturing');
     return;
   }
+  if (currentSession.locked) {
+    toast('Unlock the class before taking a snapshot');
+    status('Session is locked');
+    return;
+  }
+  if (!frozen && vid.readyState >= 2) {
+    drawFrame();
+  }
   // Use the last frozen frame (or current canvas if live)
-  const imgPng = lastOrigPng || (frozen ? mc.toDataURL('image/png') : mc.toDataURL('image/png'));
+  const imgPng = frozen ? (lastOrigPng || mc.toDataURL('image/png')) : mc.toDataURL('image/png');
   if (!imgPng) { status('Nothing to capture — freeze a frame first'); return; }
 
   const ts = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
   const fn = `capture_${ts}.png`;
-  playCameraSound();
+  await playCameraSound();
   const saved = await _saveCapture(imgPng, '', `Capture ${ts.slice(0,16).replace('T',' ')}`, 'explicit');
   if (!saved) {
     toast('Capture failed to save to the gallery');
