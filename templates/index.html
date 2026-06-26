@@ -1429,6 +1429,15 @@ function toast(msg, duration = 3000) {
   }, duration);
 }
 
+function escapeHtml(text) {
+  return String(text ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // ── Board-only update (incremental) ───────────────
 async function updateBoardOnly(dataURL, quiet = false) {
   const sw = document.getElementById('svgWrapper');
@@ -1485,13 +1494,16 @@ async function updateBoardOnly(dataURL, quiet = false) {
     } else if (!hasSvg && !quiet) {
       const msg = boardError || 'AI Board could not be generated.';
       sw.innerHTML = `<p style="color:#555;padding:40px;font-size:14px;text-align:center">${escapeHtml(msg)}</p>`;
+      status(msg);
       toast(`⚠ ${msg}`, 4500);
     } else if (boardError && !quiet) {
+      status(boardError);
       toast(`⚠ ${boardError}`, 4500);
     }
   } catch(e) {
     if (!quiet) {
       document.getElementById('boardLoading').style.display = 'none';
+      status('Board update failed: ' + e.message);
       toast('⚠ Board update failed: ' + e.message, 4000);
     }
   }
@@ -2293,6 +2305,7 @@ function toggleFreeze() {
     document.getElementById('chatEmpty').style.display = 'flex';
     chatHistory = []; currentAnalysisContext = '';
     boardFrozen = false;
+    analysisReady = false;
     _syncAnalyseBtn();
     status('Live');
     refreshOriginalView();
@@ -2301,7 +2314,7 @@ function toggleFreeze() {
 
 // On-demand text analysis (called from "Analyse Board" button)
 async function runTextAnalysis() {
-  if (!analysisReady || !lastOrigPng) { status('Freeze a frame first'); return; }
+  if (!frozen || !analysisReady || !lastOrigPng) { status('Freeze a frame first'); return; }
 
   document.getElementById('chatEmpty').style.display = 'none';
   document.getElementById('analyseBarWrapper').style.display = 'none';
@@ -2317,7 +2330,13 @@ async function runTextAnalysis() {
         svg_prompt: '',
       })
     });
-    const res = await r.json();
+    let res;
+    try {
+      res = await r.json();
+    } catch (_) {
+      const raw = await r.text();
+      throw new Error(raw || 'Analysis request failed.');
+    }
     removeTyping();
     if (!r.ok || res.error) {
       addChatMsg('teacher', `Error: ${res.error || 'Analysis request failed.'}`);

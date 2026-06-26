@@ -307,62 +307,66 @@ def admin_dashboard():
 @anon_api_quota
 @login_required_api
 def analyze():
-    data, error_response = require_json_payload()
-    if error_response:
-        return error_response
     try:
-        quota_snapshot = QUOTAS.ensure_analysis_available()
-    except QuotaExceeded as e:
-        return jsonify({"svg": "", "analysis": "", "error": str(e), "quota": e.quota_snapshot}), 429
-    try:
-        image_bytes, _ = decode_image_data_url(data.get("image", ""),
-                                               app.config["MAX_IMAGE_BYTES"])
-    except ValueError as e:
-        return jsonify({"svg": "", "analysis": "", "error": str(e)}), 400
+        data, error_response = require_json_payload()
+        if error_response:
+            return error_response
+        try:
+            quota_snapshot = QUOTAS.ensure_analysis_available()
+        except QuotaExceeded as e:
+            return jsonify({"svg": "", "analysis": "", "error": str(e), "quota": e.quota_snapshot}), 429
+        try:
+            image_bytes, _ = decode_image_data_url(data.get("image", ""),
+                                                   app.config["MAX_IMAGE_BYTES"])
+        except ValueError as e:
+            return jsonify({"svg": "", "analysis": "", "error": str(e)}), 400
 
-    if not CLAUDE_AVAILABLE:
-        return jsonify({"svg": "", "analysis": "Claude API key not configured.",
-                        "error": "No API key"})
+        if not CLAUDE_AVAILABLE:
+            return jsonify({"svg": "", "analysis": "Claude API key not configured.",
+                            "error": "No API key"})
 
-    # Accept custom prompts from frontend (user-editable via Settings)
-    custom_svg_prompt      = data.get("svg_prompt", None)
-    custom_analysis_prompt = data.get("analysis_prompt", None)
+        # Accept custom prompts from frontend (user-editable via Settings)
+        custom_svg_prompt      = data.get("svg_prompt", None)
+        custom_analysis_prompt = data.get("analysis_prompt", None)
 
-    cache_key = stable_cache_key("analyze", {
-        "image_sha": hashlib.sha256(image_bytes).hexdigest(),
-        "svg_prompt": custom_svg_prompt or "",
-        "analysis_prompt": custom_analysis_prompt or "",
-    })
-    cached = ANALYSIS_CACHE.get(cache_key)
-    if cached is not None:
-        return jsonify({**cached, "quota": quota_snapshot})
+        cache_key = stable_cache_key("analyze", {
+            "image_sha": hashlib.sha256(image_bytes).hexdigest(),
+            "svg_prompt": custom_svg_prompt or "",
+            "analysis_prompt": custom_analysis_prompt or "",
+        })
+        cached = ANALYSIS_CACHE.get(cache_key)
+        if cached is not None:
+            return jsonify({**cached, "quota": quota_snapshot})
 
-    include_svg = bool((custom_svg_prompt or "").strip())
+        include_svg = bool((custom_svg_prompt or "").strip())
 
-    svg_f = _pool.submit(_gen_svg, image_bytes, custom_svg_prompt) if include_svg else None
-    analysis_f = _pool.submit(_gen_analysis, image_bytes, custom_analysis_prompt)
+        svg_f = _pool.submit(_gen_svg, image_bytes, custom_svg_prompt) if include_svg else None
+        analysis_f = _pool.submit(_gen_analysis, image_bytes, custom_analysis_prompt)
 
-    svg_result = svg_f.result() if svg_f else {"svg": "", "error": ""}
-    analysis_result = analysis_f.result()
-    result = {
-        "svg": svg_result["svg"],
-        "analysis": analysis_result["analysis"],
-    }
-    if svg_result.get("error"):
-        result["svg_error"] = svg_result["error"]
-    if analysis_result.get("error"):
-        result["error"] = analysis_result["error"]
-    ANALYSIS_CACHE.set(cache_key, result)
-    QUOTAS.record_event("analysis", {"session_id": data.get("session_id", ""), "board_id": data.get("board_id")})
-    QUOTAS.record_event("ai_request", {"route": "/analyze"})
-    QUOTAS.record_event("ocr_request", {"route": "/analyze"})
-    log_event(
-        SECURITY["logger"],
-        "analysis_completed",
-        ip=request.remote_addr,
-        user_id=(current_user() or {}).get("id"),
-    )
-    return jsonify({**result, "quota": QUOTAS.quota_snapshot()})
+        svg_result = svg_f.result() if svg_f else {"svg": "", "error": ""}
+        analysis_result = analysis_f.result()
+        result = {
+            "svg": svg_result["svg"],
+            "analysis": analysis_result["analysis"],
+        }
+        if svg_result.get("error"):
+            result["svg_error"] = svg_result["error"]
+        if analysis_result.get("error"):
+            result["error"] = analysis_result["error"]
+        ANALYSIS_CACHE.set(cache_key, result)
+        QUOTAS.record_event("analysis", {"session_id": data.get("session_id", ""), "board_id": data.get("board_id")})
+        QUOTAS.record_event("ai_request", {"route": "/analyze"})
+        QUOTAS.record_event("ocr_request", {"route": "/analyze"})
+        log_event(
+            SECURITY["logger"],
+            "analysis_completed",
+            ip=request.remote_addr,
+            user_id=(current_user() or {}).get("id"),
+        )
+        return jsonify({**result, "quota": QUOTAS.quota_snapshot()})
+    except Exception as e:
+        print(f"/analyze route error: {e}")
+        return jsonify({"svg": "", "analysis": "", "error": f"Internal server error during analysis: {e}"}), 500
 
 
 @app.route("/chat", methods=["POST"])
