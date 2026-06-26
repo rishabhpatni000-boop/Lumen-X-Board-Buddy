@@ -8,7 +8,13 @@ import os
 
 import requests
 
-from supabase_integration import current_access_token, current_user, supabase_config
+from supabase_integration import (
+    current_access_token,
+    current_user,
+    is_admin_user,
+    supabase_config,
+    supabase_service_headers,
+)
 
 
 class QuotaExceeded(Exception):
@@ -18,6 +24,8 @@ class QuotaExceeded(Exception):
 
 
 class QuotaService:
+    ADMIN_UNLIMITED = 10**9
+
     def __init__(self):
         self.daily_analyses_limit = int(os.getenv("DAILY_ANALYSES_LIMIT", "20"))
         self.monthly_analyses_limit = int(os.getenv("MONTHLY_ANALYSES_LIMIT", "200"))
@@ -31,6 +39,12 @@ class QuotaService:
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
         }
+
+    def _best_effort_headers(self):
+        try:
+            return supabase_service_headers()
+        except Exception:
+            return self._headers()
 
     def _base_url(self):
         return f"{supabase_config()['url']}/rest/v1/usage_events"
@@ -61,24 +75,28 @@ class QuotaService:
         if not cfg["url"] or not cfg["anon_key"] or not token or not current_user():
             return 0
 
-        resp = requests.get(
-            self._base_url(),
-            headers={**self._headers(), "Prefer": "count=exact"},
-            params=[
-                ("select", "id"),
-                ("event_type", f"eq.{event_type}"),
-                ("created_at", f"gte.{start}"),
-                ("created_at", f"lt.{end}"),
-                ("limit", "1"),
-            ],
-            timeout=15,
-        )
-        resp.raise_for_status()
-        content_range = resp.headers.get("Content-Range", "0-0/0")
         try:
-            return int(content_range.split("/")[-1])
-        except (TypeError, ValueError):
-            return len(resp.json())
+            resp = requests.get(
+                self._base_url(),
+                headers={**self._best_effort_headers(), "Prefer": "count=exact"},
+                params=[
+                    ("select", "id"),
+                    ("user_id", f"eq.{current_user()['id']}"),
+                    ("event_type", f"eq.{event_type}"),
+                    ("created_at", f"gte.{start}"),
+                    ("created_at", f"lt.{end}"),
+                    ("limit", "1"),
+                ],
+                timeout=15,
+            )
+            resp.raise_for_status()
+            content_range = resp.headers.get("Content-Range", "0-0/0")
+            try:
+                return int(content_range.split("/")[-1])
+            except (TypeError, ValueError):
+                return len(resp.json())
+        except Exception:
+            return 0
 
     def record_event(self, event_type: str, metadata: dict | None = None):
         cfg = supabase_config()
@@ -86,19 +104,22 @@ class QuotaService:
         user = current_user()
         if not cfg["url"] or not cfg["anon_key"] or not token or not user:
             return None
-        resp = requests.post(
-            self._base_url(),
-            headers={**self._headers(), "Prefer": "return=representation"},
-            json={
-                "user_id": user["id"],
-                "event_type": event_type,
-                "metadata": metadata or {},
-            },
-            timeout=15,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        return data[0] if isinstance(data, list) and data else data
+        try:
+            resp = requests.post(
+                self._base_url(),
+                headers={**self._best_effort_headers(), "Prefer": "return=representation"},
+                json={
+                    "user_id": user["id"],
+                    "event_type": event_type,
+                    "metadata": metadata or {},
+                },
+                timeout=15,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            return data[0] if isinstance(data, list) and data else data
+        except Exception:
+            return None
 
     def _limits(self):
         limits = {
@@ -136,6 +157,21 @@ class QuotaService:
         return limits
 
     def quota_snapshot(self):
+        if is_admin_user():
+            return {
+                "daily_analyses": 0,
+                "monthly_analyses": 0,
+                "daily_uploads": 0,
+                "daily_remaining": self.ADMIN_UNLIMITED,
+                "monthly_remaining": self.ADMIN_UNLIMITED,
+                "upload_remaining": self.ADMIN_UNLIMITED,
+                "limits": {
+                    "daily_analyses": self.ADMIN_UNLIMITED,
+                    "monthly_analyses": self.ADMIN_UNLIMITED,
+                    "daily_uploads": self.ADMIN_UNLIMITED,
+                },
+                "is_admin_unlimited": True,
+            }
         today_start, today_end = self._today_range()
         month_start, month_end = self._month_range()
         daily_analyses = self._count("analysis", today_start, today_end)
@@ -171,15 +207,19 @@ class QuotaService:
         token = current_access_token()
         if not cfg["url"] or not cfg["anon_key"] or not token or not current_user():
             return []
-        resp = requests.get(
-            self._base_url(),
-            headers=self._headers(),
-            params=[
-                ("select", "event_type,metadata,created_at"),
-                ("order", "created_at.desc"),
-                ("limit", str(limit)),
-            ],
-            timeout=15,
-        )
-        resp.raise_for_status()
-        return resp.json()
+        try:
+            resp = requests.get(
+                self._base_url(),
+                headers=self._best_effort_headers(),
+                params=[
+                    ("select", "event_type,metadata,created_at"),
+                    ("user_id", f"eq.{current_user()['id']}"),
+                    ("order", "created_at.desc"),
+                    ("limit", str(limit)),
+                ],
+                timeout=15,
+            )
+            resp.raise_for_status()
+            return resp.json()
+        except Exception:
+            return []
