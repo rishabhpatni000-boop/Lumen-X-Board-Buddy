@@ -337,9 +337,21 @@ def analyze():
     if cached is not None:
         return jsonify({**cached, "quota": quota_snapshot})
 
-    svg_f      = _pool.submit(_gen_svg,      image_bytes, custom_svg_prompt)
+    include_svg = bool((custom_svg_prompt or "").strip())
+
+    svg_f = _pool.submit(_gen_svg, image_bytes, custom_svg_prompt) if include_svg else None
     analysis_f = _pool.submit(_gen_analysis, image_bytes, custom_analysis_prompt)
-    result = {"svg": svg_f.result(), "analysis": analysis_f.result()}
+
+    svg_result = svg_f.result() if svg_f else {"svg": "", "error": ""}
+    analysis_result = analysis_f.result()
+    result = {
+        "svg": svg_result["svg"],
+        "analysis": analysis_result["analysis"],
+    }
+    if svg_result.get("error"):
+        result["svg_error"] = svg_result["error"]
+    if analysis_result.get("error"):
+        result["error"] = analysis_result["error"]
     ANALYSIS_CACHE.set(cache_key, result)
     QUOTAS.record_event("analysis", {"session_id": data.get("session_id", ""), "board_id": data.get("board_id")})
     QUOTAS.record_event("ai_request", {"route": "/analyze"})
@@ -558,8 +570,8 @@ def update_board():
     if previous_svg.strip().startswith("<svg"):
         result = _gen_svg_incremental(image_bytes, previous_svg, svg_prompt)
     else:
-        svg = _gen_svg(image_bytes, svg_prompt)
-        result = {"svg": svg, "is_new_board": False}
+        svg_result = _gen_svg(image_bytes, svg_prompt)
+        result = {"svg": svg_result["svg"], "is_new_board": False, "error": svg_result["error"]}
     BOARD_CACHE.set(cache_key, result)
     QUOTAS.record_event("ai_request", {"route": "/update-board"})
     return jsonify(result)
@@ -1106,13 +1118,19 @@ Return ONLY raw SVG code starting with <svg. No markdown, no explanation."""
                      flags=re.DOTALL | re.IGNORECASE)
         is_new_board = "<!-- NEW_BOARD_DETECTED -->" in svg
         svg = svg.replace("<!-- NEW_BOARD_DETECTED -->", "").strip()
-        return {"svg": svg if "<svg" in svg else "", "is_new_board": is_new_board}
+        if "<svg" not in svg:
+            return {
+                "svg": "",
+                "is_new_board": False,
+                "error": "Claude returned an invalid AI Board SVG.",
+            }
+        return {"svg": svg, "is_new_board": is_new_board, "error": ""}
     except Exception as e:
         print(f"Incremental SVG error: {e}")
-        return {"svg": "", "is_new_board": False}
+        return {"svg": "", "is_new_board": False, "error": f"AI Board update failed: {e}"}
 
 
-def _gen_svg(image_bytes: bytes, custom_prompt: str = None) -> str:
+def _gen_svg(image_bytes: bytes, custom_prompt: str = None) -> dict:
     """Generate a clean SVG recreation of the whiteboard."""
     try:
         prompt = custom_prompt if custom_prompt else """Recreate this classroom whiteboard as a clean, readable SVG image.
@@ -1156,13 +1174,15 @@ No explanation. No markdown. No code fences."""
         svg = re.sub(r"<script[^>]*>.*?</script>", "", svg,
                      flags=re.DOTALL | re.IGNORECASE)
 
-        return svg if "<svg" in svg else ""
+        if "<svg" not in svg:
+            return {"svg": "", "error": "Claude returned an invalid AI Board SVG."}
+        return {"svg": svg, "error": ""}
     except Exception as e:
         print(f"SVG generation error: {e}")
-        return ""
+        return {"svg": "", "error": f"AI Board generation failed: {e}"}
 
 
-def _gen_analysis(image_bytes: bytes, custom_prompt: str = None) -> str:
+def _gen_analysis(image_bytes: bytes, custom_prompt: str = None) -> dict:
     """Generate a student-friendly explanation of the class content."""
 
     DEFAULT_PROMPT = """You are an enthusiastic, patient teacher. A student with low vision has shared a photo of their classroom whiteboard. Help them understand the lesson fully.
@@ -1199,10 +1219,13 @@ Rules:
             max_tokens=1024,
             messages=_img_msg(image_bytes, prompt),
         )
-        return resp.content[0].text.strip()
+        text = resp.content[0].text.strip()
+        if not text:
+            return {"analysis": "", "error": "Claude returned an empty analysis."}
+        return {"analysis": text, "error": ""}
     except Exception as e:
         print(f"Analysis error: {e}")
-        return f"Could not generate analysis: {e}"
+        return {"analysis": "", "error": f"Could not generate analysis: {e}"}
 
 
 # ── Start ─────────────────────────────────────────────────────────────────────

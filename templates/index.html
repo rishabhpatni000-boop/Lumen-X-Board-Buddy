@@ -1115,6 +1115,8 @@ let lastSvgString   = '';    // raw SVG from last AI Board (for PNG export)
 let lastOrigPng     = '';    // data-URL of last frozen frame
 let previousSvg     = '';    // SVG used as base for next incremental update
 let boardFrozen     = false; // is there a board available to analyse?
+let analysisReady   = false; // is there a frozen frame available to analyse?
+let frozenFrameImg  = null;  // cached frozen frame for view switching
 let boardId         = 0;     // increments each time "New Board" is pressed
 // Perspective calibration
 let calCorners      = null;   // 4 src corners [[x,y],...] in video pixels
@@ -1325,6 +1327,15 @@ function openClassPicker() {
   // Stop auto-freeze before going home
   stopAutoFreeze();
   stopCamera();
+  lastOrigPng = '';
+  previousSvg = '';
+  lastSvgString = '';
+  boardFrozen = false;
+  analysisReady = false;
+  frozenFrameImg = null;
+  frozen = false;
+  hasSvg = false;
+  _syncAnalyseBtn();
   document.getElementById('workspaceEmpty').style.display = 'flex';
   document.getElementById('sessionModal').classList.add('open');
   document.getElementById('sessionModal').setAttribute('aria-hidden', 'false');
@@ -1342,11 +1353,16 @@ function confirmNewBoard() {
   if (!confirm('Start a fresh board? The previous board will stay in the Gallery.')) return;
   boardId++;          // new board_id → AI board saves won't overwrite previous board
   previousSvg = '';
+  lastOrigPng = '';
+  lastSvgString = '';
   boardFrozen = false;
+  analysisReady = false;
+  frozenFrameImg = null;
   document.getElementById('svgWrapper').innerHTML = '';
   document.getElementById('boardEmpty').style.display = 'flex';
   hasSvg = false;
   document.getElementById('newBoardBtn').style.display = 'none';
+  _syncAnalyseBtn();
   status('🆕 New board started — freeze a frame to begin');
 }
 
@@ -1430,6 +1446,7 @@ async function updateBoardOnly(dataURL, quiet = false) {
       })
     });
     const res = await r.json();
+    const boardError = res.error || (!r.ok ? 'AI Board request failed.' : '');
 
     if (!quiet) document.getElementById('boardLoading').style.display = 'none';
     document.getElementById('boardEmpty').style.display = 'none';
@@ -1447,7 +1464,7 @@ async function updateBoardOnly(dataURL, quiet = false) {
       document.getElementById('newBoardBtn').style.display = '';
       bZoom=1; bPanX=0; bPanY=0; updBoardTransform();
 
-      // Unlock "Analyse" button now that there's a board
+      // Board availability should not control whether a frozen frame can be analysed.
       boardFrozen = true;
       _syncAnalyseBtn();
 
@@ -1466,7 +1483,11 @@ async function updateBoardOnly(dataURL, quiet = false) {
         }, 500);
       }
     } else if (!hasSvg && !quiet) {
-      sw.innerHTML = '<p style="color:#555;padding:40px;font-size:14px;text-align:center">AI Board could not be generated.</p>';
+      const msg = boardError || 'AI Board could not be generated.';
+      sw.innerHTML = `<p style="color:#555;padding:40px;font-size:14px;text-align:center">${escapeHtml(msg)}</p>`;
+      toast(`⚠ ${msg}`, 4500);
+    } else if (boardError && !quiet) {
+      toast(`⚠ ${boardError}`, 4500);
     }
   } catch(e) {
     if (!quiet) {
@@ -1479,7 +1500,7 @@ async function updateBoardOnly(dataURL, quiet = false) {
 function _syncAnalyseBtn() {
   const btn  = document.getElementById('analyseNowBtn');
   const wrap = document.getElementById('analyseBarWrapper');
-  if (boardFrozen) {
+  if (analysisReady) {
     btn.style.opacity        = '1';
     btn.style.pointerEvents  = 'auto';
     wrap.style.display       = 'flex';
@@ -1884,7 +1905,7 @@ function setView(v) {
   document.getElementById('zoomLbl').textContent = z.toFixed(1) + '×';
 
   closePanels();
-  if (isOrig) resizeCanvas();
+  if (isOrig) refreshOriginalView();
   if (isGallery) loadGallery();
 }
 
@@ -1945,6 +1966,52 @@ function stopCamera() {
   mCtx.clearRect(0, 0, mc.width, mc.height);
 }
 
+function cacheFrozenFrame(dataUrl) {
+  frozenFrameImg = null;
+  if (!dataUrl) return;
+  const img = new Image();
+  img.onload = () => {
+    frozenFrameImg = img;
+    if (view === 'orig' && frozen) renderFrozenFrame();
+  };
+  img.src = dataUrl;
+}
+
+function drawImageContain(ctx, img, cw, ch) {
+  if (!img || !cw || !ch) return;
+  const iw = img.naturalWidth || img.videoWidth || img.width;
+  const ih = img.naturalHeight || img.videoHeight || img.height;
+  if (!iw || !ih) return;
+  const scale = Math.min(cw / iw, ch / ih);
+  const drawW = iw * scale;
+  const drawH = ih * scale;
+  const drawX = (cw - drawW) / 2;
+  const drawY = (ch - drawH) / 2;
+  ctx.clearRect(0, 0, cw, ch);
+  ctx.drawImage(img, drawX, drawY, drawW, drawH);
+}
+
+function renderFrozenFrame() {
+  if (!lastOrigPng) return;
+  const cw = mc.width;
+  const ch = mc.height;
+  if (!cw || !ch) return;
+  if (frozenFrameImg?.complete) {
+    drawImageContain(mCtx, frozenFrameImg, cw, ch);
+    return;
+  }
+  cacheFrozenFrame(lastOrigPng);
+}
+
+function refreshOriginalView() {
+  resizeCanvas();
+  if (frozen && lastOrigPng) {
+    renderFrozenFrame();
+  } else if (vid.readyState >= 2) {
+    drawFrame();
+  }
+}
+
 function buildCameraConstraints(deviceId, isFullscreen) {
   return {
     deviceId: deviceId ? {exact: deviceId} : undefined,
@@ -1978,7 +2045,7 @@ function resizeCanvas() {
 
 // ResizeObserver fires AFTER layout settles — handles hide controls,
 // fullscreen, window resize, all in one place
-const _ro = new ResizeObserver(() => resizeCanvas());
+const _ro = new ResizeObserver(() => refreshOriginalView());
 _ro.observe(document.getElementById('originalView'));
 
 // ════════════════════════════════════════════════
@@ -2208,6 +2275,9 @@ function toggleFreeze() {
     badge.style.display = 'block';
     // Capture the original frame PNG right now (before analysis modifies anything)
     lastOrigPng = mc.toDataURL('image/png');
+    cacheFrozenFrame(lastOrigPng);
+    analysisReady = true;
+    _syncAnalyseBtn();
     status('FROZEN — updating AI Board…');
     updateBoardOnly(lastOrigPng);
     saveLatestFreeze();   // overwrite latest frozen frame in gallery
@@ -2222,14 +2292,16 @@ function toggleFreeze() {
     document.getElementById('chatInputArea').style.display = 'none';
     document.getElementById('chatEmpty').style.display = 'flex';
     chatHistory = []; currentAnalysisContext = '';
-    boardFrozen = false; _syncAnalyseBtn();
+    boardFrozen = false;
+    _syncAnalyseBtn();
     status('Live');
+    refreshOriginalView();
   }
 }
 
 // On-demand text analysis (called from "Analyse Board" button)
 async function runTextAnalysis() {
-  if (!lastOrigPng) { status('Freeze a frame first'); return; }
+  if (!analysisReady || !lastOrigPng) { status('Freeze a frame first'); return; }
 
   document.getElementById('chatEmpty').style.display = 'none';
   document.getElementById('analyseBarWrapper').style.display = 'none';
@@ -2247,6 +2319,13 @@ async function runTextAnalysis() {
     });
     const res = await r.json();
     removeTyping();
+    if (!r.ok || res.error) {
+      addChatMsg('teacher', `Error: ${res.error || 'Analysis request failed.'}`);
+      document.getElementById('chatInputArea').style.display = 'none';
+      document.getElementById('analyseBarWrapper').style.display = 'flex';
+      status(res.error || 'Analysis failed');
+      return;
+    }
     const analysis = res.analysis || '(No analysis)';
     if (res.quota) updateDashboardQuota(res.quota);
     currentAnalysisContext = analysis;
