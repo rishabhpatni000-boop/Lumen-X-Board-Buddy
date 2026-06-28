@@ -45,12 +45,26 @@ textarea{min-height:92px;resize:vertical}
 .section-title{margin:0 0 14px;font-size:18px}
 .row-actions{display:flex;gap:8px;flex-wrap:wrap}
 .note{font-size:12px;color:#8ea2b8;line-height:1.6}
+.demo-card{margin-top:18px}
+.demo-uploader{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:end}
+.demo-uploader .wide{grid-column:1/-1}
+.demo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;margin-top:16px}
+.demo-tile{background:#0b141d;border:1px solid rgba(126,157,194,.14);border-radius:18px;overflow:hidden}
+.demo-tile img{width:100%;height:150px;object-fit:contain;background:#172331;display:block}
+.demo-tile-body{padding:12px}
+.demo-title-row{display:flex;gap:8px;align-items:flex-start;justify-content:space-between}
+.demo-title-row strong{font-size:15px}
+.demo-pill{display:inline-flex;align-items:center;border-radius:999px;padding:4px 8px;font-size:11px;font-weight:700;background:#24364a;color:#a9c2df}
+.demo-pill.off{background:#3b2630;color:#eda8b7}
+.demo-caption{margin-top:7px;color:#9fb4cb;font-size:13px;line-height:1.45}
+.demo-meta{margin-top:7px;color:#7f98b5;font-size:12px}
 @media (max-width: 1100px){
   .grid{grid-template-columns:1fr}
 }
 @media (max-width: 760px){
   .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
   .form-grid{grid-template-columns:1fr}
+  .demo-uploader{grid-template-columns:1fr}
 }
 </style>
 </head>
@@ -77,6 +91,7 @@ textarea{min-height:92px;resize:vertical}
       <article class="card"><div class="stat-label">Users</div><div class="stat-value" id="statUsers">0</div></article>
       <article class="card"><div class="stat-label">Admins</div><div class="stat-value" id="statAdmins">0</div></article>
       <article class="card"><div class="stat-label">Tracked Analyses</div><div class="stat-value" id="statAnalyses">0</div></article>
+      <article class="card"><div class="stat-label">Demo Images</div><div class="stat-value" id="statDemos">0</div></article>
     </section>
 
     <section class="grid">
@@ -133,12 +148,52 @@ textarea{min-height:92px;resize:vertical}
       </article>
     </section>
 
+    <section class="card demo-card">
+      <h2 class="section-title">Demo Gallery Images</h2>
+      <div class="note">Upload default board examples that appear in every matching class gallery. Use subject “All” to show a demo everywhere.</div>
+      <div style="height:14px"></div>
+      <div class="demo-uploader">
+        <div>
+          <label for="demoFile">Image</label>
+          <input id="demoFile" type="file" accept="image/png,image/jpeg,image/webp">
+        </div>
+        <div>
+          <label for="demoTitle">Title</label>
+          <input id="demoTitle" type="text" placeholder="Demo: Maths whiteboard">
+        </div>
+        <div>
+          <label for="demoSubject">Subject</label>
+          <input id="demoSubject" type="text" placeholder="All, Maths, Science..." value="All">
+        </div>
+        <div>
+          <label for="demoActive">Visibility</label>
+          <select id="demoActive">
+            <option value="true">Active</option>
+            <option value="false">Inactive</option>
+          </select>
+        </div>
+        <div class="wide">
+          <label for="demoCaption">Caption</label>
+          <textarea id="demoCaption" placeholder="This is a demo image students can use to try AI analysis."></textarea>
+        </div>
+      </div>
+      <div style="height:12px"></div>
+      <div class="row-actions">
+        <button class="btn primary" onclick="uploadDemoImage()">Upload Demo Image</button>
+        <button class="btn" onclick="loadDemoImages()">Refresh Demos</button>
+      </div>
+      <div id="demoStatus" class="note" style="margin-top:10px"></div>
+      <div id="demoGrid" class="demo-grid">
+        <div class="muted">Loading demo images…</div>
+      </div>
+    </section>
+
   </main>
 
   <script>
     const csrfToken = {{ csrf_token|tojson }};
     const _nativeFetch = window.fetch.bind(window);
-    let adminState = { users: [], defaults: {} };
+    let adminState = { users: [], defaults: {}, demos: [] };
 
     window.fetch = (input, init = {}) => {
       const method = (init.method || 'GET').toUpperCase();
@@ -167,9 +222,28 @@ textarea{min-height:92px;resize:vertical}
       return new Date(value).toLocaleString('en-GB');
     }
 
+    function escapeHtml(text) {
+      return String(text ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function fileToDataUrl(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(reader.error || new Error('Could not read file'));
+        reader.readAsDataURL(file);
+      });
+    }
+
     function renderUsers() {
       const tbody = document.getElementById('userRows');
       const users = adminState.users || [];
+      document.getElementById('statDemos').textContent = (adminState.demos || []).filter(item => item.active).length;
       document.getElementById('statUsers').textContent = users.length;
       document.getElementById('statAdmins').textContent = users.filter(u => u.is_admin).length;
       document.getElementById('statAnalyses').textContent =
@@ -183,8 +257,8 @@ textarea{min-height:92px;resize:vertical}
       tbody.innerHTML = users.map(user => `
         <tr>
           <td>
-            <div><strong>${user.full_name || 'Unnamed user'}</strong> ${user.is_admin ? '<span class="admin-badge">Admin</span>' : ''}</div>
-            <div class="muted">${user.email || 'No email'} </div>
+            <div><strong>${escapeHtml(user.full_name || 'Unnamed user')}</strong> ${user.is_admin ? '<span class="admin-badge">Admin</span>' : ''}</div>
+            <div class="muted">${escapeHtml(user.email || 'No email')} </div>
             <div class="muted">Joined ${formatWhen(user.created_at)}</div>
           </td>
           <td>
@@ -197,13 +271,13 @@ textarea{min-height:92px;resize:vertical}
             <div>Monthly AI: ${user.effective_limits.monthly_analyses}</div>
             <div>Daily uploads: ${user.effective_limits.daily_uploads}</div>
           </td>
-          <td class="muted">${(user.quota_override || {}).notes || 'No override notes'}</td>
+          <td class="muted">${escapeHtml((user.quota_override || {}).notes || 'No override notes')}</td>
         </tr>
       `).join('');
 
       const sel = document.getElementById('quotaUser');
       sel.innerHTML = users.map(user =>
-        `<option value="${user.id}">${user.email || user.full_name || user.id}</option>`
+        `<option value="${escapeHtml(user.id)}">${escapeHtml(user.email || user.full_name || user.id)}</option>`
       ).join('');
       if (users[0]) {
         sel.value = users[0].id;
@@ -228,7 +302,8 @@ textarea{min-height:92px;resize:vertical}
           `<tr><td colspan="4" class="muted" style="color:#e49a9a">Could not load users: ${data.details || data.error || 'Unknown error'}</td></tr>`;
         return;
       }
-      adminState = data;
+      const existingDemos = adminState.demos || [];
+      adminState = {...data, demos: existingDemos};
       renderUsers();
       document.getElementById('quotaStatus').textContent = (data.warnings || []).length
         ? `Warnings: ${data.warnings.join(' | ')}`
@@ -253,8 +328,104 @@ textarea{min-height:92px;resize:vertical}
       await loadOverview();
     }
 
+    function renderDemoImages() {
+      const grid = document.getElementById('demoGrid');
+      const demos = adminState.demos || [];
+      document.getElementById('statDemos').textContent = demos.filter(item => item.active).length;
+      if (!demos.length) {
+        grid.innerHTML = '<div class="muted">No demo images yet. Upload one JPG, PNG, or WebP to make it available in every gallery.</div>';
+        return;
+      }
+      grid.innerHTML = demos.map(item => `
+        <article class="demo-tile">
+          <img src="${escapeHtml(item.url)}" alt="${escapeHtml(item.title)}">
+          <div class="demo-tile-body">
+            <div class="demo-title-row">
+              <strong>${escapeHtml(item.title)}</strong>
+              <span class="demo-pill ${item.active ? '' : 'off'}">${item.active ? 'Active' : 'Hidden'}</span>
+            </div>
+            <div class="demo-caption">${escapeHtml(item.caption || 'Demo image for gallery analysis.')}</div>
+            <div class="demo-meta">Subject: ${escapeHtml(item.subject || 'All')} · ${formatWhen(item.created_at)}</div>
+            <div class="row-actions" style="margin-top:10px">
+              <button class="btn" onclick="toggleDemoImage('${escapeHtml(item.id)}', ${item.active ? 'false' : 'true'})">${item.active ? 'Hide' : 'Show'}</button>
+              <button class="btn" onclick="deleteDemoImage('${escapeHtml(item.id)}')">Delete</button>
+            </div>
+          </div>
+        </article>
+      `).join('');
+    }
+
+    async function loadDemoImages() {
+      const resp = await fetch('/api/admin/demo-images');
+      const data = await resp.json();
+      if (!resp.ok) {
+        document.getElementById('demoStatus').textContent = data.error || 'Could not load demo images.';
+        return;
+      }
+      adminState.demos = data;
+      document.getElementById('demoStatus').textContent = '';
+      renderDemoImages();
+    }
+
+    async function uploadDemoImage() {
+      const file = document.getElementById('demoFile').files[0];
+      if (!file) {
+        document.getElementById('demoStatus').textContent = 'Choose a JPG, PNG, or WebP image first.';
+        return;
+      }
+      document.getElementById('demoStatus').textContent = 'Uploading demo image…';
+      const imageData = await fileToDataUrl(file);
+      const payload = {
+        image_data: imageData,
+        title: document.getElementById('demoTitle').value,
+        caption: document.getElementById('demoCaption').value,
+        subject: document.getElementById('demoSubject').value || 'All',
+        active: document.getElementById('demoActive').value === 'true'
+      };
+      const resp = await fetch('/api/admin/demo-images', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        document.getElementById('demoStatus').textContent = data.error || 'Could not upload demo image.';
+        return;
+      }
+      document.getElementById('demoFile').value = '';
+      document.getElementById('demoTitle').value = '';
+      document.getElementById('demoCaption').value = '';
+      document.getElementById('demoSubject').value = 'All';
+      document.getElementById('demoStatus').textContent = 'Demo image uploaded.';
+      await loadDemoImages();
+    }
+
+    async function toggleDemoImage(id, active) {
+      const resp = await fetch(`/api/admin/demo-images/${id}`, {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({active})
+      });
+      const data = await resp.json();
+      document.getElementById('demoStatus').textContent = resp.ok
+        ? 'Demo visibility updated.'
+        : (data.error || 'Could not update demo image.');
+      await loadDemoImages();
+    }
+
+    async function deleteDemoImage(id) {
+      if (!confirm('Delete this demo image? It will disappear from all galleries.')) return;
+      const resp = await fetch(`/api/admin/demo-images/${id}`, {method: 'DELETE'});
+      const data = await resp.json();
+      document.getElementById('demoStatus').textContent = resp.ok
+        ? 'Demo image deleted.'
+        : (data.error || 'Could not delete demo image.');
+      await loadDemoImages();
+    }
+
     document.getElementById('quotaUser').addEventListener('change', populateQuotaEditor);
     loadOverview();
+    loadDemoImages();
   </script>
 </body>
 </html>

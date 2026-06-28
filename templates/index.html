@@ -195,6 +195,23 @@ video{display:none}
   animation:spin .8s linear infinite;margin-bottom:14px}
 @keyframes spin{to{transform:rotate(360deg)}}
 .overlay p{color:var(--ink-soft);font-size:14px;text-align:center;max-width:280px;line-height:1.6}
+.board-loading-overlay{background:
+  radial-gradient(circle at 45% 35%,rgba(255,250,243,.96),rgba(244,239,231,.76) 48%,rgba(232,220,203,.72));
+  backdrop-filter:blur(2px)}
+.board-loading-card{width:min(440px,calc(100vw - 48px));background:rgba(255,250,243,.94);
+  border:1px solid rgba(20,33,47,.1);border-radius:28px;padding:26px 28px;text-align:center;
+  box-shadow:0 28px 80px rgba(38,34,28,.18)}
+.magic-orb{width:74px;height:74px;border-radius:28px;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;
+  font-size:34px;color:#fffaf3;background:conic-gradient(from 180deg,#7f8fb2,#dd9b72,#b8a6c9,#7f8fb2);
+  box-shadow:0 14px 35px rgba(127,143,178,.35);animation:floatOrb 2.4s ease-in-out infinite}
+.board-loading-card h3{font-size:24px;line-height:1.25;margin-bottom:8px;color:var(--ink)}
+.board-loading-card p{font-size:16px;color:var(--ink-soft);line-height:1.55;max-width:none;margin:0 auto}
+.board-loading-steps{display:flex;justify-content:center;gap:7px;margin-top:18px}
+.board-loading-steps span{width:9px;height:9px;border-radius:50%;background:#9aa8c6;opacity:.35;animation:magicDots 1.3s infinite}
+.board-loading-steps span:nth-child(2){animation-delay:.18s}
+.board-loading-steps span:nth-child(3){animation-delay:.36s}
+@keyframes floatOrb{0%,100%{transform:translateY(0) rotate(0deg)}50%{transform:translateY(-6px) rotate(8deg)}}
+@keyframes magicDots{0%,80%,100%{opacity:.25;transform:scale(.8)}40%{opacity:1;transform:scale(1.15)}}
 
 	/* ── STATUS ── */
 	#statusBar{font-size:15px;color:#7a6855;padding:5px 14px;
@@ -243,6 +260,25 @@ legend{font-size:10px;color:#7a6855;padding:0 3px;letter-spacing:.2px}
 .move-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
 .move-pad button{height:40px;border-radius:10px;font-size:14px}
 .quick-note{font-size:11px;color:#7a6855;line-height:1.5}
+.auto-freeze-card{background:linear-gradient(180deg,rgba(255,250,243,.96),rgba(255,246,234,.92))}
+.auto-freeze-panel{display:flex;flex-direction:column;gap:10px}
+.af-row{display:flex;gap:8px;align-items:center}
+.af-row select{flex:1;background:var(--surface);color:var(--ink);border:1px solid var(--line-strong);
+  border-radius:12px;padding:9px 10px;font-size:13px}
+.af-status-card{background:rgba(127,143,178,.1);border:1px solid rgba(127,143,178,.16);
+  border-radius:14px;padding:11px 12px;overflow:hidden}
+.af-status-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.af-pill{font-size:11px;font-weight:700;color:#fdfbf7;background:linear-gradient(135deg,#7f8fb2,#9aa8c6);
+  border-radius:999px;padding:4px 9px}
+.af-pill.off{background:#b8ad9e;color:#fffaf3}
+.af-pill.paused{background:#ba895e}
+.af-pill.busy{background:#5b8c76}
+#afStatus{font-size:14px;color:var(--ink);font-weight:700;line-height:1.35}
+#afCountdownBar{height:5px;background:rgba(127,143,178,.16);border-radius:999px;margin-top:10px;overflow:hidden}
+#afCountdownFill{height:100%;width:0;background:linear-gradient(90deg,#dd9b72,#9aa8c6);border-radius:999px;transition:width .25s ease}
+#afPauseBtn{display:none;width:100%;background:#eef4ea;color:#647a58;border:1px solid #c8d8bb;
+  border-radius:12px;cursor:pointer;font-size:13px;padding:10px 12px;font-weight:700}
+#afPauseBtn.paused{background:#fff0e4;color:#9a7050;border-color:#ddb990}
 
 /* ── BUTTONS ── */
 button{background:#fffaf3;color:var(--ink);border:1px solid var(--line-strong);
@@ -446,13 +482,20 @@ body.dark-theme .workspace-empty-card{background:rgba(31,39,46,.92)}
   justify-content:center;color:#8f7c67;font-size:30px;background:#eadcc8}
 	.gcap-info{padding:10px 12px 12px}
 	.gcap-subject{font-size:16px;font-weight:700;color:var(--ink);margin-bottom:3px}
-	.gcap-topic{font-size:14px;color:var(--accent);margin-bottom:4px;line-height:1.35}
-	.gcap-footer{display:flex;align-items:flex-end;justify-content:space-between;gap:10px}
-	.gcap-meta{font-size:14px;color:#7a6855;display:flex;flex-wrap:wrap;gap:5px 10px;line-height:1.35;min-width:0}
-	.gcap-dl-icon{width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;
-	  background:#fff6ea;color:var(--accent);border:1px solid rgba(30,93,114,.18);
-	  border-radius:10px;padding:0;font-size:16px;cursor:pointer;line-height:1}
-.gcap-dl-icon:hover{background:#f8ecdc}
+		.gcap-topic{font-size:14px;color:var(--accent);margin-bottom:4px;line-height:1.35}
+		.gcap-footer{display:flex;align-items:flex-end;justify-content:space-between;gap:10px}
+		.gcap-meta{font-size:14px;color:#7a6855;display:flex;flex-wrap:wrap;gap:5px 10px;line-height:1.35;min-width:0}
+		.gcap-actions{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+		.gcap-analyse-btn{height:34px;display:inline-flex;align-items:center;justify-content:center;
+		  background:linear-gradient(135deg,#9aa8c6,#7f8fb2);color:#fffdf7;border:none;border-radius:10px;
+		  padding:0 11px;font-size:13px;font-weight:700;cursor:pointer;line-height:1}
+		.gcap-dl-icon{width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;
+		  background:#fff6ea;color:var(--accent);border:1px solid rgba(30,93,114,.18);
+		  border-radius:10px;padding:0;font-size:16px;cursor:pointer;line-height:1}
+	.gcap-dl-icon:hover{background:#f8ecdc}
+	.gcap-demo-ribbon{position:absolute;top:8px;left:8px;z-index:19;background:linear-gradient(135deg,#dd9b72,#c7865e);
+	  color:#fffaf3;border-radius:999px;padding:5px 9px;font-size:11px;font-weight:800;letter-spacing:.4px;
+	  box-shadow:0 10px 22px rgba(38,34,28,.18)}
 .gcap-empty{display:flex;align-items:center;justify-content:center;
   color:#8f7c67;font-size:15px;grid-column:1/-1;padding:60px}
 
@@ -536,8 +579,11 @@ body.dark-theme #chatInputArea{
 	body.dark-theme .status-pill,
 	body.dark-theme .panel-edge-toggle,
 	body.dark-theme .view-seg,
-	body.dark-theme .essentials-card,
-	body.dark-theme .collapse-toggle,
+		body.dark-theme .essentials-card,
+		body.dark-theme .auto-freeze-card,
+		body.dark-theme .af-status-card,
+		body.dark-theme .board-loading-card,
+		body.dark-theme .collapse-toggle,
 	body.dark-theme .controls-header,
 	body.dark-theme .gcap-card,
 	body.dark-theme .board-source-chip,
@@ -837,9 +883,13 @@ body.dark-theme .view-seg button.active{
 	    <div id="svgWrapper"><!-- SVG injected here --></div>
 	    <div id="aiBoardSourceInfo" class="board-source-chip" aria-live="polite"></div>
 	    <!-- loading -->
-    <div id="boardLoading" class="overlay solid" style="display:none">
-      <div class="spinner"></div>
-      <p>Claude is recreating the whiteboard…<br><small style="color:#7a6855">(~5 seconds)</small></p>
+    <div id="boardLoading" class="overlay solid board-loading-overlay" style="display:none">
+      <div class="board-loading-card">
+        <div class="magic-orb">✦</div>
+        <h3 id="boardLoadingTitle">AI tutor is studying the board</h3>
+        <p id="boardLoadingMessage">Turning classroom scribbles into clean, readable magic. Tiny chalk elves are helping.</p>
+        <div class="board-loading-steps" aria-hidden="true"><span></span><span></span><span></span></div>
+      </div>
     </div>
     <!-- empty state -->
     <div id="boardEmpty" class="overlay">
@@ -916,9 +966,39 @@ body.dark-theme .view-seg button.active{
         <button id="captureBtn" class="core-btn" onclick="doCapture()">📷 Snapshot [⌘S]</button>
       </div>
     </div>
-  </div>
+	  </div>
 
-  <div id="zoomGroup" class="essentials-card collapse-card">
+	  <div id="autoFreezeGroup" class="essentials-card collapse-card auto-freeze-card">
+	    <button class="collapse-toggle" onclick="toggleCollapse('autoFreezeGroup')" aria-expanded="true">
+	      <span class="section-title">Auto-freeze</span>
+	      <span class="collapse-icon">▾</span>
+	    </button>
+	    <div class="collapse-body">
+	      <div class="auto-freeze-panel">
+	        <div class="af-row">
+	          <label for="afInterval" class="section-title" style="min-width:45px">Every</label>
+	          <select id="afInterval" onchange="setAutoFreeze()">
+	            <option value="0">Off</option>
+	            <option value="60">1 min</option>
+	            <option value="120">2 min</option>
+	            <option value="300">5 min</option>
+	            <option value="600">10 min</option>
+	          </select>
+	        </div>
+	        <div class="af-status-card" aria-live="polite">
+	          <div class="af-status-top">
+	            <div id="afStatus">Off — choose an interval to refresh the AI Board automatically.</div>
+	            <span id="afStatePill" class="af-pill off">Off</span>
+	          </div>
+	          <div id="afCountdownBar"><div id="afCountdownFill"></div></div>
+	        </div>
+	        <button id="afPauseBtn" onclick="toggleAutoFreezePause()">⏸ Pause auto-freeze</button>
+	        <div class="quick-note">Lumen keeps one latest auto-refresh image per board, so Board 1 and Board 2 stay separate.</div>
+	      </div>
+	    </div>
+	  </div>
+
+	  <div id="zoomGroup" class="essentials-card collapse-card">
     <button class="collapse-toggle" onclick="toggleCollapse('zoomGroup')" aria-expanded="true">
       <span class="section-title">Zoom &amp; Move</span>
       <span class="collapse-icon">▾</span>
@@ -1003,24 +1083,6 @@ body.dark-theme .view-seg button.active{
       <option value="inverted">Inverted Board</option>
       <option value="lowglare">Low Glare</option>
     </select>
-  </div>
-  <div id="autoFreezeGroup" class="panel-section">
-    <h4>Auto-Freeze</h4>
-    <div class="control-row">
-      <label for="afInterval">Every</label>
-      <select id="afInterval" onchange="setAutoFreeze()" style="flex:1">
-        <option value="0">Off</option>
-        <option value="60">1 min</option>
-        <option value="120">2 min</option>
-        <option value="300">5 min</option>
-        <option value="600">10 min</option>
-      </select>
-    </div>
-    <button id="afPauseBtn" onclick="toggleAutoFreezePause()"
-      style="display:none;width:100%;background:#eef4ea;color:#647a58;
-             border:1px solid #c8d8bb;border-radius:10px;cursor:pointer;
-             font-size:11px;padding:8px;margin-top:8px">⏸ Pause</button>
-    <div id="afStatus" style="font-size:11px;color:#7d876f;margin-top:8px;min-height:14px"></div>
   </div>
   <div id="calibrateGroup" class="panel-section">
     <h4>Auto-Frame</h4>
@@ -1157,6 +1219,7 @@ let analysisReady   = false; // is there a frozen frame available to analyse?
 let frozenFrameImg  = null;  // cached frozen frame for view switching
 let boardId         = 0;     // increments each time "New Board" is pressed
 let lastBoardSourceAt = '';  // timestamp of the frame behind the visible AI Board
+let galleryAnalysisItems = [];
 // Perspective calibration
 let calCorners      = null;   // 4 src corners [[x,y],...] in video pixels
 let calHomography   = null;   // 3×3 homography matrix (row-major)
@@ -1170,6 +1233,21 @@ let afMs            = 0;
 let afPaused        = false;
 let afCountdown     = 0;
 let afCountTimer    = null;
+let afDeadlineAt    = 0;
+let afPausedRemainingMs = 0;
+let afInFlight      = false;
+let afWaitingForLive = false;
+
+const BOARD_LOADING_MESSAGES = [
+  ['AI tutor is studying the board', 'Turning classroom scribbles into clean, readable magic. Tiny chalk elves are helping.'],
+  ['AI is working its magic', 'Give it a moment. It is sharpening the board, not taking a nap.'],
+  ['Your board buddy is on it', 'Reading handwriting, rebuilding diagrams, and politely ignoring marker smudges.'],
+  ['Almost there', 'The AI tutor is tidying the board so it is easier on the eyes.'],
+  ['Board makeover in progress', 'Converting whiteboard chaos into something students can actually read.'],
+  ['Thinking cap is on', 'The AI is checking the lesson layout and cleaning things up.']
+];
+let boardLoadingTimer = null;
+let boardLoadingIndex = 0;
 
 // ── Session Modal ────────────────────────────────
 function smShowNew() {
@@ -1339,6 +1417,7 @@ function smLaunch(session, isResume) {
   status(isResume
     ? `Resumed: ${session.subject} (${session.captures.length} captures)`
     : `New class: ${session.subject}`);
+  if (afMs > 0 && !afPaused) scheduleAutoFreeze(afMs);
   loadGallery();
 }
 
@@ -1369,6 +1448,10 @@ function openClassPicker() {
   closePanels();
   // Stop auto-freeze before going home
   stopAutoFreeze();
+  if (afMs > 0) {
+    afWaitingForLive = true;
+    renderAutoFreezeStatus();
+  }
   // Keep the camera stream warm while changing classes; repeatedly releasing
   // USB cameras makes Chrome much more likely to reopen them as a black feed.
   lastOrigPng = '';
@@ -1421,50 +1504,118 @@ function setAutoFreeze() {
   stopAutoFreeze();
   if (afMs > 0) {
     afPaused = false;
-    document.getElementById('afPauseBtn').style.display = '';
-    document.getElementById('afPauseBtn').textContent = '⏸ Pause';
-    startAfCountdown();
-    afTimer = setInterval(afTick, afMs);
-    document.getElementById('afStatus').textContent = `Next in ${secs}s`;
+    afPausedRemainingMs = 0;
+    scheduleAutoFreeze(afMs);
   } else {
-    document.getElementById('afPauseBtn').style.display = 'none';
-    document.getElementById('afStatus').textContent = '';
+    renderAutoFreezeStatus();
   }
 }
 
 function stopAutoFreeze() {
-  if (afTimer)       { clearInterval(afTimer);       afTimer = null; }
-  if (afCountTimer)  { clearInterval(afCountTimer);  afCountTimer = null; }
+  if (afTimer)      { clearTimeout(afTimer);       afTimer = null; }
+  if (afCountTimer) { clearInterval(afCountTimer); afCountTimer = null; }
+  afDeadlineAt = 0;
+  afCountdown = 0;
+  afInFlight = false;
+  afWaitingForLive = false;
+}
+
+function scheduleAutoFreeze(delayMs = afMs) {
+  if (afTimer) clearTimeout(afTimer);
+  afDeadlineAt = Date.now() + Math.max(500, delayMs);
+  afTimer = setTimeout(afTick, Math.max(500, delayMs));
+  startAfCountdown();
+  renderAutoFreezeStatus();
 }
 
 function startAfCountdown() {
-  afCountdown = afMs / 1000;
   if (afCountTimer) clearInterval(afCountTimer);
-  afCountTimer = setInterval(() => {
-    if (afPaused) return;
-    afCountdown--;
-    if (afCountdown > 0) {
-      document.getElementById('afStatus').textContent = `Next in ${afCountdown}s`;
-    }
-  }, 1000);
+  afCountTimer = setInterval(renderAutoFreezeStatus, 500);
 }
 
 function toggleAutoFreezePause() {
+  if (afMs <= 0) return;
   afPaused = !afPaused;
-  const btn = document.getElementById('afPauseBtn');
-  btn.textContent = afPaused ? '▶ Resume' : '⏸ Pause';
-  btn.style.color  = afPaused ? '#9a7050' : '#647a58';
-  document.getElementById('afStatus').textContent = afPaused ? 'Paused' : `Next in ${afCountdown}s`;
+  if (afPaused) {
+    afPausedRemainingMs = Math.max(1000, afDeadlineAt - Date.now());
+    if (afTimer) { clearTimeout(afTimer); afTimer = null; }
+  } else {
+    scheduleAutoFreeze(afPausedRemainingMs || afMs);
+    afPausedRemainingMs = 0;
+  }
+  renderAutoFreezeStatus();
+}
+
+function renderAutoFreezeStatus() {
+  const pauseBtn = document.getElementById('afPauseBtn');
+  const statusEl = document.getElementById('afStatus');
+  const pill = document.getElementById('afStatePill');
+  const fill = document.getElementById('afCountdownFill');
+  if (!pauseBtn || !statusEl || !pill || !fill) return;
+
+  pauseBtn.style.display = afMs > 0 ? 'block' : 'none';
+  pauseBtn.classList.toggle('paused', afPaused);
+  pauseBtn.textContent = afPaused ? '▶ Resume auto-freeze' : '⏸ Pause auto-freeze';
+
+  pill.className = 'af-pill';
+  if (afMs <= 0) {
+    pill.classList.add('off');
+    pill.textContent = 'Off';
+    statusEl.textContent = 'Off — choose an interval to refresh the AI Board automatically.';
+    fill.style.width = '0%';
+    return;
+  }
+  if (afPaused) {
+    pill.classList.add('paused');
+    pill.textContent = 'Paused';
+    const remaining = Math.max(1, Math.ceil((afPausedRemainingMs || afMs) / 1000));
+    statusEl.textContent = `Paused with ${remaining}s left. Resume when the student is ready.`;
+    fill.style.width = `${Math.max(0, Math.min(100, 100 - (remaining * 1000 / afMs) * 100))}%`;
+    return;
+  }
+  if (afInFlight) {
+    pill.classList.add('busy');
+    pill.textContent = 'Updating';
+    statusEl.textContent = 'Refreshing the AI Board now...';
+    fill.style.width = '100%';
+    return;
+  }
+  if (afWaitingForLive) {
+    pill.classList.add('paused');
+    pill.textContent = 'Waiting';
+    statusEl.textContent = 'Waiting for the live board before the next auto-freeze.';
+    fill.style.width = '100%';
+    return;
+  }
+  const remainingMs = Math.max(0, afDeadlineAt - Date.now());
+  afCountdown = Math.ceil(remainingMs / 1000);
+  pill.textContent = 'On';
+  statusEl.textContent = `Next auto-freeze in ${afCountdown}s`;
+  const elapsed = Math.max(0, afMs - remainingMs);
+  fill.style.width = `${Math.max(0, Math.min(100, (elapsed / afMs) * 100))}%`;
 }
 
 async function afTick() {
-  if (afPaused || frozen) return;   // don't interrupt manual freeze
-  afCountdown = afMs / 1000;
-	  toast('⏱ Auto-updating AI Board…');
-	  lastBoardSourceAt = new Date().toISOString();
-	  const autoFreezePng = captureCanvasTrimmedPng();
-	  await saveLatestFreeze(autoFreezePng, 'Auto-refresh');
-  await updateBoardOnly(mc.toDataURL('image/png'), /*quiet=*/true);
+  if (afMs <= 0 || afPaused) return;
+  if (!currentSession || frozen || !vid.srcObject) {
+    afWaitingForLive = true;
+    renderAutoFreezeStatus();
+    scheduleAutoFreeze(5000);
+    return;
+  }
+  afWaitingForLive = false;
+  afInFlight = true;
+  renderAutoFreezeStatus();
+  try {
+    toast(`⏱ Auto-refreshing Board ${boardId + 1}…`);
+    lastBoardSourceAt = new Date().toISOString();
+    const autoFreezePng = captureCanvasTrimmedPng();
+    await saveLatestFreeze(autoFreezePng, `Auto-refresh · Board ${boardId + 1}`);
+    await updateBoardOnly(autoFreezePng, /*quiet=*/true);
+  } finally {
+    afInFlight = false;
+    if (afMs > 0 && !afPaused) scheduleAutoFreeze(afMs);
+  }
 }
 
 // Subtle toast in status bar (non-distracting)
@@ -1544,12 +1695,37 @@ function captureCanvasTrimmedPng() {
   return out.toDataURL('image/png');
 }
 
+function setBoardLoadingMessage(index = 0) {
+  const pair = BOARD_LOADING_MESSAGES[index % BOARD_LOADING_MESSAGES.length];
+  document.getElementById('boardLoadingTitle').textContent = pair[0];
+  document.getElementById('boardLoadingMessage').textContent = pair[1];
+}
+
+function showBoardLoading() {
+  boardLoadingIndex = Math.floor(Math.random() * BOARD_LOADING_MESSAGES.length);
+  setBoardLoadingMessage(boardLoadingIndex);
+  document.getElementById('boardLoading').style.display = 'flex';
+  if (boardLoadingTimer) clearInterval(boardLoadingTimer);
+  boardLoadingTimer = setInterval(() => {
+    boardLoadingIndex++;
+    setBoardLoadingMessage(boardLoadingIndex);
+  }, 2300);
+}
+
+function hideBoardLoading() {
+  if (boardLoadingTimer) {
+    clearInterval(boardLoadingTimer);
+    boardLoadingTimer = null;
+  }
+  document.getElementById('boardLoading').style.display = 'none';
+}
+
 // ── Board-only update (incremental) ───────────────
 async function updateBoardOnly(dataURL, quiet = false) {
   const sw = document.getElementById('svgWrapper');
   if (!quiet) {
     if (!hasSvg) document.getElementById('boardEmpty').style.display = 'flex';
-    document.getElementById('boardLoading').style.display = 'flex';
+    showBoardLoading();
   }
   try {
     const r = await fetch('/update-board', {
@@ -1563,7 +1739,7 @@ async function updateBoardOnly(dataURL, quiet = false) {
     const res = await r.json();
     const boardError = res.error || (!r.ok ? 'AI Board request failed.' : '');
 
-    if (!quiet) document.getElementById('boardLoading').style.display = 'none';
+    if (!quiet) hideBoardLoading();
     document.getElementById('boardEmpty').style.display = 'none';
 
     if (res.svg && res.svg.trim().startsWith('<svg')) {
@@ -1610,7 +1786,7 @@ async function updateBoardOnly(dataURL, quiet = false) {
     }
   } catch(e) {
     if (!quiet) {
-      document.getElementById('boardLoading').style.display = 'none';
+      hideBoardLoading();
       status('Board update failed: ' + e.message);
       toast('⚠ Board update failed: ' + e.message, 4000);
     }
@@ -1750,7 +1926,8 @@ async function _saveCapture(origPng, aiboardPng, topic, capType) {
     }
     // Keep local list in sync
     if (capType === 'latest_freeze') {
-      const idx = currentSession.captures.findIndex(c => c.capture_type === 'latest_freeze');
+      const idx = currentSession.captures.findIndex(
+        c => c.capture_type === 'latest_freeze' && c.board_id === boardId);
       if (idx !== -1) currentSession.captures.splice(idx, 1);
     } else if (capType === 'aiboard') {
       const idx = currentSession.captures.findIndex(
@@ -1789,31 +1966,88 @@ async function autoSaveCapture(analysisText, svgString) {
 
 // ── Gallery ──────────────────────────────────────
 function _capTypeLabel(cap) {
+  const boardSuffix = Number.isFinite(Number(cap.board_id)) ? ` · Board ${Number(cap.board_id) + 1}` : '';
   switch(cap.capture_type) {
     case 'explicit':      return '📷 Snapshot';
-    case 'latest_freeze': return '⏱ Auto-refresh';
+    case 'latest_freeze': return `⏱ Auto-refresh${boardSuffix}`;
     case 'aiboard':       return '🎨 AI Board';
+    case 'demo':          return '🧪 Demo image';
     default:              return '📌';
   }
 }
 
 function _gallerySecondaryText(cap) {
+  if (cap.capture_type === 'demo') return cap.topic || 'Try AI analysis on this demo board.';
   if (cap.capture_type === 'explicit' || cap.capture_type === 'latest_freeze') return '';
   return cap.topic || '';
 }
 
 function captureAssetSrc(value) {
   if (!value) return '';
+  if (value.startsWith('/') || value.startsWith('http://') || value.startsWith('https://')) return value;
   return value.startsWith('data:image/') ? value : `/api/images/${value}`;
+}
+
+async function imageSrcToDataUrl(src) {
+  if (!src) throw new Error('No image available for analysis.');
+  if (src.startsWith('data:image/')) return src;
+  const resp = await fetch(src);
+  if (!resp.ok) throw new Error('Could not load this gallery image.');
+  const blob = await resp.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error || new Error('Could not read gallery image.'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function analyseGalleryItem(index) {
+  const item = galleryAnalysisItems[index];
+  if (!item?.src) {
+    toast('No image found for this gallery item.', 3500);
+    return;
+  }
+  try {
+    status('Preparing gallery image for AI analysis...');
+    const dataUrl = await imageSrcToDataUrl(item.src);
+    lastOrigPng = dataUrl;
+    lastBoardSourceAt = item.timestamp || new Date().toISOString();
+    cacheFrozenFrame(lastOrigPng);
+    analysisReady = true;
+    frozen = true;
+    const freezeBtn = document.getElementById('freezeBtn');
+    freezeBtn.textContent = '▶  Resume  [Space]';
+    freezeBtn.classList.add('frozen');
+    document.getElementById('frozenBadge').style.display = 'block';
+    _syncAnalyseBtn();
+    await runTextAnalysis({
+      imageData: dataUrl,
+      sourceLabel: item.isDemo ? `Demo image: ${item.title}` : `Gallery image: ${item.title}`,
+      sourceTimestamp: item.timestamp,
+      saveCapture: false,
+    });
+  } catch (e) {
+    status(`Gallery analysis failed: ${e.message}`);
+    toast(`Gallery analysis failed: ${e.message}`, 4500);
+  }
 }
 
 async function loadGallery() {
   if (!currentSession) return;
   const grid = document.getElementById('galleryGrid');
 
-  // Fetch ALL sessions for the same subject
-  const r    = await fetch(`/api/sessions/by-subject/${encodeURIComponent(currentSession.subject)}`);
-  const sessions = await r.json();
+  // Fetch all sessions for the same subject, plus admin-managed demo images.
+  const [sessionsResult, demosResult] = await Promise.allSettled([
+    fetch(`/api/sessions/by-subject/${encodeURIComponent(currentSession.subject)}`),
+    fetch(`/api/demo-images?subject=${encodeURIComponent(currentSession.subject)}`),
+  ]);
+  const sessions = sessionsResult.status === 'fulfilled' && sessionsResult.value.ok
+    ? await sessionsResult.value.json()
+    : [];
+  const demos = demosResult.status === 'fulfilled' && demosResult.value.ok
+    ? await demosResult.value.json()
+    : [];
 
   // Flatten all captures with session info, sort newest first
   const all = [];
@@ -1824,37 +2058,68 @@ async function loadGallery() {
 
   // Gallery rules:
   // 1. Keep all manual snapshots
-  // 2. Keep only the single most recent auto-freeze image
+  // 2. Keep the most recent auto-freeze image per board
   // 3. Hide AI-board-only records from the gallery
-  let keptAutoFreeze = false;
-  const visible = all.filter(({cap}) => {
+  const keptAutoFreezeBoards = new Set();
+  const visibleCaptures = all.filter(({cap, session}) => {
     if (cap.capture_type === 'explicit') return true;
     if (cap.capture_type === 'latest_freeze') {
-      if (keptAutoFreeze) return false;
-      keptAutoFreeze = true;
+      const key = `${session.id}:${cap.board_id ?? 0}`;
+      if (keptAutoFreezeBoards.has(key)) return false;
+      keptAutoFreezeBoards.add(key);
       return true;
     }
     return false;
   });
+  const demoEntries = demos.map(demo => ({
+    cap: {
+      id: `demo_${demo.id}`,
+      timestamp: demo.created_at || new Date().toISOString(),
+      topic: demo.caption || 'This is a demo image. Try AI analysis without taking a new snapshot.',
+      capture_type: 'demo',
+      original_file: demo.url,
+      demo_title: demo.title || 'Demo image',
+      is_demo: true,
+    },
+    session: {
+      id: 'demo',
+      subject: demo.subject && demo.subject !== 'All' ? demo.subject : currentSession.subject,
+      teacher: '',
+      locked: false,
+    },
+    demo,
+  }));
+  const visible = [...demoEntries, ...visibleCaptures];
 
   const subj = currentSession.subject;
   document.getElementById('galleryTitle').textContent = `🖼️ Gallery — ${subj}`;
   document.getElementById('galleryCount').textContent = `${visible.length} item${visible.length!==1?'s':''}`;
 
   if (!visible.length) {
-    grid.innerHTML = '<div class="gcap-empty">No gallery items yet — snapshots and the latest auto-refresh image will appear here.</div>';
+    grid.innerHTML = '<div class="gcap-empty">No gallery items yet — snapshots, demo images, and latest auto-refresh images will appear here.</div>';
     return;
   }
 
-  grid.innerHTML = visible.map(({cap, session}) => {
+  galleryAnalysisItems = [];
+  grid.innerHTML = visible.map(({cap, session}, index) => {
     const when = formatLocalTimestamp(cap.timestamp);
     const origSrc = captureAssetSrc(cap.original_file);
     const secondaryText = _gallerySecondaryText(cap);
+    const titleText = cap.demo_title || `${_capTypeLabel(cap)} · ${session.subject}`;
+    const subjectLine = cap.is_demo
+      ? `${_capTypeLabel(cap)} · ${escapeHtml(cap.demo_title || 'Demo image')}`
+      : `${_capTypeLabel(cap)} · ${escapeHtml(session.subject)}${session.locked?' 🔒':''}`;
+    galleryAnalysisItems[index] = {
+      src: origSrc,
+      title: titleText,
+      timestamp: cap.timestamp,
+      isDemo: !!cap.is_demo,
+    };
     return `
     <div class="gcap-card">
-      <!-- 🗑 Delete always visible top-right -->
-      <button class="gcap-del" title="Delete this capture"
-        onclick="deleteCapture('${session.id}','${cap.id}',this)">🗑</button>
+      ${cap.is_demo ? '<div class="gcap-demo-ribbon">DEMO</div>' : `
+        <button class="gcap-del" title="Delete this capture"
+          onclick="deleteCapture('${session.id}','${cap.id}',this)">🗑</button>`}
       <div class="gcap-thumbs">
         ${origSrc
           ? `<img src="${origSrc}" class="gcap-thumb" title="Click to open Original"
@@ -1862,19 +2127,22 @@ async function loadGallery() {
                onerror="this.parentNode.innerHTML='<div class=gcap-no-img>📷</div>'">`
           : '<div class="gcap-no-img">📷</div>'}
       </div>
-	      <div class="gcap-info">
-	        <div class="gcap-subject">${_capTypeLabel(cap)} · ${session.subject}${session.locked?' 🔒':''}</div>
-	        ${secondaryText ? `<div class="gcap-topic">${escapeHtml(secondaryText)}</div>` : ''}
-	        <div class="gcap-footer">
-	          <div class="gcap-meta">
-	            <span>${when.date}</span>
-	            <span>${when.time}</span>
-	            ${session.teacher ? `<span>👩‍🏫 ${session.teacher}</span>` : ''}
-	          </div>
-	          ${origSrc ? `<button class="gcap-dl-icon" title="Download photo" aria-label="Download photo" onclick="dlImg('${origSrc}','${cap.id}_orig.png')">⬇</button>` : ''}
-	        </div>
-	      </div>
-	    </div>`;
+		      <div class="gcap-info">
+		        <div class="gcap-subject">${subjectLine}</div>
+		        ${secondaryText ? `<div class="gcap-topic">${escapeHtml(secondaryText)}</div>` : ''}
+		        <div class="gcap-footer">
+		          <div class="gcap-meta">
+		            <span>${when.date}</span>
+		            <span>${when.time}</span>
+		            ${session.teacher ? `<span>👩‍🏫 ${escapeHtml(session.teacher)}</span>` : ''}
+		          </div>
+		          <div class="gcap-actions">
+		            ${origSrc ? `<button class="gcap-analyse-btn" title="Analyse this image" onclick="analyseGalleryItem(${index})">AI Analysis</button>` : ''}
+		            ${origSrc ? `<button class="gcap-dl-icon" title="Download photo" aria-label="Download photo" onclick="dlImg('${origSrc}','${cap.id}_orig.png')">⬇</button>` : ''}
+		          </div>
+		        </div>
+		      </div>
+		    </div>`;
   }).join('');
 }
 
@@ -2785,21 +3053,33 @@ function toggleFreeze() {
 }
 
 // On-demand text analysis (called from "Analyse Board" button)
-async function runTextAnalysis() {
-  if (!frozen || !analysisReady || !lastOrigPng) { status('Freeze a frame first'); return; }
+async function runTextAnalysis(options = {}) {
+  const imageData = options.imageData || lastOrigPng;
+  if (!imageData || (!options.imageData && (!frozen || !analysisReady))) {
+    status('Freeze a frame first');
+    return;
+  }
 
   document.getElementById('chatEmpty').style.display = 'none';
   document.getElementById('analyseBarWrapper').style.display = 'none';
+  document.getElementById('chatMessages').innerHTML = '';
+  document.getElementById('suggestedQs').style.display = 'none';
+  document.getElementById('chatInputArea').style.display = 'none';
+  chatHistory = [];
+  currentAnalysisContext = '';
   addChatTyping();
   setView('analysis');
+  status(options.sourceLabel ? `Analysing ${options.sourceLabel}...` : 'Analysing board...');
 
   try {
     const r = await fetch('/analyze', {
       method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({
-        image: lastOrigPng,
+        image: imageData,
         analysis_prompt: analysisPrompt,
         svg_prompt: '',
+        session_id: currentSession?.id || '',
+        board_id: boardId,
       })
     });
     let res;
@@ -2821,13 +3101,16 @@ async function runTextAnalysis() {
     if (res.quota) updateDashboardQuota(res.quota);
     currentAnalysisContext = analysis;
     chatHistory = [{role:'assistant', content: analysis}];
+    if (options.sourceLabel) {
+      addChatMsg('teacher', `Analysing ${options.sourceLabel}.`);
+    }
     addChatMsg('teacher', analysis);
     document.getElementById('chatInputArea').style.display = 'flex';
     document.getElementById('analyseBarWrapper').style.display = 'flex';
 
     // Auto-save with analysis
     if (currentSession) {
-      autoSaveCapture(analysis, lastSvgString);
+      if (options.saveCapture !== false) autoSaveCapture(analysis, lastSvgString);
       await saveAnalysisHistory(analysis);
     }
 
@@ -3354,6 +3637,7 @@ applyTheme(localStorage.getItem('vac-theme') || 'light');
 loadDashboardSummary();
 setView('orig');
 updateControlsVisibility();
+renderAutoFreezeStatus();
 if (navigator.mediaDevices?.addEventListener) {
   navigator.mediaDevices.addEventListener('devicechange', handleCameraDeviceChange);
 } else if (navigator.mediaDevices) {

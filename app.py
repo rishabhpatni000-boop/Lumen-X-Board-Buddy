@@ -114,6 +114,51 @@ def _session_payload_for_store(s: dict) -> dict:
     }
 
 
+def _demo_images_json_path() -> str:
+    return os.path.join(STORAGE.demo_images_dir, "demo_images.json")
+
+
+def _load_demo_images() -> list[dict]:
+    try:
+        with open(_demo_images_json_path(), "r", encoding="utf-8") as handle:
+            rows = json.load(handle)
+    except (OSError, json.JSONDecodeError):
+        rows = []
+    if not isinstance(rows, list):
+        return []
+    cleaned = []
+    for row in rows:
+        if not isinstance(row, dict) or not row.get("filename"):
+            continue
+        cleaned.append({
+            "id": str(row.get("id") or uuid.uuid4().hex),
+            "title": str(row.get("title") or "Demo image"),
+            "caption": str(row.get("caption") or ""),
+            "subject": str(row.get("subject") or "All"),
+            "filename": str(row.get("filename")),
+            "active": bool(row.get("active", True)),
+            "created_at": str(row.get("created_at") or ""),
+            "updated_at": str(row.get("updated_at") or row.get("created_at") or ""),
+            "created_by": str(row.get("created_by") or ""),
+        })
+    return cleaned
+
+
+def _save_demo_images(rows: list[dict]):
+    path = _demo_images_json_path()
+    tmp_path = f"{path}.tmp"
+    with open(tmp_path, "w", encoding="utf-8") as handle:
+        json.dump(rows, handle, indent=2, sort_keys=True)
+    os.replace(tmp_path, path)
+
+
+def _demo_image_payload(row: dict) -> dict:
+    return {
+        **row,
+        "url": f"/api/demo-images/{row['filename']}",
+    }
+
+
 def _use_supabase_session_store() -> bool:
     cfg = supabase_config()
     return bool(cfg["url"] and cfg["anon_key"] and current_access_token() and current_user())
@@ -674,10 +719,11 @@ def api_add_capture(sid):
             if cap.get(fkey):
                 STORAGE.delete_file("session_images", cap[fkey])
 
-    # latest_freeze: keep only the newest auto-freeze for the session
+    # latest_freeze: keep only the newest auto-freeze for each board in the session
     if cap_type == "latest_freeze":
         idx = next((i for i, c in enumerate(s["captures"])
-                    if c.get("capture_type") == "latest_freeze"), None)
+                    if c.get("capture_type") == "latest_freeze"
+                    and c.get("board_id") == board_id), None)
         if idx is not None:
             _delete_old_files(s["captures"][idx])
             s["captures"].pop(idx)
@@ -780,10 +826,34 @@ def api_by_subject(subject):
                     if s.get("subject", "").lower() == subject.lower()])
 
 
+@app.route("/api/demo-images", methods=["GET"])
+@read_api_limit
+@login_required_api
+def api_demo_images():
+    subject = (request.args.get("subject") or "").strip().lower()
+    rows = []
+    for row in _load_demo_images():
+        if not row.get("active", True):
+            continue
+        row_subject = (row.get("subject") or "All").strip().lower()
+        if subject and row_subject not in ("", "all", subject):
+            continue
+        rows.append(_demo_image_payload(row))
+    rows.sort(key=lambda item: item.get("created_at") or "", reverse=True)
+    return jsonify(rows)
+
+
 @app.route("/api/images/<filename>")
 @login_required_api
 def api_image(filename):
     return send_from_directory(STORAGE.images_dir, filename)
+
+
+@app.route("/api/demo-images/<filename>")
+@read_api_limit
+@login_required_api
+def api_demo_image_file(filename):
+    return send_from_directory(STORAGE.demo_images_dir, filename)
 
 
 @app.route("/api/history-images/<filename>")
@@ -976,6 +1046,86 @@ def api_admin_user_quota(user_id):
         "notes": (data.get("notes") or "").strip(),
     })
     return jsonify({"ok": True, "record": record})
+
+
+@app.route("/api/admin/demo-images", methods=["GET"])
+@read_api_limit
+@admin_required_api
+def api_admin_demo_images():
+    rows = [_demo_image_payload(row) for row in _load_demo_images()]
+    rows.sort(key=lambda item: item.get("created_at") or "", reverse=True)
+    return jsonify(rows)
+
+
+@app.route("/api/admin/demo-images", methods=["POST"])
+@write_api_limit
+@admin_required_api
+def api_admin_create_demo_image():
+    data, error_response = require_json_payload()
+    if error_response:
+        return error_response
+    image_data = (data.get("image_data") or "").strip()
+    if not image_data:
+        return jsonify({"error": "Demo image is required"}), 400
+    now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    image_id = uuid.uuid4().hex
+    try:
+        stored = STORAGE.save_data_url(image_data, "demo_images", f"demo_{image_id}.png")
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    row = {
+        "id": image_id,
+        "title": (data.get("title") or "Demo image").strip()[:120] or "Demo image",
+        "caption": (data.get("caption") or "").strip()[:300],
+        "subject": (data.get("subject") or "All").strip()[:60] or "All",
+        "filename": stored.filename,
+        "active": bool(data.get("active", True)),
+        "created_at": now,
+        "updated_at": now,
+        "created_by": (current_user() or {}).get("email", ""),
+    }
+    rows = _load_demo_images()
+    rows.append(row)
+    _save_demo_images(rows)
+    return jsonify(_demo_image_payload(row))
+
+
+@app.route("/api/admin/demo-images/<image_id>", methods=["PATCH"])
+@write_api_limit
+@admin_required_api
+def api_admin_update_demo_image(image_id):
+    data, error_response = require_json_payload()
+    if error_response:
+        return error_response
+    rows = _load_demo_images()
+    row = next((item for item in rows if item.get("id") == image_id), None)
+    if not row:
+        return jsonify({"error": "Demo image not found"}), 404
+    if "title" in data:
+        row["title"] = (data.get("title") or "Demo image").strip()[:120] or "Demo image"
+    if "caption" in data:
+        row["caption"] = (data.get("caption") or "").strip()[:300]
+    if "subject" in data:
+        row["subject"] = (data.get("subject") or "All").strip()[:60] or "All"
+    if "active" in data:
+        row["active"] = bool(data.get("active"))
+    row["updated_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    _save_demo_images(rows)
+    return jsonify(_demo_image_payload(row))
+
+
+@app.route("/api/admin/demo-images/<image_id>", methods=["DELETE"])
+@write_api_limit
+@admin_required_api
+def api_admin_delete_demo_image(image_id):
+    rows = _load_demo_images()
+    idx = next((i for i, item in enumerate(rows) if item.get("id") == image_id), None)
+    if idx is None:
+        return jsonify({"error": "Demo image not found"}), 404
+    row = rows.pop(idx)
+    STORAGE.delete_file("demo_images", row.get("filename"))
+    _save_demo_images(rows)
+    return jsonify({"ok": True})
 
 
 

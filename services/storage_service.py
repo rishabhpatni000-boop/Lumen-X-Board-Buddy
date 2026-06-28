@@ -29,6 +29,7 @@ class StorageService:
         self.captures_dir = os.path.join(self.base_dir, "captures")
         self.sessions_dir = os.path.join(self.base_dir, "sessions")
         self.images_dir = os.path.join(self.sessions_dir, "images")
+        self.demo_images_dir = os.path.join(self.base_dir, "demo_images")
         self.history_dir = os.path.join(self.base_dir, "history_uploads")
         self.logs_dir = os.path.join(self.base_dir, "logs")
         self.tmp_dir = os.path.join(self.base_dir, "tmp")
@@ -41,6 +42,7 @@ class StorageService:
             self.captures_dir,
             self.sessions_dir,
             self.images_dir,
+            self.demo_images_dir,
             self.history_dir,
             self.logs_dir,
             self.tmp_dir,
@@ -82,6 +84,7 @@ class StorageService:
         target_dir = {
             "captures": self.captures_dir,
             "session_images": self.images_dir,
+            "demo_images": self.demo_images_dir,
             "history_uploads": self.history_dir,
         }[folder]
         absolute_path = os.path.join(target_dir, safe_name)
@@ -90,7 +93,11 @@ class StorageService:
         return StoredFile(
             filename=safe_name,
             absolute_path=absolute_path,
-            relative_url=f"/api/images/{safe_name}" if folder == "session_images" else safe_name,
+            relative_url=(
+                f"/api/images/{safe_name}" if folder == "session_images"
+                else f"/api/demo-images/{safe_name}" if folder == "demo_images"
+                else safe_name
+            ),
             mime_type=mime_type,
         )
 
@@ -98,6 +105,7 @@ class StorageService:
         target_dir = {
             "captures": self.captures_dir,
             "session_images": self.images_dir,
+            "demo_images": self.demo_images_dir,
             "history_uploads": self.history_dir,
         }[folder]
         absolute_path = os.path.join(target_dir, filename)
@@ -111,6 +119,7 @@ class StorageService:
         target_dir = {
             "captures": self.captures_dir,
             "session_images": self.images_dir,
+            "demo_images": self.demo_images_dir,
             "history_uploads": self.history_dir,
         }[folder]
         try:
