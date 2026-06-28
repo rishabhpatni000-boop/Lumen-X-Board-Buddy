@@ -988,6 +988,11 @@ body.dark-theme .view-seg button.active{
       <label for="camSel">Camera</label>
       <select id="camSel" onchange="switchCamera()" style="flex:1"></select>
     </div>
+    <div class="control-row" style="margin-top:8px">
+      <button class="mini-btn" onclick="refreshCameras()" style="flex:1">↻ Refresh cameras</button>
+      <button class="mini-btn" onclick="retryCamera()" style="flex:1">Retry camera</button>
+    </div>
+    <div id="cameraStatus" class="quick-note" style="margin-top:8px">Camera will start when a class opens.</div>
   </div>
   <div class="panel-section">
     <h4>Image Preset</h4>
@@ -1301,7 +1306,9 @@ function smLaunch(session, isResume) {
   _syncLockBtn();
   document.getElementById('workspaceEmpty').style.display = 'none';
   ensureCameraReady().catch((error) => {
-    status('Camera error: ' + error.message);
+    const msg = describeCameraError(error);
+    setCameraStatus(msg, 'error');
+    status(msg);
   });
 
   // On resume: restore the last AI Board so the student sees it immediately
@@ -1362,7 +1369,8 @@ function openClassPicker() {
   closePanels();
   // Stop auto-freeze before going home
   stopAutoFreeze();
-  stopCamera();
+  // Keep the camera stream warm while changing classes; repeatedly releasing
+  // USB cameras makes Chrome much more likely to reopen them as a black feed.
   lastOrigPng = '';
   previousSvg = '';
 	  lastSvgString = '';
@@ -1973,10 +1981,19 @@ let frozen = false, inverted = false, ctrlsShown = true;
 let raf;
 let activePanel = null;
 let currentDeviceId = null;
+let currentCameraLabel = '';
 let lastDrawAt = 0;
 let cameraReady = false;
+let cameraStarting = false;
+let cameraStartSeq = 0;
+let cameraReconnectTimer = null;
+let cameraReconnectAttempts = 0;
+let cameraKnownDevices = [];
 let currentTheme = 'light';
 const csrfToken = {{ csrf_token|tojson }};
+const CAMERA_PREF_KEY = 'vac-preferred-camera-v2';
+const EXTERNAL_CAMERA_RE = /4k|veo|usb|uvc|external|webcam|document|visual|elmo|aver|ipevo|inswan|image/i;
+const BUILT_IN_CAMERA_RE = /macbook|facetime|built.?in|integrated|internal/i;
 
 // Original zoom / pan
 let zoom = 1, panX = 0, panY = 0;
@@ -2046,53 +2063,401 @@ function startNewAnalysis() {
 // ════════════════════════════════════════════════
 //  Camera
 // ════════════════════════════════════════════════
-async function initCameras() {
-  try { await navigator.mediaDevices.getUserMedia({video:true,audio:false}); } catch(e){}
-  const devs = await navigator.mediaDevices.enumerateDevices();
-  const cams = devs.filter(d => d.kind === 'videoinput');
-  const sel  = document.getElementById('camSel');
+function stopMediaStream(stream) {
+  stream?.getTracks?.().forEach(track => track.stop());
+}
+
+function hasActiveCameraStream() {
+  return !!vid.srcObject &&
+    vid.srcObject.getVideoTracks().some(track => track.readyState === 'live');
+}
+
+function normalizeCameraLabel(label) {
+  return String(label || '').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+function cameraDisplayName(device, index = 0) {
+  return device?.label || `Camera ${index + 1}`;
+}
+
+function cameraIsBuiltIn(device) {
+  return BUILT_IN_CAMERA_RE.test(normalizeCameraLabel(device?.label));
+}
+
+function cameraIsExternal(device) {
+  const label = normalizeCameraLabel(device?.label);
+  return !!label && EXTERNAL_CAMERA_RE.test(label) && !cameraIsBuiltIn(device);
+}
+
+function getCameraPreference() {
+  try {
+    return JSON.parse(localStorage.getItem(CAMERA_PREF_KEY) || 'null');
+  } catch (_) {
+    return null;
+  }
+}
+
+function saveCameraPreference(device) {
+  if (!device) return;
+  try {
+    localStorage.setItem(CAMERA_PREF_KEY, JSON.stringify({
+      deviceId: device.deviceId || '',
+      groupId: device.groupId || '',
+      label: device.label || currentCameraLabel || '',
+      updatedAt: new Date().toISOString(),
+    }));
+  } catch (_) {}
+}
+
+function cameraScore(device, index, preferred) {
+  const label = normalizeCameraLabel(device.label);
+  const prefLabel = normalizeCameraLabel(preferred?.label);
+  let score = 100 - index;
+  if (preferred?.deviceId && device.deviceId === preferred.deviceId) score += 500;
+  if (preferred?.groupId && device.groupId && device.groupId === preferred.groupId) score += 280;
+  if (prefLabel && label && label === prefLabel) score += 240;
+  if (cameraIsExternal(device)) score += 160;
+  if (/4k|veo/.test(label)) score += 90;
+  if (/usb|uvc|external|webcam/.test(label)) score += 60;
+  if (label && !cameraIsBuiltIn(device)) score += 40;
+  if (cameraIsBuiltIn(device)) score -= 120;
+  return score;
+}
+
+function chooseCamera(cameras, requestedDeviceId = '') {
+  if (!cameras.length) return null;
+  if (requestedDeviceId) {
+    const requested = cameras.find(c => c.deviceId === requestedDeviceId);
+    if (requested) return requested;
+  }
+  const preferred = getCameraPreference();
+  return [...cameras]
+    .map((device, index) => ({device, score: cameraScore(device, index, preferred)}))
+    .sort((a, b) => b.score - a.score)[0].device;
+}
+
+function describeCameraError(error) {
+  const name = error?.name || 'CameraError';
+  const constraint = error?.constraint ? ` (${error.constraint})` : '';
+  if (name === 'NotAllowedError' || name === 'SecurityError') {
+    return 'Camera permission denied. Allow camera access in Chrome, then retry.';
+  }
+  if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+    return 'No camera found. Check the USB cable, then press Refresh cameras.';
+  }
+  if (name === 'NotReadableError' || name === 'TrackStartError') {
+    return 'Camera is busy or did not start. Unplug/replug the USB camera, then press Retry camera.';
+  }
+  if (name === 'OverconstrainedError' || name === 'ConstraintNotSatisfiedError') {
+    return `Selected camera is unavailable${constraint}. Trying another available camera may help.`;
+  }
+  return `Camera error: ${name}${error?.message ? ' — ' + error.message : ''}`;
+}
+
+function setCameraStatus(message, tone = 'info') {
+  const el = document.getElementById('cameraStatus');
+  if (!el) return;
+  el.textContent = message;
+  el.style.color = tone === 'error' ? '#c77' : (tone === 'ok' ? '#5aaa5a' : '');
+}
+
+function populateCameraSelect(cameras, selectedDeviceId = '') {
+  const sel = document.getElementById('camSel');
+  if (!sel) return;
   sel.innerHTML = '';
-  let best = 0;
-  cams.forEach((c,i) => {
+  if (!cameras.length) {
     const o = document.createElement('option');
-    o.value = c.deviceId; o.text = c.label || `Camera ${i}`;
-    if (/4k|veo|usb|external/i.test(c.label)) best = i;
+    o.value = '';
+    o.textContent = 'No camera found';
+    sel.appendChild(o);
+    return;
+  }
+  cameras.forEach((camera, index) => {
+    const o = document.createElement('option');
+    const external = cameraIsExternal(camera);
+    o.value = camera.deviceId;
+    o.textContent = `${external ? '⭐ ' : ''}${cameraDisplayName(camera, index)}`;
+    o.dataset.label = camera.label || '';
+    o.dataset.groupId = camera.groupId || '';
     sel.appendChild(o);
   });
-  sel.selectedIndex = best;
-  currentDeviceId = cams[best]?.deviceId || null;
-  cameraReady = true;
+  const selected = selectedDeviceId && cameras.some(c => c.deviceId === selectedDeviceId)
+    ? selectedDeviceId
+    : chooseCamera(cameras)?.deviceId;
+  if (selected) sel.value = selected;
+}
+
+async function enumerateCameras({requestPermission = true} = {}) {
+  if (!navigator.mediaDevices?.enumerateDevices || !navigator.mediaDevices?.getUserMedia) {
+    throw new Error('This browser does not support camera access.');
+  }
+  let permissionError = null;
+  if (requestPermission && !hasActiveCameraStream()) {
+    let tempStream = null;
+    try {
+      tempStream = await navigator.mediaDevices.getUserMedia({video: true, audio: false});
+    } catch (error) {
+      permissionError = error;
+    } finally {
+      stopMediaStream(tempStream);
+    }
+  }
+  const devices = await navigator.mediaDevices.enumerateDevices();
+  const cameras = devices.filter(device => device.kind === 'videoinput');
+  if (!cameras.length && permissionError) throw permissionError;
+  cameraKnownDevices = cameras;
+  return cameras;
+}
+
+async function initCameras({requestPermission = true, requestedDeviceId = ''} = {}) {
+  const cameras = await enumerateCameras({requestPermission});
+  const selected = chooseCamera(cameras, requestedDeviceId || currentDeviceId);
+  populateCameraSelect(cameras, selected?.deviceId || currentDeviceId || '');
+  if (selected && !hasActiveCameraStream()) {
+    currentDeviceId = selected.deviceId;
+    currentCameraLabel = selected.label || cameraDisplayName(selected);
+  }
+  cameraReady = cameras.length > 0;
+  setCameraStatus(
+    cameras.length
+      ? `${cameras.length} camera${cameras.length === 1 ? '' : 's'} found. Preferred: ${cameraDisplayName(selected)}`
+      : 'No cameras found. Check the USB connection.',
+    cameras.length ? 'ok' : 'error'
+  );
+  return {cameras, selected};
+}
+
+function buildCameraConstraints(deviceId, isFullscreen, deviceMode = 'exact', quality = 'high') {
+  const video = {
+    width:  {ideal: quality === 'low' ? 1280 : (isFullscreen ? 3840 : 1920)},
+    height: {ideal: quality === 'low' ? 720  : (isFullscreen ? 2160 : 1080)},
+    aspectRatio: {ideal: window.innerWidth / Math.max(window.innerHeight, 1)},
+    frameRate: {ideal: isFullscreen ? 30 : 24}
+  };
+  if (deviceId && deviceMode === 'exact') video.deviceId = {exact: deviceId};
+  if (deviceId && deviceMode === 'ideal') video.deviceId = {ideal: deviceId};
+  return video;
+}
+
+async function openCameraStream(deviceId, {allowFallback = true} = {}) {
+  const attempts = [];
+  if (deviceId) {
+    attempts.push({label: 'selected camera', video: buildCameraConstraints(deviceId, document.fullscreenElement, 'exact', 'high')});
+    attempts.push({label: 'selected camera at safer resolution', video: buildCameraConstraints(deviceId, document.fullscreenElement, 'exact', 'low')});
+    attempts.push({label: 'preferred camera fallback', video: buildCameraConstraints(deviceId, document.fullscreenElement, 'ideal', 'high')});
+  }
+  if (allowFallback) {
+    attempts.push({label: 'any available camera', video: buildCameraConstraints('', document.fullscreenElement, 'none', 'high')});
+  }
+
+  let lastError = null;
+  for (const attempt of attempts) {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({video: attempt.video, audio: false});
+      return {stream, attempt};
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError || new Error('Could not start a camera.');
+}
+
+function syncCameraSelection(deviceId) {
+  const sel = document.getElementById('camSel');
+  if (!sel || !deviceId) return;
+  if ([...sel.options].some(o => o.value === deviceId)) sel.value = deviceId;
+}
+
+function attachCameraTrackHandlers(stream) {
+  const track = stream.getVideoTracks()[0];
+  if (!track) return;
+  track.onended = () => {
+    cameraReady = false;
+    setCameraStatus('Camera disconnected. Waiting for it to come back...', 'error');
+    status('Camera disconnected — reconnecting...');
+    scheduleCameraReconnect();
+  };
+  track.onmute = () => {
+    setCameraStatus('Camera paused by the browser. Retrying if it does not recover...', 'error');
+  };
+  track.onunmute = () => {
+    setCameraStatus(`Camera active: ${currentCameraLabel || 'camera'}`, 'ok');
+  };
+}
+
+async function startCamera(deviceId = '', options = {}) {
+  const seq = ++cameraStartSeq;
+  const requestedDeviceId = deviceId || document.getElementById('camSel')?.value || currentDeviceId || '';
+  const forceRestart = !!options.forceRestart;
+  if (cameraStarting && !forceRestart) return false;
+  if (hasActiveCameraStream() && currentDeviceId === requestedDeviceId && !forceRestart) {
+    setCameraStatus(`Camera active: ${currentCameraLabel || 'selected camera'}`, 'ok');
+    return true;
+  }
+  cameraStarting = true;
+  setCameraStatus('Connecting camera...', 'info');
+  status('Connecting camera...');
+  try {
+    if (options.refreshDevices !== false) {
+      await initCameras({requestPermission: !hasActiveCameraStream(), requestedDeviceId});
+    }
+    const selected = chooseCamera(cameraKnownDevices, requestedDeviceId);
+    const desiredDeviceId = requestedDeviceId || selected?.deviceId || '';
+    const oldStream = vid.srcObject;
+
+    if (forceRestart && oldStream && desiredDeviceId === currentDeviceId) {
+      stopMediaStream(oldStream);
+      vid.srcObject = null;
+    }
+
+    const {stream, attempt} = await openCameraStream(desiredDeviceId, {allowFallback: true});
+    if (seq !== cameraStartSeq) {
+      stopMediaStream(stream);
+      return false;
+    }
+
+    vid.srcObject = stream;
+    await vid.play();
+    if (oldStream && oldStream !== stream && vid.srcObject === stream) stopMediaStream(oldStream);
+
+    const track = stream.getVideoTracks()[0];
+    const settings = track?.getSettings?.() || {};
+    const activeDeviceId = settings.deviceId || desiredDeviceId;
+    const activeDevice = cameraKnownDevices.find(c => c.deviceId === activeDeviceId) ||
+      cameraKnownDevices.find(c => c.deviceId === desiredDeviceId) ||
+      selected;
+
+    currentDeviceId = activeDeviceId || desiredDeviceId;
+    currentCameraLabel = activeDevice?.label || cameraDisplayName(activeDevice);
+    cameraReady = true;
+    cameraReconnectAttempts = 0;
+    syncCameraSelection(currentDeviceId);
+    attachCameraTrackHandlers(stream);
+    saveCameraPreference(activeDevice || {deviceId: currentDeviceId, label: currentCameraLabel});
+
+    resizeCanvas();
+    refreshOriginalView();
+    startLoop();
+    const fallbackNote = attempt.label === 'any available camera' ? ' (fallback)' : '';
+    const liveMessage = `Live — ${currentCameraLabel || 'Camera'}${fallbackNote} — ${vid.videoWidth}×${vid.videoHeight}`;
+    setCameraStatus(liveMessage, 'ok');
+    status(liveMessage);
+    return true;
+  } catch (error) {
+    const msg = describeCameraError(error);
+    if (hasActiveCameraStream()) {
+      cameraReady = true;
+      setCameraStatus(`${msg} Still using ${currentCameraLabel || 'the current camera'}.`, 'error');
+      status(`Could not switch camera — still live on ${currentCameraLabel || 'current camera'}`);
+    } else {
+      cameraReady = false;
+      setCameraStatus(msg, 'error');
+      status(msg);
+      if (options.autoRetry !== false) scheduleCameraReconnect();
+    }
+    return false;
+  } finally {
+    if (seq === cameraStartSeq) cameraStarting = false;
+  }
 }
 
 async function ensureCameraReady() {
-  if (!cameraReady) await initCameras();
-  await startCamera(document.getElementById('camSel').value || currentDeviceId);
-}
-
-async function startCamera(deviceId) {
-  if (vid.srcObject) vid.srcObject.getTracks().forEach(t => t.stop());
-  currentDeviceId = deviceId || null;
-  try {
-    vid.srcObject = await navigator.mediaDevices.getUserMedia({
-      video: buildCameraConstraints(deviceId, document.fullscreenElement)
-    });
-    await vid.play();
-    resizeCanvas();
-    status(`Live — ${vid.videoWidth}×${vid.videoHeight}`);
-    startLoop();
-  } catch(e) { status('Camera error: ' + e.message); }
-}
-
-function switchCamera() { startCamera(document.getElementById('camSel').value); }
-
-function stopCamera() {
-  if (vid.srcObject) {
-    vid.srcObject.getTracks().forEach(t => t.stop());
-    vid.srcObject = null;
+  if (hasActiveCameraStream()) {
+    const result = await initCameras({requestPermission: false}).catch(() => null);
+    const preferred = result?.selected;
+    if (preferred?.deviceId && preferred.deviceId !== currentDeviceId && cameraIsExternal(preferred)) {
+      return startCamera(preferred.deviceId, {refreshDevices: false, autoRetry: true});
+    }
+    setCameraStatus(`Camera active: ${currentCameraLabel || 'camera'}`, 'ok');
+    return true;
   }
+  const {selected} = await initCameras({requestPermission: true});
+  return startCamera(document.getElementById('camSel').value || selected?.deviceId || currentDeviceId, {
+    refreshDevices: false,
+    autoRetry: true,
+  });
+}
+
+async function switchCamera() {
+  const selectedId = document.getElementById('camSel').value;
+  const selected = cameraKnownDevices.find(c => c.deviceId === selectedId);
+  if (selected) saveCameraPreference(selected);
+  await startCamera(selectedId, {manual: true, refreshDevices: false, autoRetry: false});
+}
+
+async function refreshCameras() {
+  try {
+    await initCameras({requestPermission: true});
+    status(`Found ${cameraKnownDevices.length} camera${cameraKnownDevices.length === 1 ? '' : 's'}`);
+    if (currentSession && !hasActiveCameraStream()) {
+      await startCamera(document.getElementById('camSel').value || currentDeviceId, {
+        refreshDevices: false,
+        autoRetry: true,
+      });
+    }
+  } catch (error) {
+    const msg = describeCameraError(error);
+    setCameraStatus(msg, 'error');
+    status(msg);
+  }
+}
+
+async function retryCamera() {
+  clearTimeout(cameraReconnectTimer);
+  cameraReconnectTimer = null;
+  await startCamera(document.getElementById('camSel').value || currentDeviceId, {
+    forceRestart: true,
+    refreshDevices: true,
+    autoRetry: true,
+  });
+}
+
+function scheduleCameraReconnect() {
+  if (!currentSession || cameraReconnectTimer || cameraStarting) return;
+  const delay = Math.min(5000, 700 + cameraReconnectAttempts * 900);
+  cameraReconnectAttempts++;
+  cameraReconnectTimer = setTimeout(async () => {
+    cameraReconnectTimer = null;
+    if (currentSession && !hasActiveCameraStream()) {
+      await startCamera(document.getElementById('camSel').value || currentDeviceId, {
+        refreshDevices: true,
+        autoRetry: cameraReconnectAttempts < 5,
+      });
+    }
+  }, delay);
+}
+
+async function handleCameraDeviceChange() {
+  try {
+    await initCameras({requestPermission: false});
+    const preferred = chooseCamera(cameraKnownDevices);
+    if (!currentSession) return;
+    if (!hasActiveCameraStream()) {
+      scheduleCameraReconnect();
+      return;
+    }
+    if (preferred?.deviceId && preferred.deviceId !== currentDeviceId && cameraIsExternal(preferred)) {
+      const saved = getCameraPreference();
+      if (saved?.deviceId === preferred.deviceId || normalizeCameraLabel(saved?.label) === normalizeCameraLabel(preferred.label)) {
+        await startCamera(preferred.deviceId, {refreshDevices: false, autoRetry: true});
+      }
+    }
+  } catch (error) {
+    setCameraStatus(describeCameraError(error), 'error');
+  }
+}
+
+function stopCamera({forget = false, clearCanvas = true} = {}) {
+  clearTimeout(cameraReconnectTimer);
+  cameraReconnectTimer = null;
+  stopMediaStream(vid.srcObject);
+  vid.srcObject = null;
   cameraReady = false;
-  currentDeviceId = null;
-  mCtx.clearRect(0, 0, mc.width, mc.height);
+  if (forget) {
+    currentDeviceId = null;
+    currentCameraLabel = '';
+  }
+  if (clearCanvas) mCtx.clearRect(0, 0, mc.width, mc.height);
 }
 
 function cacheFrozenFrame(dataUrl) {
@@ -2141,21 +2506,11 @@ function refreshOriginalView() {
   }
 }
 
-function buildCameraConstraints(deviceId, isFullscreen) {
-  return {
-    deviceId: deviceId ? {exact: deviceId} : undefined,
-    width:  isFullscreen ? {ideal: 3840} : {ideal: 1920},
-    height: isFullscreen ? {ideal: 2160} : {ideal: 1080},
-    aspectRatio: {ideal: window.innerWidth / Math.max(window.innerHeight, 1)},
-    frameRate: {ideal: isFullscreen ? 30 : 24}
-  };
-}
-
 async function optimizeCameraForFullscreen(isFullscreen) {
   const track = vid.srcObject?.getVideoTracks?.()[0];
   if (!track) return;
   try {
-    await track.applyConstraints(buildCameraConstraints(currentDeviceId, isFullscreen));
+    await track.applyConstraints(buildCameraConstraints('', isFullscreen, 'none'));
     if (vid.readyState >= 2) {
       status(`${isFullscreen ? 'Fullscreen' : 'Windowed'} — ${vid.videoWidth}×${vid.videoHeight}`);
     }
@@ -2999,6 +3354,12 @@ applyTheme(localStorage.getItem('vac-theme') || 'light');
 loadDashboardSummary();
 setView('orig');
 updateControlsVisibility();
+if (navigator.mediaDevices?.addEventListener) {
+  navigator.mediaDevices.addEventListener('devicechange', handleCameraDeviceChange);
+} else if (navigator.mediaDevices) {
+  navigator.mediaDevices.ondevicechange = handleCameraDeviceChange;
+}
+window.addEventListener('beforeunload', () => stopCamera({clearCanvas: false}));
 openClassPicker();
 </script>
 </body>
