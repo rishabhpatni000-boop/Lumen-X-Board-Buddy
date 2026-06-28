@@ -97,6 +97,20 @@ def _supabase_user_headers():
     }
 
 
+def _supabase_persistence_headers():
+    try:
+        return supabase_service_headers()
+    except Exception:
+        return _supabase_user_headers()
+
+
+def _current_user_id_required() -> str:
+    user_id = (current_user() or {}).get("id")
+    if not user_id:
+        raise RuntimeError("No signed-in user is available for persistence")
+    return user_id
+
+
 def _capture_for_store(cap: dict) -> dict:
     return dict(cap)
 
@@ -165,7 +179,7 @@ def _demo_image_payload(row: dict) -> dict:
 
 def _use_supabase_session_store() -> bool:
     cfg = supabase_config()
-    return bool(cfg["url"] and cfg["anon_key"] and current_access_token() and current_user())
+    return bool(cfg["url"] and cfg["anon_key"] and current_user())
 
 
 def _allow_local_session_fallback() -> bool:
@@ -231,11 +245,13 @@ def _sessions_list() -> list:
     if _use_supabase_session_store():
         try:
             cfg = supabase_config()
+            user_id = _current_user_id_required()
             resp = requests.get(
                 f"{cfg['url']}/rest/v1/class_sessions",
-                headers=_supabase_user_headers(),
+                headers=_supabase_persistence_headers(),
                 params=[
                     ("select", "id,subject,teacher,created_at,locked,captures"),
+                    ("user_id", f"eq.{user_id}"),
                     ("order", "created_at.desc"),
                 ],
                 timeout=20,
@@ -259,12 +275,14 @@ def _session_get(sid: str):
     if _use_supabase_session_store():
         try:
             cfg = supabase_config()
+            user_id = _current_user_id_required()
             resp = requests.get(
                 f"{cfg['url']}/rest/v1/class_sessions",
-                headers=_supabase_user_headers(),
+                headers=_supabase_persistence_headers(),
                 params=[
                     ("select", "id,subject,teacher,created_at,locked,captures"),
                     ("id", f"eq.{sid}"),
+                    ("user_id", f"eq.{user_id}"),
                     ("limit", "1"),
                 ],
                 timeout=20,
@@ -288,7 +306,7 @@ def _session_save(s: dict):
             payload = _session_payload_for_store(s)
             resp = requests.post(
                 f"{cfg['url']}/rest/v1/class_sessions",
-                headers={**_supabase_user_headers(), "Prefer": "resolution=merge-duplicates,return=representation"},
+                headers={**_supabase_persistence_headers(), "Prefer": "resolution=merge-duplicates,return=representation"},
                 json=payload,
                 timeout=20,
             )
@@ -858,8 +876,11 @@ def api_delete_session(sid):
             cfg = supabase_config()
             resp = requests.delete(
                 f"{cfg['url']}/rest/v1/class_sessions",
-                headers=_supabase_user_headers(),
-                params=[("id", f"eq.{sid}")],
+                headers=_supabase_persistence_headers(),
+                params=[
+                    ("id", f"eq.{sid}"),
+                    ("user_id", f"eq.{_current_user_id_required()}"),
+                ],
                 timeout=20,
             )
             resp.raise_for_status()

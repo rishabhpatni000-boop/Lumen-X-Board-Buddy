@@ -1299,16 +1299,31 @@ async function smCreateSession() {
   const subject = document.getElementById('smSubject').value;
   const teacher = document.getElementById('smTeacher').value.trim();
   if (!subject) return;
-  const r   = await fetch('/api/sessions', {
-    method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({subject, teacher})
-  });
-  const s = await r.json();
-  if (!r.ok) {
-    status(`Could not save class: ${s.details || s.error || 'Unknown error'}`);
-    return;
+  const btn = document.getElementById('smStartBtn');
+  const originalText = btn?.textContent || 'Start Class →';
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Starting...';
   }
-  smLaunch(s, false);
+  try {
+    const r = await fetch('/api/sessions', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({subject, teacher})
+    });
+    const s = await r.json().catch(() => ({error: 'Server returned an unreadable response'}));
+    if (!r.ok) {
+      status(`Could not save class: ${s.details || s.error || 'Unknown error'}`);
+      return;
+    }
+    smLaunch(s, false);
+  } catch (error) {
+    status(`Could not reach the server to start class: ${error.message || error}`);
+  } finally {
+    if (btn) {
+      btn.textContent = originalText;
+      btn.disabled = !document.getElementById('smSubject').value;
+    }
+  }
 }
 
 let _smSessions = [];
@@ -2259,6 +2274,8 @@ let cameraStartSeq = 0;
 let cameraReconnectTimer = null;
 let cameraReconnectAttempts = 0;
 let cameraKnownDevices = [];
+let cameraHealthTimer = null;
+let cameraMutedTimer = null;
 let currentTheme = 'light';
 const csrfToken = {{ csrf_token|tojson }};
 const CAMERA_PREF_KEY = 'vac-preferred-camera-v2';
@@ -2335,6 +2352,15 @@ function startNewAnalysis() {
 // ════════════════════════════════════════════════
 function stopMediaStream(stream) {
   stream?.getTracks?.().forEach(track => track.stop());
+}
+
+function clearCameraTimers() {
+  clearTimeout(cameraReconnectTimer);
+  cameraReconnectTimer = null;
+  clearInterval(cameraHealthTimer);
+  cameraHealthTimer = null;
+  clearTimeout(cameraMutedTimer);
+  cameraMutedTimer = null;
 }
 
 function hasActiveCameraStream() {
@@ -2457,12 +2483,15 @@ function populateCameraSelect(cameras, selectedDeviceId = '') {
   if (selected) sel.value = selected;
 }
 
-async function enumerateCameras({requestPermission = true} = {}) {
+async function enumerateCameras({requestPermission = false} = {}) {
   if (!navigator.mediaDevices?.enumerateDevices || !navigator.mediaDevices?.getUserMedia) {
     throw new Error('This browser does not support camera access.');
   }
+  let devices = await navigator.mediaDevices.enumerateDevices();
+  let cameras = devices.filter(device => device.kind === 'videoinput');
+  const hasLabels = cameras.some(device => device.label);
   let permissionError = null;
-  if (requestPermission && !hasActiveCameraStream()) {
+  if (requestPermission && !hasActiveCameraStream() && !hasLabels) {
     let tempStream = null;
     try {
       tempStream = await navigator.mediaDevices.getUserMedia({video: true, audio: false});
@@ -2471,15 +2500,15 @@ async function enumerateCameras({requestPermission = true} = {}) {
     } finally {
       stopMediaStream(tempStream);
     }
+    devices = await navigator.mediaDevices.enumerateDevices();
+    cameras = devices.filter(device => device.kind === 'videoinput');
   }
-  const devices = await navigator.mediaDevices.enumerateDevices();
-  const cameras = devices.filter(device => device.kind === 'videoinput');
   if (!cameras.length && permissionError) throw permissionError;
   cameraKnownDevices = cameras;
   return cameras;
 }
 
-async function initCameras({requestPermission = true, requestedDeviceId = ''} = {}) {
+async function initCameras({requestPermission = false, requestedDeviceId = ''} = {}) {
   const cameras = await enumerateCameras({requestPermission});
   const selected = chooseCamera(cameras, requestedDeviceId || currentDeviceId);
   populateCameraSelect(cameras, selected?.deviceId || currentDeviceId || '');
@@ -2499,10 +2528,10 @@ async function initCameras({requestPermission = true, requestedDeviceId = ''} = 
 
 function buildCameraConstraints(deviceId, isFullscreen, deviceMode = 'exact', quality = 'high') {
   const video = {
-    width:  {ideal: quality === 'low' ? 1280 : (isFullscreen ? 3840 : 1920)},
-    height: {ideal: quality === 'low' ? 720  : (isFullscreen ? 2160 : 1080)},
+    width:  {ideal: quality === 'low' ? 1280 : (isFullscreen ? 1920 : 1600)},
+    height: {ideal: quality === 'low' ? 720  : (isFullscreen ? 1080 : 900)},
     aspectRatio: {ideal: window.innerWidth / Math.max(window.innerHeight, 1)},
-    frameRate: {ideal: isFullscreen ? 30 : 24}
+    frameRate: {ideal: 20, max: 30}
   };
   if (deviceId && deviceMode === 'exact') video.deviceId = {exact: deviceId};
   if (deviceId && deviceMode === 'ideal') video.deviceId = {ideal: deviceId};
@@ -2512,24 +2541,66 @@ function buildCameraConstraints(deviceId, isFullscreen, deviceMode = 'exact', qu
 async function openCameraStream(deviceId, {allowFallback = true} = {}) {
   const attempts = [];
   if (deviceId) {
+    attempts.push({label: 'selected camera at stable resolution', video: buildCameraConstraints(deviceId, document.fullscreenElement, 'exact', 'low')});
     attempts.push({label: 'selected camera', video: buildCameraConstraints(deviceId, document.fullscreenElement, 'exact', 'high')});
-    attempts.push({label: 'selected camera at safer resolution', video: buildCameraConstraints(deviceId, document.fullscreenElement, 'exact', 'low')});
+    attempts.push({label: 'preferred camera stable fallback', video: buildCameraConstraints(deviceId, document.fullscreenElement, 'ideal', 'low')});
     attempts.push({label: 'preferred camera fallback', video: buildCameraConstraints(deviceId, document.fullscreenElement, 'ideal', 'high')});
   }
   if (allowFallback) {
+    attempts.push({label: 'any available camera stable fallback', video: buildCameraConstraints('', document.fullscreenElement, 'none', 'low')});
     attempts.push({label: 'any available camera', video: buildCameraConstraints('', document.fullscreenElement, 'none', 'high')});
+    attempts.push({label: 'browser default camera', video: true});
   }
 
   let lastError = null;
   for (const attempt of attempts) {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({video: attempt.video, audio: false});
+      const stream = await withCameraTimeout(
+        navigator.mediaDevices.getUserMedia({video: attempt.video, audio: false}),
+        12000,
+      );
       return {stream, attempt};
     } catch (error) {
       lastError = error;
     }
   }
   throw lastError || new Error('Could not start a camera.');
+}
+
+function withCameraTimeout(promise, timeoutMs) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      const err = new Error('Camera connection timed out');
+      err.name = 'NotReadableError';
+      reject(err);
+    }, timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+function waitForVideoReady(timeoutMs = 3000) {
+  if (vid.readyState >= 2 && vid.videoWidth > 0) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const done = () => {
+      cleanup();
+      resolve();
+    };
+    const fail = () => {
+      cleanup();
+      const err = new Error('Camera opened but did not produce video frames');
+      err.name = 'NotReadableError';
+      reject(err);
+    };
+    const cleanup = () => {
+      clearTimeout(timer);
+      vid.removeEventListener('loadedmetadata', done);
+      vid.removeEventListener('canplay', done);
+    };
+    const timer = setTimeout(fail, timeoutMs);
+    vid.addEventListener('loadedmetadata', done, {once: true});
+    vid.addEventListener('canplay', done, {once: true});
+  });
 }
 
 function syncCameraSelection(deviceId) {
@@ -2549,10 +2620,32 @@ function attachCameraTrackHandlers(stream) {
   };
   track.onmute = () => {
     setCameraStatus('Camera paused by the browser. Retrying if it does not recover...', 'error');
+    clearTimeout(cameraMutedTimer);
+    cameraMutedTimer = setTimeout(() => {
+      if (track.muted && currentSession && !frozen) scheduleCameraReconnect(true);
+    }, 1800);
   };
   track.onunmute = () => {
+    clearTimeout(cameraMutedTimer);
+    cameraMutedTimer = null;
     setCameraStatus(`Camera active: ${currentCameraLabel || 'camera'}`, 'ok');
   };
+}
+
+function startCameraHealthMonitor() {
+  clearInterval(cameraHealthTimer);
+  cameraHealthTimer = setInterval(() => {
+    if (!currentSession || frozen || cameraStarting) return;
+    if (!hasActiveCameraStream()) {
+      scheduleCameraReconnect(true);
+      return;
+    }
+    const stalled = vid.readyState < 2 || !vid.videoWidth || (performance.now() - lastDrawAt > 7000);
+    if (stalled) {
+      setCameraStatus('Camera feed stalled. Reconnecting...', 'error');
+      scheduleCameraReconnect(true);
+    }
+  }, 4000);
 }
 
 async function startCamera(deviceId = '', options = {}) {
@@ -2569,7 +2662,7 @@ async function startCamera(deviceId = '', options = {}) {
   status('Connecting camera...');
   try {
     if (options.refreshDevices !== false) {
-      await initCameras({requestPermission: !hasActiveCameraStream(), requestedDeviceId});
+      await initCameras({requestPermission: false, requestedDeviceId});
     }
     const selected = chooseCamera(cameraKnownDevices, requestedDeviceId);
     const desiredDeviceId = requestedDeviceId || selected?.deviceId || '';
@@ -2588,6 +2681,7 @@ async function startCamera(deviceId = '', options = {}) {
 
     vid.srcObject = stream;
     await vid.play();
+    await waitForVideoReady();
     if (oldStream && oldStream !== stream && vid.srcObject === stream) stopMediaStream(oldStream);
 
     const track = stream.getVideoTracks()[0];
@@ -2608,6 +2702,7 @@ async function startCamera(deviceId = '', options = {}) {
     resizeCanvas();
     refreshOriginalView();
     startLoop();
+    startCameraHealthMonitor();
     const fallbackNote = attempt.label === 'any available camera' ? ' (fallback)' : '';
     const liveMessage = `Live — ${currentCameraLabel || 'Camera'}${fallbackNote} — ${vid.videoWidth}×${vid.videoHeight}`;
     setCameraStatus(liveMessage, 'ok');
@@ -2641,7 +2736,7 @@ async function ensureCameraReady() {
     setCameraStatus(`Camera active: ${currentCameraLabel || 'camera'}`, 'ok');
     return true;
   }
-  const {selected} = await initCameras({requestPermission: true});
+  const {selected} = await initCameras({requestPermission: false});
   return startCamera(document.getElementById('camSel').value || selected?.deviceId || currentDeviceId, {
     refreshDevices: false,
     autoRetry: true,
@@ -2682,14 +2777,21 @@ async function retryCamera() {
   });
 }
 
-function scheduleCameraReconnect() {
+function scheduleCameraReconnect(forceRestart = false) {
   if (!currentSession || cameraReconnectTimer || cameraStarting) return;
-  const delay = Math.min(5000, 700 + cameraReconnectAttempts * 900);
+  const delay = Math.min(6000, forceRestart ? 350 : 700 + cameraReconnectAttempts * 900);
   cameraReconnectAttempts++;
   cameraReconnectTimer = setTimeout(async () => {
     cameraReconnectTimer = null;
     if (currentSession && !hasActiveCameraStream()) {
       await startCamera(document.getElementById('camSel').value || currentDeviceId, {
+        forceRestart,
+        refreshDevices: true,
+        autoRetry: cameraReconnectAttempts < 5,
+      });
+    } else if (currentSession && forceRestart) {
+      await startCamera(document.getElementById('camSel').value || currentDeviceId, {
+        forceRestart: true,
         refreshDevices: true,
         autoRetry: cameraReconnectAttempts < 5,
       });
@@ -2718,8 +2820,7 @@ async function handleCameraDeviceChange() {
 }
 
 function stopCamera({forget = false, clearCanvas = true} = {}) {
-  clearTimeout(cameraReconnectTimer);
-  cameraReconnectTimer = null;
+  clearCameraTimers();
   stopMediaStream(vid.srcObject);
   vid.srcObject = null;
   cameraReady = false;

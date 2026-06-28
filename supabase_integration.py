@@ -200,6 +200,16 @@ def supabase_service_headers():
     }
 
 
+def _best_effort_rest_headers(access_token: str | None = None):
+    try:
+        return supabase_service_headers()
+    except Exception:
+        token = access_token or current_access_token()
+        if not token:
+            raise RuntimeError("No Supabase user token is available")
+        return _supabase_rest_headers(token)
+
+
 def _supabase_rest_headers(access_token: str):
     cfg = supabase_config()
     return {
@@ -211,16 +221,15 @@ def _supabase_rest_headers(access_token: str):
 
 def insert_history_record(record: dict):
     cfg = supabase_config()
-    token = current_access_token()
     user = current_user()
-    if not cfg["url"] or not cfg["anon_key"] or not token or not user:
+    if not cfg["url"] or not cfg["anon_key"] or not user:
         return None
     payload = {"user_id": user["id"], **record}
 
     resp = requests.post(
         f"{cfg['url']}/rest/v1/analysis_history",
         headers={
-            **_supabase_rest_headers(token),
+            **_best_effort_rest_headers(),
             "Prefer": "return=representation",
         },
         json=payload,
@@ -240,14 +249,15 @@ def list_history_records(limit: int = 100):
 def list_history_records_paginated(page: int = 1, per_page: int = 12,
                                    search: str = "", subject: str = ""):
     cfg = supabase_config()
-    token = current_access_token()
-    if not cfg["url"] or not cfg["anon_key"] or not token:
+    user = current_user()
+    if not cfg["url"] or not cfg["anon_key"] or not user:
         return {"items": [], "page": page, "per_page": per_page, "total": 0}
 
     start = max(0, (page - 1) * per_page)
     end = start + per_page - 1
     params = [
         ("select", "id,subject,teacher,session_id,board_id,topic,analysis_text,ai_response,ocr_text,board_svg,image_path,created_at"),
+        ("user_id", f"eq.{user['id']}"),
         ("order", "created_at.desc"),
         ("offset", str(start)),
         ("limit", str(per_page)),
@@ -265,7 +275,7 @@ def list_history_records_paginated(page: int = 1, per_page: int = 12,
 
     resp = requests.get(
         f"{cfg['url']}/rest/v1/analysis_history",
-        headers={**_supabase_rest_headers(token), "Prefer": "count=exact"},
+        headers={**_best_effort_rest_headers(), "Prefer": "count=exact"},
         params=params,
         timeout=15,
     )
@@ -286,8 +296,8 @@ def list_history_records_paginated(page: int = 1, per_page: int = 12,
 
 def count_history_records_this_month():
     cfg = supabase_config()
-    token = current_access_token()
-    if not cfg["url"] or not cfg["anon_key"] or not token:
+    user = current_user()
+    if not cfg["url"] or not cfg["anon_key"] or not user:
         return 0
 
     from datetime import datetime
@@ -300,9 +310,10 @@ def count_history_records_this_month():
 
     resp = requests.get(
         f"{cfg['url']}/rest/v1/analysis_history",
-        headers={**_supabase_rest_headers(token), "Prefer": "count=exact"},
+        headers={**_best_effort_rest_headers(), "Prefer": "count=exact"},
         params=[
             ("select", "id"),
+            ("user_id", f"eq.{user['id']}"),
             ("created_at", f"gte.{start}"),
             ("created_at", f"lt.{end}"),
             ("limit", "1"),
