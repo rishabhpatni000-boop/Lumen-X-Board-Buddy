@@ -3,6 +3,19 @@
 
 create extension if not exists pgcrypto;
 
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+    'lumen-assets',
+    'lumen-assets',
+    false,
+    5242880,
+    array['image/png', 'image/jpeg', 'image/webp', 'application/json']
+)
+on conflict (id) do update
+set public = excluded.public,
+    file_size_limit = excluded.file_size_limit,
+    allowed_mime_types = excluded.allowed_mime_types;
+
 create table if not exists public.users (
     id uuid primary key references auth.users(id) on delete cascade,
     email text,

@@ -152,8 +152,11 @@ body{margin:0;min-height:100vh;background:linear-gradient(160deg,#09121a,#0f1823
           const created = new Date(row.created_at).toLocaleString('en-GB', {
             day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
           });
-          const thumb = row.image_path
-            ? `<div class="thumb"><img src="/api/history-images/${encodeURIComponent(row.image_path)}" alt="Uploaded classroom reference image"></div>`
+          const imagePath = row.image_path
+            ? row.image_path.split('/').map(encodeURIComponent).join('/')
+            : '';
+          const thumb = imagePath
+            ? `<div class="thumb"><img src="/api/history-images/${imagePath}" alt="Uploaded classroom reference image"></div>`
             : `<div class="placeholder">No uploaded image reference saved for this analysis.</div>`;
           return `
             <article class="card">

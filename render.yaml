@@ -37,3 +37,9 @@ services:
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: lumen-assets
+      - key: REQUIRE_DURABLE_STORAGE
+        value: "true"
+      - key: ALLOW_LOCAL_SESSION_FALLBACK
+        value: "false"

@@ -22,8 +22,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dotenv import load_dotenv
 load_dotenv()
 
-from flask import Flask, request, jsonify, render_template, send_from_directory, redirect, url_for
-from werkzeug.utils import secure_filename
+from flask import Flask, request, jsonify, render_template, redirect, url_for, Response, abort
 
 from supabase_integration import (
     admin_required_api,
@@ -47,7 +46,7 @@ from supabase_integration import (
 from services.cache_service import TTLCache, stable_cache_key
 from services.logging_service import log_event, log_warning
 from services.quota_service import QuotaExceeded, QuotaService
-from services.storage_service import StorageService
+from services.storage_service import StorageService, StorageUnavailable
 from web_security import configure_app_security, decode_image_data_url, require_json_payload
 
 # ── Claude ────────────────────────────────────────────────────────────────────
@@ -119,9 +118,17 @@ def _demo_images_json_path() -> str:
 
 
 def _load_demo_images() -> list[dict]:
+    rows = None
+    stored = STORAGE.read_file("demo_images", "demo_images.json")
+    if stored is not None:
+        try:
+            rows = json.loads(stored[0].decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            rows = []
     try:
-        with open(_demo_images_json_path(), "r", encoding="utf-8") as handle:
-            rows = json.load(handle)
+        if rows is None:
+            with open(_demo_images_json_path(), "r", encoding="utf-8") as handle:
+                rows = json.load(handle)
     except (OSError, json.JSONDecodeError):
         rows = []
     if not isinstance(rows, list):
@@ -145,11 +152,8 @@ def _load_demo_images() -> list[dict]:
 
 
 def _save_demo_images(rows: list[dict]):
-    path = _demo_images_json_path()
-    tmp_path = f"{path}.tmp"
-    with open(tmp_path, "w", encoding="utf-8") as handle:
-        json.dump(rows, handle, indent=2, sort_keys=True)
-    os.replace(tmp_path, path)
+    payload = json.dumps(rows, indent=2, sort_keys=True).encode("utf-8")
+    STORAGE.save_bytes(payload, "demo_images", "demo_images.json", "application/json")
 
 
 def _demo_image_payload(row: dict) -> dict:
@@ -164,10 +168,64 @@ def _use_supabase_session_store() -> bool:
     return bool(cfg["url"] and cfg["anon_key"] and current_access_token() and current_user())
 
 
+def _allow_local_session_fallback() -> bool:
+    raw = os.getenv("ALLOW_LOCAL_SESSION_FALLBACK", "").strip().lower()
+    if raw:
+        return raw in {"1", "true", "yes", "on"}
+    return not STORAGE.force_durable
+
+
 def _session_store_fallback_allowed(error: Exception) -> bool:
+    if not _allow_local_session_fallback():
+        return False
     if isinstance(error, requests.HTTPError) and error.response is not None:
         return error.response.status_code in (401, 403, 404)
     return False
+
+
+def _storage_user_id() -> str | None:
+    return (current_user() or {}).get("id")
+
+
+def _is_user_scoped_file_allowed(filename: str) -> bool:
+    if is_admin_user():
+        return True
+    user_id = _storage_user_id()
+    if not user_id:
+        return False
+    parts = filename.replace("\\", "/").split("/")
+    # Older local records were filename-only. Keep them readable while future
+    # records are stored under the owning user's id.
+    return len(parts) == 1 or parts[0] == user_id
+
+
+def _serve_stored_file(folder: str, filename: str, user_scoped: bool = False):
+    if user_scoped and not _is_user_scoped_file_allowed(filename):
+        abort(404)
+    try:
+        stored = STORAGE.read_file(folder, filename)
+    except StorageUnavailable as e:
+        return jsonify({"error": str(e)}), 503
+    if stored is None:
+        abort(404)
+    payload, mime_type = stored
+    return Response(payload, mimetype=mime_type)
+
+
+def _delete_stored_file_best_effort(folder: str, filename: str | None, **context):
+    if not filename:
+        return
+    try:
+        STORAGE.delete_file(folder, filename)
+    except Exception as e:
+        log_warning(
+            SECURITY["logger"],
+            "stored_file_delete_failed",
+            folder=folder,
+            filename=filename,
+            error=str(e),
+            **context,
+        )
 
 def _sessions_list() -> list:
     if _use_supabase_session_store():
@@ -464,7 +522,12 @@ def save():
     img_data = data.get("image", "")
     try:
         QUOTAS.ensure_upload_available()
-        stored = STORAGE.save_data_url(img_data, "captures", data.get("filename", "capture.png"))
+        stored = STORAGE.save_data_url(
+            img_data,
+            "captures",
+            data.get("filename", "capture.png"),
+            owner_id=_storage_user_id(),
+        )
         QUOTAS.record_event("upload", {"route": "/save", "filename": stored.filename})
         log_event(SECURITY["logger"], "upload_saved", ip=request.remote_addr, filename=stored.filename)
         return jsonify({"ok": True, "path": stored.absolute_path})
@@ -717,25 +780,24 @@ def api_add_capture(sid):
     def _delete_old_files(cap):
         for fkey in ("original_file", "aiboard_file"):
             if cap.get(fkey):
-                STORAGE.delete_file("session_images", cap[fkey])
+                _delete_stored_file_best_effort("session_images", cap[fkey], session_id=sid)
+
+    replacement_idx = None
+    replacement_cap = None
 
     # latest_freeze: keep only the newest auto-freeze for each board in the session
     if cap_type == "latest_freeze":
-        idx = next((i for i, c in enumerate(s["captures"])
-                    if c.get("capture_type") == "latest_freeze"
-                    and c.get("board_id") == board_id), None)
-        if idx is not None:
-            _delete_old_files(s["captures"][idx])
-            s["captures"].pop(idx)
+        replacement_idx = next((i for i, c in enumerate(s["captures"])
+                                if c.get("capture_type") == "latest_freeze"
+                                and c.get("board_id") == board_id), None)
 
     # aiboard: keep one per board_id — replace previous for same board
     elif cap_type == "aiboard":
-        idx = next((i for i, c in enumerate(s["captures"])
-                    if c.get("capture_type") == "aiboard"
-                    and c.get("board_id") == board_id), None)
-        if idx is not None:
-            _delete_old_files(s["captures"][idx])
-            s["captures"].pop(idx)
+        replacement_idx = next((i for i, c in enumerate(s["captures"])
+                                if c.get("capture_type") == "aiboard"
+                                and c.get("board_id") == board_id), None)
+    if replacement_idx is not None:
+        replacement_cap = s["captures"][replacement_idx]
 
     # explicit: always keep, never replace
     cap_id = f"cap{int(ts.timestamp())}_{cap_type[0]}"
@@ -753,18 +815,33 @@ def api_add_capture(sid):
         raw = data.get(key, "")
         if not raw:
             return None
-        stored = STORAGE.save_data_url(raw, "session_images", f"{sid}_{cap_id}_{suffix}.png")
+        stored = STORAGE.save_data_url(
+            raw,
+            "session_images",
+            f"{sid}_{cap_id}_{suffix}.png",
+            owner_id=_storage_user_id(),
+        )
         return stored.filename
 
-    cap["original_file"] = _save_img("original", "original")
-    cap["aiboard_file"]  = _save_img("aiboard",  "aiboard")
+    try:
+        cap["original_file"] = _save_img("original", "original")
+        cap["aiboard_file"]  = _save_img("aiboard",  "aiboard")
+    except Exception as e:
+        _delete_old_files(cap)
+        log_warning(SECURITY["logger"], "session_capture_image_save_failed", session_id=sid, error=str(e))
+        return jsonify({"error": "Could not save capture image", "details": str(e)}), 500
 
+    if replacement_idx is not None:
+        s["captures"].pop(replacement_idx)
     s["captures"].append(cap)
     try:
         _session_save(s)
     except Exception as e:
+        _delete_old_files(cap)
         log_warning(SECURITY["logger"], "session_capture_save_failed", session_id=sid, error=str(e))
         return jsonify({"error": "Could not save capture to class history", "details": str(e)}), 500
+    if replacement_cap:
+        _delete_old_files(replacement_cap)
     QUOTAS.record_event("upload", {"route": "/api/sessions/capture", "capture_type": cap_type})
     return jsonify(cap)
 
@@ -786,13 +863,17 @@ def api_delete_session(sid):
                 timeout=20,
             )
             resp.raise_for_status()
+            for cap in s.get("captures", []):
+                for fkey in ("original_file", "aiboard_file"):
+                    if cap.get(fkey):
+                        _delete_stored_file_best_effort("session_images", cap[fkey], session_id=sid)
             return jsonify({"ok": True})
         except Exception as e:
             return jsonify({"error": str(e)}), 500
     for cap in s.get("captures", []):
         for fkey in ("original_file", "aiboard_file"):
             if cap.get(fkey):
-                STORAGE.delete_file("session_images", cap[fkey])
+                _delete_stored_file_best_effort("session_images", cap[fkey], session_id=sid)
     try: os.remove(STORAGE.session_json_path(sid))
     except: pass
     return jsonify({"ok": True})
@@ -809,11 +890,13 @@ def api_delete_capture(sid, cap_id):
     if idx is None:
         return jsonify({"error": "Capture not found"}), 404
     cap = s["captures"].pop(idx)
-    if not _use_supabase_session_store():
-        for fkey in ("original_file", "aiboard_file"):
-            if cap.get(fkey):
-                STORAGE.delete_file("session_images", cap[fkey])
-    _session_save(s)
+    try:
+        _session_save(s)
+    except Exception as e:
+        return jsonify({"error": "Could not update class session", "details": str(e)}), 500
+    for fkey in ("original_file", "aiboard_file"):
+        if cap.get(fkey):
+            _delete_stored_file_best_effort("session_images", cap[fkey], session_id=sid, capture_id=cap_id)
     return jsonify({"ok": True})
 
 
@@ -843,24 +926,24 @@ def api_demo_images():
     return jsonify(rows)
 
 
-@app.route("/api/images/<filename>")
+@app.route("/api/images/<path:filename>")
 @login_required_api
 def api_image(filename):
-    return send_from_directory(STORAGE.images_dir, filename)
+    return _serve_stored_file("session_images", filename, user_scoped=True)
 
 
-@app.route("/api/demo-images/<filename>")
+@app.route("/api/demo-images/<path:filename>")
 @read_api_limit
 @login_required_api
 def api_demo_image_file(filename):
-    return send_from_directory(STORAGE.demo_images_dir, filename)
+    return _serve_stored_file("demo_images", filename)
 
 
-@app.route("/api/history-images/<filename>")
+@app.route("/api/history-images/<path:filename>")
 @read_api_limit
 @login_required_api
 def api_history_image(filename):
-    return send_from_directory(STORAGE.history_dir, filename)
+    return _serve_stored_file("history_uploads", filename, user_scoped=True)
 
 
 @app.route("/api/dashboard", methods=["GET"])
@@ -928,6 +1011,11 @@ def _admin_try_fetch(fetcher, default):
 @admin_required_api
 def api_admin_overview():
     warnings = []
+    storage_summary = STORAGE.storage_summary()
+    if storage_summary["durable_required"] and storage_summary["backend"] != "supabase_storage":
+        warnings.append("storage: durable Supabase Storage is required but not configured")
+    if not _allow_local_session_fallback() and not _use_supabase_session_store():
+        warnings.append("sessions: Supabase session storage is required but not currently available")
     profile_rows, err = _admin_try_fetch(
         lambda: _admin_rest_get("/rest/v1/users", [
             ("select", "id,email,full_name,created_at"),
@@ -1028,6 +1116,7 @@ def api_admin_overview():
             "monthly_analyses": QUOTAS.monthly_analyses_limit,
             "daily_uploads": QUOTAS.daily_upload_limit,
         },
+        "storage": storage_summary,
     })
 
 
@@ -1123,7 +1212,7 @@ def api_admin_delete_demo_image(image_id):
     if idx is None:
         return jsonify({"error": "Demo image not found"}), 404
     row = rows.pop(idx)
-    STORAGE.delete_file("demo_images", row.get("filename"))
+    _delete_stored_file_best_effort("demo_images", row.get("filename"), demo_image_id=image_id)
     _save_demo_images(rows)
     return jsonify({"ok": True})
 
@@ -1158,6 +1247,7 @@ def api_create_history():
                 data.get("image_data", "").strip(),
                 "history_uploads",
                 f"history_{uuid.uuid4().hex}.png",
+                owner_id=_storage_user_id(),
             )
             image_path = stored.filename
             QUOTAS.record_event("upload", {"route": "/api/history", "filename": stored.filename})

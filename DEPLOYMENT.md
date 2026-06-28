@@ -57,6 +57,7 @@ https://app.visualassistcam.com/auth/callback
    - `TRUST_PROXY_COUNT=1` (or the correct proxy hop count)
    - `VISUALASSISTCAM_DATA_DIR=/path/to/persistent/storage`
 6. Use persistent storage for captures, session JSON, and logs, or replace local storage with object storage such as S3 or Supabase Storage.
+   In the current web deployment, Supabase Storage is the durable source for gallery/demo/history images.
 7. Start the app with a production server such as:
 
 ```bash
@@ -97,6 +98,9 @@ In `Environment`, add these as **secret** environment variables:
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_STORAGE_BUCKET=lumen-assets`
+- `REQUIRE_DURABLE_STORAGE=true`
+- `ALLOW_LOCAL_SESSION_FALLBACK=false`
 - `SESSION_COOKIE_SECURE=true`
 - `TRUST_PROXY_COUNT=1`
 - `VISUALASSISTCAM_DATA_DIR=/var/data/visualassistcam`
@@ -116,7 +120,7 @@ Important:
 
 ### 4. Persistent disk
 
-Because this app still uses local file storage for captures, session files, and logs:
+The app now writes gallery captures, demo images, and history uploads to Supabase Storage when `SUPABASE_SERVICE_ROLE_KEY` and `SUPABASE_STORAGE_BUCKET` are configured. The Render disk is still useful for logs, temporary files, local development fallback, and migration of older local files.
 
 1. Add a Render Persistent Disk.
 2. Mount it at:
@@ -131,7 +135,7 @@ Because this app still uses local file storage for captures, session files, and 
 VISUALASSISTCAM_DATA_DIR=/var/data/visualassistcam
 ```
 
-Without a persistent disk, uploaded files and session JSON files will be lost on redeploy/restart.
+Without Supabase Storage or a persistent disk fallback, uploaded files and session JSON files can be lost on redeploy/restart. In production, keep `REQUIRE_DURABLE_STORAGE=true` so the app fails loudly instead of silently saving to ephemeral storage.
 
 ### 5. Supabase configuration
 
@@ -171,6 +175,8 @@ Verify:
 
 - sign-in works with Google
 - Supabase history rows are created per user
+- class sessions are created in Supabase `class_sessions`
+- gallery/demo/history images load after a redeploy or restart
 - quota widgets load on the dashboard
 - uploaded images persist after a restart
 - CSRF-protected POST routes still work from the UI
@@ -182,7 +188,7 @@ After initial Render deployment, consider:
 
 - using `gunicorn app:app` as the start command instead of Flask’s built-in server
 - moving rate-limit storage from memory to Redis
-- moving local file storage to Supabase Storage or S3
+- migrating any older local-only image files after confirming all active sessions load correctly
 - adding uptime monitoring and alerting
 
 ## Raspberry Pi deployment

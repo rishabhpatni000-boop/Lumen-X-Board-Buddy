@@ -20,6 +20,8 @@ This creates:
 - `public.users`
 - `public.analysis_history`
 - `public.usage_events`
+- `public.class_sessions`
+- a private `lumen-assets` Supabase Storage bucket for gallery, demo, and history image files
 - RLS policies so users can only read and write their own data
 - a signup trigger to mirror `auth.users` into `public.users`
 
@@ -57,6 +59,10 @@ Copy [.env.example](/Users/rishabhpatni/Downloads/Lumen/.env.example) to `.env` 
 - `FLASK_SECRET_KEY`
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_STORAGE_BUCKET=lumen-assets`
+- `REQUIRE_DURABLE_STORAGE=true` in production
+- `ALLOW_LOCAL_SESSION_FALLBACK=false` in production
 - `ANTHROPIC_API_KEY`
 
 ## 6. How history storage works
@@ -66,3 +72,4 @@ Copy [.env.example](/Users/rishabhpatni/Downloads/Lumen/.env.example) to `.env` 
 - History requests to Supabase REST are made with that user token.
 - Because RLS is enabled, each user only sees their own `analysis_history` rows.
 - Usage and quota tracking are recorded in `usage_events` with the same RLS protections.
+- Class metadata is stored in `class_sessions`; image bytes are stored in the private Supabase Storage bucket and served through authenticated Flask routes.
