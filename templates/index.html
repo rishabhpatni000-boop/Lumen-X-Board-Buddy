@@ -1315,6 +1315,7 @@ async function smCreateSession() {
       status(`Could not save class: ${s.details || s.error || 'Unknown error'}`);
       return;
     }
+    _smSessions = [s, ..._smSessions.filter(item => item.id !== s.id)];
     smLaunch(s, false);
   } catch (error) {
     status(`Could not reach the server to start class: ${error.message || error}`);
@@ -1334,25 +1335,30 @@ async function smLoadPrev(sortBy) {
   ['date','subject','teacher'].forEach(k => {
     document.getElementById('sb-'+k).classList.toggle('active', k===sortBy);
   });
-  if (!_smSessions.length) {
+  const grid = document.getElementById('prevGrid');
+  grid.innerHTML = '<p style="color:#54606a;font-size:16px;padding:20px">Loading classes...</p>';
+  try {
     const r = await fetch('/api/sessions');
-    const payload = await r.json();
+    const payload = await r.json().catch(() => ({error: 'Server returned an unreadable response'}));
     if (!r.ok) {
-      document.getElementById('prevGrid').innerHTML =
-        `<p style="color:#c77;font-size:14px;padding:20px">Could not load classes: ${payload.details || payload.error || 'Unknown error'}</p>`;
+      grid.innerHTML =
+        `<p style="color:#c77;font-size:16px;padding:20px">Could not load classes: ${escapeHtml(payload.details || payload.error || 'Unknown error')}</p>`;
       return;
     }
-    _smSessions = payload;
+    _smSessions = Array.isArray(payload) ? payload : [];
+  } catch (error) {
+    grid.innerHTML =
+      `<p style="color:#c77;font-size:16px;padding:20px">Could not reach the server for class history: ${escapeHtml(error.message || error)}</p>`;
+    return;
   }
   const sorted = [..._smSessions].sort((a,b) => {
-    if (sortBy==='date')    return b.created_at.localeCompare(a.created_at);
-    if (sortBy==='subject') return a.subject.localeCompare(b.subject);
-    if (sortBy==='teacher') return (a.teacher||'').localeCompare(b.teacher||'');
+    if (sortBy==='date')    return String(b.created_at || '').localeCompare(String(a.created_at || ''));
+    if (sortBy==='subject') return String(a.subject || '').localeCompare(String(b.subject || ''));
+    if (sortBy==='teacher') return String(a.teacher || '').localeCompare(String(b.teacher || ''));
     return 0;
   });
-  const grid = document.getElementById('prevGrid');
   if (!sorted.length) {
-    grid.innerHTML = '<p style="color:#444;font-size:14px;padding:20px">No previous classes yet.</p>';
+    grid.innerHTML = '<p style="color:#444;font-size:16px;padding:20px">No previous classes yet.</p>';
     return;
   }
   grid.innerHTML = sorted.map(s => {
@@ -1361,14 +1367,14 @@ async function smLoadPrev(sortBy) {
     const timeStr = d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
     return `<div class="prev-card" onclick="smResumeSession('${s.id}')">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
-        <div class="prev-subj">${s.subject}${s.locked ? ' 🔒' : ''}</div>
+        <div class="prev-subj">${escapeHtml(s.subject || 'Class')}${s.locked ? ' 🔒' : ''}</div>
         <button onclick="deleteSessionConfirm('${s.id}',event)"
           style="background:none;border:none;color:#5a2a2a;cursor:pointer;
                  font-size:14px;padding:0 2px" title="Delete class">🗑</button>
       </div>
       <div class="prev-date">${dateStr} at ${timeStr}</div>
-      ${s.teacher ? `<div class="prev-teacher">👩‍🏫 ${s.teacher}</div>` : ''}
-      <div class="prev-count">${s.captures.length} capture${s.captures.length!==1?'s':''}</div>
+      ${s.teacher ? `<div class="prev-teacher">👩‍🏫 ${escapeHtml(s.teacher)}</div>` : ''}
+      <div class="prev-count">${(s.captures || []).length} capture${(s.captures || []).length!==1?'s':''}</div>
     </div>`;
   }).join('');
 }

@@ -98,6 +98,8 @@ def _supabase_user_headers():
 
 
 def _supabase_persistence_headers():
+    if os.getenv("REQUIRE_DURABLE_STORAGE", "").strip().lower() in {"1", "true", "yes", "on"}:
+        return supabase_service_headers()
     try:
         return supabase_service_headers()
     except Exception:

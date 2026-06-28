@@ -117,6 +117,19 @@ create table if not exists public.admin_surveys (
     created_at timestamptz not null default timezone('utc', now())
 );
 
+grant usage on schema public to anon, authenticated, service_role;
+grant select, insert, update on public.users to authenticated;
+grant select, insert, delete on public.analysis_history to authenticated;
+grant select, insert on public.usage_events to authenticated;
+grant select, insert, update, delete on public.class_sessions to authenticated;
+grant select on public.user_quota_overrides to authenticated;
+grant all on public.users to service_role;
+grant all on public.analysis_history to service_role;
+grant all on public.usage_events to service_role;
+grant all on public.class_sessions to service_role;
+grant all on public.user_quota_overrides to service_role;
+grant all on public.admin_surveys to service_role;
+
 alter table public.users enable row level security;
 alter table public.analysis_history enable row level security;
 alter table public.usage_events enable row level security;
