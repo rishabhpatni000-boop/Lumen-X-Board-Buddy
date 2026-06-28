@@ -410,9 +410,9 @@ body.dark-theme .workspace-empty-card{background:rgba(31,39,46,.92)}
 #galleryHeader span{color:#7a6855;font-size:13px}
 #galleryGrid{flex:1;overflow-y:auto;padding:16px;
   display:grid;grid-template-columns:repeat(auto-fill, minmax(360px, 360px));
-  justify-content:flex-start;align-content:start;gap:14px}
+  grid-auto-rows:max-content;justify-content:flex-start;align-content:start;align-items:start;gap:14px}
 .gcap-card{background:#fffaf3;border:1px solid var(--line);border-radius:18px;
-  overflow:hidden;position:relative}
+  overflow:hidden;position:relative;align-self:start}
 .gcap-thumbs{display:flex;align-items:center;justify-content:center;background:#eadcc8;
   height:190px;overflow:hidden;padding:10px}
 .gcap-thumb{display:block;cursor:pointer;height:100%;width:100%;object-fit:contain;
@@ -431,10 +431,10 @@ body.dark-theme .workspace-empty-card{background:rgba(31,39,46,.92)}
 .gcap-subject{font-size:13px;font-weight:700;color:var(--ink);margin-bottom:1px}
 .gcap-topic{font-size:12px;color:var(--accent);margin-bottom:3px;line-height:1.3}
 .gcap-meta{font-size:11px;color:#7a6855;display:flex;flex-wrap:wrap;gap:5px}
-.gcap-actions{padding:3px 10px 8px;display:flex;gap:6px}
-.gcap-dl{flex:1;background:#fff6ea;color:var(--accent);border:1px solid rgba(30,93,114,.18);
-  border-radius:5px;padding:5px 4px;font-size:11px;cursor:pointer;text-align:center}
-.gcap-dl:hover{background:#f8ecdc}
+.gcap-dl-icon{width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;
+  background:#fff6ea;color:var(--accent);border:1px solid rgba(30,93,114,.18);
+  border-radius:6px;padding:0;font-size:13px;cursor:pointer;line-height:1}
+.gcap-dl-icon:hover{background:#f8ecdc}
 .gcap-empty{display:flex;align-items:center;justify-content:center;
   color:#8f7c67;font-size:15px;grid-column:1/-1;padding:60px}
 
@@ -1806,11 +1806,9 @@ async function loadGallery() {
           <span>${when.date}</span>
           <span>${when.time}</span>
           ${session.teacher ? `<span>👩‍🏫 ${session.teacher}</span>` : ''}
+          ${origSrc ? `<button class="gcap-dl-icon" title="Download photo" onclick="dlImg('${origSrc}','${cap.id}_orig.png')">⬇</button>` : ''}
         </div>
       </div>
-      ${origSrc ? `<div class="gcap-actions">
-        ${origSrc ? `<button class="gcap-dl" onclick="dlImg('${origSrc}','${cap.id}_orig.png')">⬇ Photo</button>` : ''}
-      </div>` : ''}
     </div>`;
   }).join('');
 }
