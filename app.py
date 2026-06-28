@@ -99,12 +99,7 @@ def _supabase_user_headers():
 
 
 def _capture_for_store(cap: dict) -> dict:
-    stored = dict(cap)
-    for key in ("original_file", "aiboard_file"):
-        value = stored.get(key)
-        if isinstance(value, str) and value.startswith("data:image/"):
-            stored[key] = None
-    return stored
+    return dict(cap)
 
 
 def _session_payload_for_store(s: dict) -> dict:
@@ -605,7 +600,7 @@ def api_create_session():
         "id":         str(uuid.uuid4())[:12],
         "subject":    data.get("subject", "Unknown").strip(),
         "teacher":    data.get("teacher", "").strip(),
-        "created_at": datetime.datetime.now().isoformat(),
+        "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "locked":     False,
         "captures":   [],
     }
@@ -672,22 +667,17 @@ def api_add_capture(sid):
         return jsonify({"error": str(e), "quota": e.quota_snapshot}), 429
     cap_type     = data.get("capture_type", "explicit")  # explicit | latest_freeze | aiboard
     board_id     = data.get("board_id", 0)
-    ts           = datetime.datetime.now()
-
-    using_supabase_sessions = _use_supabase_session_store()
+    ts           = datetime.datetime.now(datetime.timezone.utc)
 
     def _delete_old_files(cap):
-        if using_supabase_sessions:
-            return
         for fkey in ("original_file", "aiboard_file"):
             if cap.get(fkey):
                 STORAGE.delete_file("session_images", cap[fkey])
 
-    # latest_freeze: keep one per board_id — replace previous freeze from same board
+    # latest_freeze: keep only the newest auto-freeze for the session
     if cap_type == "latest_freeze":
         idx = next((i for i, c in enumerate(s["captures"])
-                    if c.get("capture_type") == "latest_freeze"
-                    and c.get("board_id") == board_id), None)
+                    if c.get("capture_type") == "latest_freeze"), None)
         if idx is not None:
             _delete_old_files(s["captures"][idx])
             s["captures"].pop(idx)
@@ -716,8 +706,6 @@ def api_add_capture(sid):
     def _save_img(key, suffix):
         raw = data.get(key, "")
         if not raw:
-            return None
-        if using_supabase_sessions:
             return None
         stored = STORAGE.save_data_url(raw, "session_images", f"{sid}_{cap_id}_{suffix}.png")
         return stored.filename

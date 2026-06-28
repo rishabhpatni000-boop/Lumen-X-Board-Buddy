@@ -456,7 +456,7 @@ def api_create_session():
         "id":         str(uuid.uuid4())[:12],
         "subject":    data.get("subject", "Unknown").strip(),
         "teacher":    data.get("teacher", "").strip(),
-        "created_at": datetime.datetime.now().isoformat(),
+        "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "locked":     False,
         "captures":   [],
     }
@@ -496,7 +496,7 @@ def api_add_capture(sid):
         return jsonify({"error": str(e), "quota": e.quota_snapshot}), 429
     cap_type = data.get("capture_type", "explicit")
     board_id = data.get("board_id", 0)
-    ts       = datetime.datetime.now()
+    ts       = datetime.datetime.now(datetime.timezone.utc)
 
     def _del(cap):
         for fk in ("original_file","aiboard_file"):
@@ -505,7 +505,7 @@ def api_add_capture(sid):
 
     if cap_type == "latest_freeze":
         idx = next((i for i,c in enumerate(s["captures"])
-                    if c.get("capture_type")=="latest_freeze" and c.get("board_id")==board_id), None)
+                    if c.get("capture_type")=="latest_freeze"), None)
         if idx is not None: _del(s["captures"][idx]); s["captures"].pop(idx)
     elif cap_type == "aiboard":
         idx = next((i for i,c in enumerate(s["captures"])
