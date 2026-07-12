@@ -199,6 +199,25 @@ def _session_store_fallback_allowed(error: Exception) -> bool:
     return False
 
 
+def _session_store_error_details(error: Exception) -> str:
+    text = str(error)
+    if isinstance(error, requests.ConnectionError) and (
+        "NameResolutionError" in text
+        or "Failed to resolve" in text
+        or "nodename nor servname" in text
+        or "Name or service not known" in text
+    ):
+        return (
+            "Cannot reach the Supabase database because its hostname is not resolving. "
+            "Check that SUPABASE_URL points to the active project and that the project is not paused or deleted."
+        )
+    if isinstance(error, requests.ConnectionError):
+        return "Cannot reach the Supabase database right now. Please check the network connection and Supabase project URL."
+    if isinstance(error, requests.HTTPError) and error.response is not None:
+        return f"Supabase returned HTTP {error.response.status_code}: {error.response.text[:300]}"
+    return text
+
+
 def _storage_user_id() -> str | None:
     return (current_user() or {}).get("id")
 
@@ -714,7 +733,7 @@ def api_sessions():
         return jsonify(_sessions_list())
     except Exception as e:
         log_warning(SECURITY["logger"], "session_list_failed", error=str(e))
-        return jsonify({"error": "Could not load class sessions", "details": str(e)}), 500
+        return jsonify({"error": "Could not load class sessions", "details": _session_store_error_details(e)}), 500
 
 
 @app.route("/api/sessions", methods=["POST"])
@@ -737,7 +756,7 @@ def api_create_session():
         return jsonify(s)
     except Exception as e:
         log_warning(SECURITY["logger"], "session_create_failed", error=str(e))
-        return jsonify({"error": "Could not save class session", "details": str(e)}), 500
+        return jsonify({"error": "Could not save class session", "details": _session_store_error_details(e)}), 500
 
 
 @app.route("/api/sessions/<sid>", methods=["GET"])

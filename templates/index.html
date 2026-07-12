@@ -1220,6 +1220,20 @@ let frozenFrameImg  = null;  // cached frozen frame for view switching
 let boardId         = 0;     // increments each time "New Board" is pressed
 let lastBoardSourceAt = '';  // timestamp of the frame behind the visible AI Board
 let galleryAnalysisItems = [];
+const CSRF_TOKEN = {{ csrf_token|tojson }};
+
+function apiHeaders(headers = {}) {
+  return CSRF_TOKEN ? {...headers, 'X-CSRF-Token': CSRF_TOKEN} : headers;
+}
+
+function apiFetch(url, options = {}) {
+  const method = String(options.method || 'GET').toUpperCase();
+  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+    return fetch(url, options);
+  }
+  return fetch(url, {...options, headers: apiHeaders(options.headers || {})});
+}
+
 // Perspective calibration
 let calCorners      = null;   // 4 src corners [[x,y],...] in video pixels
 let calHomography   = null;   // 3×3 homography matrix (row-major)
@@ -1306,7 +1320,7 @@ async function smCreateSession() {
     btn.textContent = 'Starting...';
   }
   try {
-    const r = await fetch('/api/sessions', {
+    const r = await apiFetch('/api/sessions', {
       method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({subject, teacher})
     });
@@ -1445,7 +1459,7 @@ function smLaunch(session, isResume) {
 // ── Lock / Unlock ────────────────────────────────
 async function toggleLock() {
   if (!currentSession) return;
-  const r = await fetch(`/api/sessions/${currentSession.id}/lock`, {method:'POST'});
+  const r = await apiFetch(`/api/sessions/${currentSession.id}/lock`, {method:'POST'});
   const res = await r.json();
   currentSession.locked = res.locked;
   _syncLockBtn();
@@ -1749,7 +1763,7 @@ async function updateBoardOnly(dataURL, quiet = false) {
     showBoardLoading();
   }
   try {
-    const r = await fetch('/update-board', {
+    const r = await apiFetch('/update-board', {
       method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({
         image:        dataURL,
@@ -1931,7 +1945,7 @@ async function _saveCapture(origPng, aiboardPng, topic, capType) {
     return null;
   }
   try {
-    const r = await fetch(`/api/sessions/${currentSession.id}/capture`, {
+    const r = await apiFetch(`/api/sessions/${currentSession.id}/capture`, {
       method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({
         capture_type: capType,
@@ -2172,7 +2186,7 @@ async function loadGallery() {
 async function deleteCapture(sessionId, capId, btn) {
   if (!confirm('Delete this capture from the gallery?')) return;
   try {
-    const r = await fetch(`/api/sessions/${sessionId}/captures/${capId}`, {method:'DELETE'});
+    const r = await apiFetch(`/api/sessions/${sessionId}/captures/${capId}`, {method:'DELETE'});
     if ((await r.json()).ok) {
       const card = btn.closest('.gcap-card');
       card.style.transition = 'opacity .3s';
@@ -2198,7 +2212,7 @@ async function deleteSessionConfirm(sid, e) {
   if (!confirm('⚠️ Delete this ENTIRE class and ALL its captures?\n\nThis cannot be undone.')) return;
   if (!confirm('⚠️ FINAL WARNING\n\nAll images and AI boards for this class will be permanently deleted.\n\nAre you absolutely sure?')) return;
   try {
-    const r = await fetch(`/api/sessions/${sid}`, {method:'DELETE'});
+    const r = await apiFetch(`/api/sessions/${sid}`, {method:'DELETE'});
     if ((await r.json()).ok) {
       _smSessions = _smSessions.filter(s => s.id !== sid);
       smLoadPrev(_smSort);
@@ -2928,7 +2942,7 @@ async function calibrateView() {
 
   const dataURL = mc.toDataURL('image/png');
   try {
-    const r   = await fetch('/calibrate', {
+    const r   = await apiFetch('/calibrate', {
       method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({image: dataURL})
     });
@@ -3181,7 +3195,7 @@ async function runTextAnalysis(options = {}) {
   status(options.sourceLabel ? `Analysing ${options.sourceLabel}...` : 'Analysing board...');
 
   try {
-    const r = await fetch('/analyze', {
+    const r = await apiFetch('/analyze', {
       method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({
         image: imageData,
@@ -3477,7 +3491,7 @@ async function logoutUser() {
     const supabase = await getSupabaseClient();
     if (supabase) await supabase.auth.signOut();
   } catch (e) {}
-  await fetch('/auth/logout', {method: 'POST'});
+  await apiFetch('/auth/logout', {method: 'POST'});
   window.location.href = '/';
 }
 
@@ -3665,7 +3679,7 @@ async function sendChat() {
   addChatTyping();
 
   try {
-    const r   = await fetch('/chat', {
+    const r   = await apiFetch('/chat', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
         message: msg,
@@ -3686,7 +3700,7 @@ async function sendChat() {
 
 async function saveAnalysisHistory(analysisText) {
   try {
-    await fetch('/api/history', {
+    await apiFetch('/api/history', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({
