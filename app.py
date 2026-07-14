@@ -218,6 +218,20 @@ def _session_store_error_details(error: Exception) -> str:
     return text
 
 
+def _storage_error_details(error: Exception) -> str:
+    text = str(error)
+    if isinstance(error, StorageUnavailable):
+        return text
+    if isinstance(error, requests.ConnectionError):
+        return (
+            "Cannot reach Supabase Storage right now. "
+            "Check that the Supabase project is fully resumed and that SUPABASE_URL points to the active project."
+        )
+    if isinstance(error, requests.HTTPError) and error.response is not None:
+        return f"Supabase Storage returned HTTP {error.response.status_code}: {error.response.text[:300]}"
+    return text or "Unexpected storage error"
+
+
 def _storage_user_id() -> str | None:
     return (current_user() or {}).get("id")
 
@@ -1183,9 +1197,13 @@ def api_admin_user_quota(user_id):
 @read_api_limit
 @admin_required_api
 def api_admin_demo_images():
-    rows = [_demo_image_payload(row) for row in _load_demo_images()]
-    rows.sort(key=lambda item: item.get("created_at") or "", reverse=True)
-    return jsonify(rows)
+    try:
+        rows = [_demo_image_payload(row) for row in _load_demo_images()]
+        rows.sort(key=lambda item: item.get("created_at") or "", reverse=True)
+        return jsonify(rows)
+    except Exception as e:
+        log_warning(SECURITY["logger"], "admin_demo_images_list_failed", error=str(e))
+        return jsonify({"error": "Could not load demo images", "details": _storage_error_details(e)}), 500
 
 
 @app.route("/api/admin/demo-images", methods=["POST"])
@@ -1202,23 +1220,26 @@ def api_admin_create_demo_image():
     image_id = uuid.uuid4().hex
     try:
         stored = STORAGE.save_data_url(image_data, "demo_images", f"demo_{image_id}.png")
+        row = {
+            "id": image_id,
+            "title": (data.get("title") or "Demo image").strip()[:120] or "Demo image",
+            "caption": (data.get("caption") or "").strip()[:300],
+            "subject": (data.get("subject") or "All").strip()[:60] or "All",
+            "filename": stored.filename,
+            "active": bool(data.get("active", True)),
+            "created_at": now,
+            "updated_at": now,
+            "created_by": (current_user() or {}).get("email", ""),
+        }
+        rows = _load_demo_images()
+        rows.append(row)
+        _save_demo_images(rows)
+        return jsonify(_demo_image_payload(row))
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
-    row = {
-        "id": image_id,
-        "title": (data.get("title") or "Demo image").strip()[:120] or "Demo image",
-        "caption": (data.get("caption") or "").strip()[:300],
-        "subject": (data.get("subject") or "All").strip()[:60] or "All",
-        "filename": stored.filename,
-        "active": bool(data.get("active", True)),
-        "created_at": now,
-        "updated_at": now,
-        "created_by": (current_user() or {}).get("email", ""),
-    }
-    rows = _load_demo_images()
-    rows.append(row)
-    _save_demo_images(rows)
-    return jsonify(_demo_image_payload(row))
+    except Exception as e:
+        log_warning(SECURITY["logger"], "admin_demo_image_create_failed", error=str(e))
+        return jsonify({"error": "Could not upload demo image", "details": _storage_error_details(e)}), 500
 
 
 @app.route("/api/admin/demo-images/<image_id>", methods=["PATCH"])
@@ -1228,35 +1249,43 @@ def api_admin_update_demo_image(image_id):
     data, error_response = require_json_payload()
     if error_response:
         return error_response
-    rows = _load_demo_images()
-    row = next((item for item in rows if item.get("id") == image_id), None)
-    if not row:
-        return jsonify({"error": "Demo image not found"}), 404
-    if "title" in data:
-        row["title"] = (data.get("title") or "Demo image").strip()[:120] or "Demo image"
-    if "caption" in data:
-        row["caption"] = (data.get("caption") or "").strip()[:300]
-    if "subject" in data:
-        row["subject"] = (data.get("subject") or "All").strip()[:60] or "All"
-    if "active" in data:
-        row["active"] = bool(data.get("active"))
-    row["updated_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
-    _save_demo_images(rows)
-    return jsonify(_demo_image_payload(row))
+    try:
+        rows = _load_demo_images()
+        row = next((item for item in rows if item.get("id") == image_id), None)
+        if not row:
+            return jsonify({"error": "Demo image not found"}), 404
+        if "title" in data:
+            row["title"] = (data.get("title") or "Demo image").strip()[:120] or "Demo image"
+        if "caption" in data:
+            row["caption"] = (data.get("caption") or "").strip()[:300]
+        if "subject" in data:
+            row["subject"] = (data.get("subject") or "All").strip()[:60] or "All"
+        if "active" in data:
+            row["active"] = bool(data.get("active"))
+        row["updated_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        _save_demo_images(rows)
+        return jsonify(_demo_image_payload(row))
+    except Exception as e:
+        log_warning(SECURITY["logger"], "admin_demo_image_update_failed", error=str(e), demo_image_id=image_id)
+        return jsonify({"error": "Could not update demo image", "details": _storage_error_details(e)}), 500
 
 
 @app.route("/api/admin/demo-images/<image_id>", methods=["DELETE"])
 @write_api_limit
 @admin_required_api
 def api_admin_delete_demo_image(image_id):
-    rows = _load_demo_images()
-    idx = next((i for i, item in enumerate(rows) if item.get("id") == image_id), None)
-    if idx is None:
-        return jsonify({"error": "Demo image not found"}), 404
-    row = rows.pop(idx)
-    _delete_stored_file_best_effort("demo_images", row.get("filename"), demo_image_id=image_id)
-    _save_demo_images(rows)
-    return jsonify({"ok": True})
+    try:
+        rows = _load_demo_images()
+        idx = next((i for i, item in enumerate(rows) if item.get("id") == image_id), None)
+        if idx is None:
+            return jsonify({"error": "Demo image not found"}), 404
+        row = rows.pop(idx)
+        _delete_stored_file_best_effort("demo_images", row.get("filename"), demo_image_id=image_id)
+        _save_demo_images(rows)
+        return jsonify({"ok": True})
+    except Exception as e:
+        log_warning(SECURITY["logger"], "admin_demo_image_delete_failed", error=str(e), demo_image_id=image_id)
+        return jsonify({"error": "Could not delete demo image", "details": _storage_error_details(e)}), 500
 
 
 

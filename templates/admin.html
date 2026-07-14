@@ -324,7 +324,9 @@ textarea{min-height:92px;resize:vertical}
         body: JSON.stringify(payload)
       });
       const data = await resp.json();
-      document.getElementById('quotaStatus').textContent = data.ok ? 'Quota override saved.' : (data.error || 'Could not save limits.');
+      document.getElementById('quotaStatus').textContent = data.ok
+        ? 'Quota override saved.'
+        : (data.details || data.error || 'Could not save limits.');
       await loadOverview();
     }
 
@@ -359,7 +361,7 @@ textarea{min-height:92px;resize:vertical}
       const resp = await fetch('/api/admin/demo-images');
       const data = await resp.json();
       if (!resp.ok) {
-        document.getElementById('demoStatus').textContent = data.error || 'Could not load demo images.';
+        document.getElementById('demoStatus').textContent = data.details || data.error || 'Could not load demo images.';
         return;
       }
       adminState.demos = data;
@@ -389,7 +391,7 @@ textarea{min-height:92px;resize:vertical}
       });
       const data = await resp.json();
       if (!resp.ok) {
-        document.getElementById('demoStatus').textContent = data.error || 'Could not upload demo image.';
+        document.getElementById('demoStatus').textContent = data.details || data.error || 'Could not upload demo image.';
         return;
       }
       document.getElementById('demoFile').value = '';
@@ -409,7 +411,7 @@ textarea{min-height:92px;resize:vertical}
       const data = await resp.json();
       document.getElementById('demoStatus').textContent = resp.ok
         ? 'Demo visibility updated.'
-        : (data.error || 'Could not update demo image.');
+        : (data.details || data.error || 'Could not update demo image.');
       await loadDemoImages();
     }
 
@@ -419,7 +421,7 @@ textarea{min-height:92px;resize:vertical}
       const data = await resp.json();
       document.getElementById('demoStatus').textContent = resp.ok
         ? 'Demo image deleted.'
-        : (data.error || 'Could not delete demo image.');
+        : (data.details || data.error || 'Could not delete demo image.');
       await loadDemoImages();
     }
 
