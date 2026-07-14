@@ -1254,6 +1254,7 @@ let galleryAnalysisItems = [];
 let showcaseMode = false;
 let showcaseImage = null;
 let showcaseItems = [];
+let analysisRequestActive = false;
 const CSRF_TOKEN = {{ csrf_token|tojson }};
 
 function apiHeaders(headers = {}) {
@@ -1266,6 +1267,19 @@ function apiFetch(url, options = {}) {
     return fetch(url, options);
   }
   return fetch(url, {...options, headers: apiHeaders(options.headers || {})});
+}
+
+function apiFetchWithTimeout(url, options = {}, timeoutMs = 90000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return apiFetch(url, {...options, signal: controller.signal})
+    .catch(error => {
+      if (error?.name === 'AbortError') {
+        throw new Error('AI analysis took too long. Please try again.');
+      }
+      throw error;
+    })
+    .finally(() => clearTimeout(timer));
 }
 
 // Perspective calibration
@@ -1799,14 +1813,14 @@ async function updateBoardOnly(dataURL, quiet = false) {
     showBoardLoading();
   }
   try {
-    const r = await apiFetch('/update-board', {
+    const r = await apiFetchWithTimeout('/update-board', {
       method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({
         image:        dataURL,
         previous_svg: previousSvg,
         svg_prompt:   boardPrompt,
       })
-    });
+    }, 90000);
     const res = await r.json();
     const boardError = res.error || (!r.ok ? 'AI Board request failed.' : '');
 
@@ -2136,9 +2150,9 @@ async function startShowcaseMode() {
     if (statusEl) statusEl.textContent = 'Starting Showcase Mode...';
     const dataUrl = await imageSrcToDataUrl(item.url);
     const img = await loadImageElement(dataUrl);
+    showcaseMode = true;
     stopAutoFreeze();
     stopCamera({clearCanvas: false});
-    showcaseMode = true;
     showcaseImage = img;
     currentSession = {
       id: 'showcase',
@@ -2764,12 +2778,14 @@ function attachCameraTrackHandlers(stream) {
   const track = stream.getVideoTracks()[0];
   if (!track) return;
   track.onended = () => {
+    if (showcaseMode) return;
     cameraReady = false;
     setCameraStatus('Camera disconnected. Waiting for it to come back...', 'error');
     status('Camera disconnected — reconnecting...');
     scheduleCameraReconnect();
   };
   track.onmute = () => {
+    if (showcaseMode) return;
     setCameraStatus('Camera paused by the browser. Retrying if it does not recover...', 'error');
     clearTimeout(cameraMutedTimer);
     cameraMutedTimer = setTimeout(() => {
@@ -2786,7 +2802,7 @@ function attachCameraTrackHandlers(stream) {
 function startCameraHealthMonitor() {
   clearInterval(cameraHealthTimer);
   cameraHealthTimer = setInterval(() => {
-    if (!currentSession || frozen || cameraStarting) return;
+    if (showcaseMode || !currentSession || frozen || cameraStarting) return;
     if (!hasActiveCameraStream()) {
       scheduleCameraReconnect(true);
       return;
@@ -2800,10 +2816,11 @@ function startCameraHealthMonitor() {
 }
 
 async function startCamera(deviceId = '', options = {}) {
-  const seq = ++cameraStartSeq;
+  if (showcaseMode) return false;
   const requestedDeviceId = deviceId || document.getElementById('camSel')?.value || currentDeviceId || '';
   const forceRestart = !!options.forceRestart;
   if (cameraStarting && !forceRestart) return false;
+  const seq = ++cameraStartSeq;
   if (hasActiveCameraStream() && currentDeviceId === requestedDeviceId && !forceRestart) {
     setCameraStatus(`Camera active: ${currentCameraLabel || 'selected camera'}`, 'ok');
     return true;
@@ -2815,6 +2832,7 @@ async function startCamera(deviceId = '', options = {}) {
     if (options.refreshDevices !== false) {
       await initCameras({requestPermission: false, requestedDeviceId});
     }
+    if (showcaseMode || seq !== cameraStartSeq) return false;
     const selected = chooseCamera(cameraKnownDevices, requestedDeviceId);
     const desiredDeviceId = requestedDeviceId || selected?.deviceId || '';
     const oldStream = vid.srcObject;
@@ -2825,7 +2843,7 @@ async function startCamera(deviceId = '', options = {}) {
     }
 
     const {stream, attempt} = await openCameraStream(desiredDeviceId, {allowFallback: true});
-    if (seq !== cameraStartSeq) {
+    if (showcaseMode || seq !== cameraStartSeq) {
       stopMediaStream(stream);
       return false;
     }
@@ -2833,6 +2851,11 @@ async function startCamera(deviceId = '', options = {}) {
     vid.srcObject = stream;
     await vid.play();
     await waitForVideoReady();
+    if (showcaseMode || seq !== cameraStartSeq) {
+      stopMediaStream(stream);
+      if (vid.srcObject === stream) vid.srcObject = null;
+      return false;
+    }
     if (oldStream && oldStream !== stream && vid.srcObject === stream) stopMediaStream(oldStream);
 
     const track = stream.getVideoTracks()[0];
@@ -2860,6 +2883,7 @@ async function startCamera(deviceId = '', options = {}) {
     status(liveMessage);
     return true;
   } catch (error) {
+    if (showcaseMode || seq !== cameraStartSeq) return false;
     const msg = describeCameraError(error);
     if (hasActiveCameraStream()) {
       cameraReady = true;
@@ -2878,6 +2902,7 @@ async function startCamera(deviceId = '', options = {}) {
 }
 
 async function ensureCameraReady() {
+  if (showcaseMode) return false;
   if (hasActiveCameraStream()) {
     const result = await initCameras({requestPermission: false}).catch(() => null);
     const preferred = result?.selected;
@@ -2929,11 +2954,12 @@ async function retryCamera() {
 }
 
 function scheduleCameraReconnect(forceRestart = false) {
-  if (!currentSession || cameraReconnectTimer || cameraStarting) return;
+  if (showcaseMode || !currentSession || cameraReconnectTimer || cameraStarting) return;
   const delay = Math.min(6000, forceRestart ? 350 : 700 + cameraReconnectAttempts * 900);
   cameraReconnectAttempts++;
   cameraReconnectTimer = setTimeout(async () => {
     cameraReconnectTimer = null;
+    if (showcaseMode) return;
     if (currentSession && !hasActiveCameraStream()) {
       await startCamera(document.getElementById('camSel').value || currentDeviceId, {
         forceRestart,
@@ -2951,6 +2977,7 @@ function scheduleCameraReconnect(forceRestart = false) {
 }
 
 async function handleCameraDeviceChange() {
+  if (showcaseMode) return;
   try {
     await initCameras({requestPermission: false});
     const preferred = chooseCamera(cameraKnownDevices);
@@ -2971,6 +2998,8 @@ async function handleCameraDeviceChange() {
 }
 
 function stopCamera({forget = false, clearCanvas = true} = {}) {
+  cameraStartSeq++;
+  cameraStarting = false;
   clearCameraTimers();
   stopMediaStream(vid.srcObject);
   vid.srcObject = null;
@@ -3361,6 +3390,10 @@ function toggleFreeze() {
 
 // On-demand text analysis (called from "Analyse Board" button)
 async function runTextAnalysis(options = {}) {
+  if (analysisRequestActive) {
+    status('AI analysis is already in progress...');
+    return;
+  }
   const imageData = options.imageData || lastOrigPng;
   if (!imageData || (!options.imageData && (!frozen || !analysisReady))) {
     status('Freeze a frame first');
@@ -3374,12 +3407,13 @@ async function runTextAnalysis(options = {}) {
   document.getElementById('chatInputArea').style.display = 'none';
   chatHistory = [];
   currentAnalysisContext = '';
+  analysisRequestActive = true;
   addChatTyping();
   setView('analysis');
   status(options.sourceLabel ? `Analysing ${options.sourceLabel}...` : 'Analysing board...');
 
   try {
-    const r = await apiFetch('/analyze', {
+    const r = await apiFetchWithTimeout('/analyze', {
       method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({
         image: imageData,
@@ -3388,12 +3422,12 @@ async function runTextAnalysis(options = {}) {
         session_id: currentSession?.id || '',
         board_id: boardId,
       })
-    });
+    }, 90000);
     let res;
+    const raw = await r.text();
     try {
-      res = await r.json();
+      res = JSON.parse(raw);
     } catch (_) {
-      const raw = await r.text();
       throw new Error(raw || 'Analysis request failed.');
     }
     removeTyping();
@@ -3426,6 +3460,10 @@ async function runTextAnalysis(options = {}) {
     removeTyping();
     addChatMsg('teacher', 'Error: ' + e.message);
     document.getElementById('analyseBarWrapper').style.display = 'flex';
+    status('Analysis failed — ' + e.message);
+  } finally {
+    analysisRequestActive = false;
+    removeTyping();
   }
 }
 

@@ -52,7 +52,12 @@ from web_security import configure_app_security, decode_image_data_url, require_
 # ── Claude ────────────────────────────────────────────────────────────────────
 try:
     import anthropic as _asdk
-    _claude = _asdk.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY", ""))
+    CLAUDE_REQUEST_TIMEOUT_SECONDS = float(os.getenv("CLAUDE_REQUEST_TIMEOUT_SECONDS", "75"))
+    _claude = _asdk.Anthropic(
+        api_key=os.environ.get("ANTHROPIC_API_KEY", ""),
+        timeout=CLAUDE_REQUEST_TIMEOUT_SECONDS,
+        max_retries=1,
+    )
     CLAUDE_AVAILABLE = bool(os.environ.get("ANTHROPIC_API_KEY", "").strip())
 except ImportError:
     _claude = None
