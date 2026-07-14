@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Signing In - Lumen</title>
+<link rel="icon" type="image/png" href="{{ url_for('static', filename='images/lumen-logo.png') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/brand.css') }}">
 <style>
 body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
   background:linear-gradient(160deg,#0b1218,#132131);color:#eef3f8;
@@ -17,6 +19,9 @@ p{margin:0;color:#9fb1c5;line-height:1.7}
 </head>
 <body>
   <div class="card">
+    <div class="lumen-brand" style="margin-bottom:18px">
+      <img class="lumen-brand-logo compact" src="{{ url_for('static', filename='images/lumen-logo.png') }}" alt="Lumen logo">
+    </div>
     <h1>Completing sign-in</h1>
     <p>Lumen is verifying your Google session and preparing your dashboard.</p>
     <p id="status">Checking Supabase session…</p>

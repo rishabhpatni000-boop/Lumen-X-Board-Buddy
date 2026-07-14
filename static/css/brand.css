@@ -1,0 +1,74 @@
+.lumen-brand{
+  display:inline-flex;
+  align-items:center;
+  gap:12px;
+  color:inherit;
+  text-decoration:none;
+  min-width:0;
+}
+
+.lumen-brand-logo{
+  width:58px;
+  height:52px;
+  flex:0 0 auto;
+  object-fit:contain;
+  border-radius:14px;
+  background:rgba(255,255,255,.92);
+  box-shadow:0 12px 30px rgba(8,20,38,.12);
+}
+
+.lumen-brand-logo.compact{
+  width:44px;
+  height:40px;
+  border-radius:11px;
+}
+
+.lumen-brand-word,
+.lumen-brand-text{
+  font-family:"Avenir Next","Montserrat","Trebuchet MS",Arial,sans-serif;
+  letter-spacing:.36em;
+  text-transform:uppercase;
+  font-weight:500;
+}
+
+.lumen-brand-word{
+  display:block;
+  font-size:16px;
+  line-height:1.05;
+}
+
+.lumen-brand-text{
+  letter-spacing:.28em;
+}
+
+.lumen-brand-subtitle{
+  display:block;
+  margin-top:4px;
+  font-size:13px;
+  line-height:1.25;
+  letter-spacing:.01em;
+  opacity:.74;
+}
+
+.lumen-brand.centered{
+  flex-direction:column;
+  justify-content:center;
+  text-align:center;
+  gap:10px;
+}
+
+.lumen-brand.centered .lumen-brand-logo{
+  width:112px;
+  height:98px;
+  border-radius:22px;
+}
+
+.lumen-brand.centered .lumen-brand-word{
+  font-size:26px;
+}
+
+@media (max-width: 640px){
+  .lumen-brand-logo{width:48px;height:44px}
+  .lumen-brand-word{font-size:14px;letter-spacing:.3em}
+  .lumen-brand-subtitle{font-size:12px}
+}

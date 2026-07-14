@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Lumen</title>
+<link rel="icon" type="image/png" href="{{ url_for('static', filename='images/lumen-logo.png') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/brand.css') }}">
 <style>
 :root{
   --bg:#f4efe7;
@@ -682,12 +684,9 @@ code{
 <body>
   <div class="page">
     <header class="topbar">
-      <a class="brand" href="/">
-        <span class="brand-mark">L</span>
-        <span class="brand-copy">
-          <strong>Lumen</strong>
-          <span>Accessible classroom vision support</span>
-        </span>
+      <a class="lumen-brand" href="/">
+        <img class="lumen-brand-logo" src="{{ url_for('static', filename='images/lumen-logo.png') }}" alt="Lumen logo">
+        <span class="lumen-brand-subtitle">Accessible classroom vision support</span>
       </a>
       <nav class="navlinks" aria-label="Public site">
         <a href="#solution">Solution</a>

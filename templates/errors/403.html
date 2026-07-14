@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Access Restricted - Lumen</title>
+<link rel="icon" type="image/png" href="{{ url_for('static', filename='images/lumen-logo.png') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/brand.css') }}">
 <style>
 body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;
   background:linear-gradient(160deg,#091119,#13202d);color:#ecf2f7;
@@ -18,6 +20,9 @@ a{display:inline-block;background:#eaf1f7;color:#132133;text-decoration:none;fon
 </head>
 <body>
   <div class="card">
+    <div class="lumen-brand" style="margin-bottom:18px">
+      <img class="lumen-brand-logo compact" src="{{ url_for('static', filename='images/lumen-logo.png') }}" alt="Lumen logo">
+    </div>
     <h1>Access restricted</h1>
     <p>{{ message or "You do not have permission to view this page or complete that action." }}</p>
     <a href="/">Return to the landing page</a>

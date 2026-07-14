@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Admin Dashboard - Lumen</title>
+<link rel="icon" type="image/png" href="{{ url_for('static', filename='images/lumen-logo.png') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/brand.css') }}">
 <script type="module">
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
 const supabaseUrl = {{ supabase_url|tojson }};
@@ -70,7 +72,10 @@ textarea{min-height:92px;resize:vertical}
 </head>
 <body>
   <div class="topbar">
-    <div class="brand">Lumen Admin</div>
+    <a class="lumen-brand" href="/app" title="Back to Lumen app">
+      <img class="lumen-brand-logo compact" src="{{ url_for('static', filename='images/lumen-logo.png') }}" alt="Lumen logo">
+      <span class="lumen-brand-subtitle">Admin</span>
+    </a>
     <div class="chip" id="adminChip">{{ current_user.email if current_user else '' }}</div>
     <div class="spacer"></div>
     <button class="btn" onclick="window.location.href='/'">Home</button>
@@ -174,7 +179,7 @@ textarea{min-height:92px;resize:vertical}
         </div>
         <div class="wide">
           <label for="demoCaption">Caption</label>
-          <textarea id="demoCaption" placeholder="This is a demo image students can use to try AI analysis."></textarea>
+          <textarea id="demoCaption" placeholder="This is a demo image admins can use in Showcase Mode."></textarea>
         </div>
       </div>
       <div style="height:12px"></div>
@@ -335,7 +340,7 @@ textarea{min-height:92px;resize:vertical}
       const demos = adminState.demos || [];
       document.getElementById('statDemos').textContent = demos.filter(item => item.active).length;
       if (!demos.length) {
-        grid.innerHTML = '<div class="muted">No demo images yet. Upload one JPG, PNG, or WebP to make it available in every gallery.</div>';
+        grid.innerHTML = '<div class="muted">No demo images yet. Upload one JPG, PNG, or WebP to make it available in admin-only Showcase Mode.</div>';
         return;
       }
       grid.innerHTML = demos.map(item => `
@@ -416,7 +421,7 @@ textarea{min-height:92px;resize:vertical}
     }
 
     async function deleteDemoImage(id) {
-      if (!confirm('Delete this demo image? It will disappear from all galleries.')) return;
+      if (!confirm('Delete this demo image? It will disappear from Showcase Mode.')) return;
       const resp = await fetch(`/api/admin/demo-images/${id}`, {method: 'DELETE'});
       const data = await resp.json();
       document.getElementById('demoStatus').textContent = resp.ok

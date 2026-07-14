@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Something Went Wrong - Lumen</title>
+<link rel="icon" type="image/png" href="{{ url_for('static', filename='images/lumen-logo.png') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/brand.css') }}">
 <style>
 body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;
   background:linear-gradient(160deg,#0a1118,#142332);color:#edf3f8;
@@ -18,6 +20,9 @@ a{display:inline-block;background:#eaf1f7;color:#132133;text-decoration:none;fon
 </head>
 <body>
   <div class="card">
+    <div class="lumen-brand" style="margin-bottom:18px">
+      <img class="lumen-brand-logo compact" src="{{ url_for('static', filename='images/lumen-logo.png') }}" alt="Lumen logo">
+    </div>
     <h1>Something went wrong</h1>
     <p>{{ message or "Lumen hit an unexpected error. The issue has been logged so it can be investigated." }}</p>
     <a href="/">Back to the landing page</a>

@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <title>Lumen</title>
+<link rel="icon" type="image/png" href="{{ url_for('static', filename='images/lumen-logo.png') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/brand.css') }}">
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script type="module">
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
@@ -554,9 +556,13 @@ body.dark-theme .workspace-empty-card{background:rgba(31,39,46,.92)}
 .panel-tile{background:#fff8ef;border:1px solid rgba(20,33,47,.08);border-radius:18px;padding:14px;cursor:pointer;transition:all .15s;text-align:left}
 .panel-tile:hover{background:#fffdf8;border-color:rgba(223,143,71,.28)}
 .panel-tile strong{display:block;color:var(--ink);font-size:14px;margin-bottom:6px}
-.panel-tile span{display:block;color:var(--ink-soft);font-size:12px;line-height:1.5}
-.panel-tile.danger{background:#fbefee;border-color:rgba(148,73,73,.14)}
-.panel-tile.danger strong{color:#7d4141}
+	.panel-tile span{display:block;color:var(--ink-soft);font-size:12px;line-height:1.5}
+	.panel-tile.danger{background:#fbefee;border-color:rgba(148,73,73,.14)}
+	.panel-tile.danger strong{color:#7d4141}
+	.showcase-picker{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;margin-top:10px}
+	.showcase-picker select{min-width:0;background:#fffaf3;color:var(--ink);border:1px solid var(--line-strong);border-radius:12px;padding:10px;font-size:13px}
+	.showcase-note{font-size:12px;color:var(--ink-soft);line-height:1.5;margin-top:8px}
+	.showcase-badge{display:none;position:absolute;left:14px;top:14px;z-index:6;background:rgba(20,33,47,.88);color:#fffaf3;border-radius:999px;padding:8px 12px;font-size:13px;font-weight:700;box-shadow:0 12px 28px rgba(0,0,0,.18)}
 .panel-section{padding-top:12px;margin-top:12px;border-top:1px solid rgba(20,33,47,.08)}
 .panel-section h4{font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px;font-family:"Trebuchet MS",sans-serif}
 .compact-field{background:#fff8ef;border:1px solid rgba(20,33,47,.08);border-radius:12px;padding:12px}
@@ -590,10 +596,11 @@ body.dark-theme #chatInputArea{
 	body.dark-theme .dash-card,
 body.dark-theme .floating-panel,
 body.dark-theme .compact-field,
-body.dark-theme .panel-user,
-body.dark-theme .panel-tile,
-body.dark-theme .panel-tile.danger,
-body.dark-theme .workspace-empty-card,
+	body.dark-theme .panel-user,
+	body.dark-theme .panel-tile,
+	body.dark-theme .panel-tile.danger,
+	body.dark-theme .showcase-picker select,
+	body.dark-theme .workspace-empty-card,
 body.dark-theme #mainCanvas,
 body.dark-theme .cmsg.teacher,
 body.dark-theme .q-chip,
@@ -730,8 +737,10 @@ body.dark-theme .view-seg button.active{
     <button class="tb-btn sm-close" onclick="closeClassPicker()" aria-label="Close start class dialog">✕</button>
   </div>
   <div class="sm-logo">
-    <h1>Lumen</h1>
-    <p>Accessible classroom companion</p>
+    <div class="lumen-brand centered">
+      <img class="lumen-brand-logo" src="{{ url_for('static', filename='images/lumen-logo.png') }}" alt="Lumen logo">
+      <span class="lumen-brand-subtitle">Accessible classroom companion</span>
+    </div>
   </div>
 
   <div class="sm-hero">
@@ -800,6 +809,9 @@ body.dark-theme .view-seg button.active{
 <!-- ═══════════════ TOP BAR ═══════════════ -->
 <div id="topbar">
   <div class="top-cluster">
+    <a class="lumen-brand" href="/" title="Lumen home" aria-label="Lumen home">
+      <img class="lumen-brand-logo compact" src="{{ url_for('static', filename='images/lumen-logo.png') }}" alt="">
+    </a>
     <button class="tb-btn" onclick="window.location.href='/'" title="Go to public landing page">Home</button>
     <button id="startClassBtn" class="tb-btn primary" onclick="openClassPicker()" title="Start or switch a class">Start a class</button>
     <div class="status-pill">
@@ -873,6 +885,7 @@ body.dark-theme .view-seg button.active{
       onwheel="oWheel(event)">
     </canvas>
     <div id="frozenBadge">FROZEN</div>
+    <div id="showcaseBadge" class="showcase-badge">SHOWCASE MODE</div>
   </div>
 
   <!-- AI BOARD -->
@@ -1115,11 +1128,15 @@ body.dark-theme .view-seg button.active{
         <span>Review previous analyses and saved board captures.</span>
       </button>
       {% if is_admin %}
-      <button class="panel-tile" onclick="togglePanel('adminPanel')">
-        <strong>Admin</strong>
-        <span>Open admin-only tools, including prompt controls.</span>
-      </button>
-      {% endif %}
+	      <button class="panel-tile" onclick="togglePanel('adminPanel')">
+	        <strong>Admin</strong>
+	        <span>Open admin-only tools, including prompt controls.</span>
+	      </button>
+	      <button class="panel-tile" onclick="togglePanel('adminPanel'); loadShowcaseImages();">
+	        <strong>Showcase Mode</strong>
+	        <span>Display an admin demo image in place of the live camera feed.</span>
+	      </button>
+	      {% endif %}
       <button class="panel-tile danger" onclick="logoutUser()">
         <strong>Logout</strong>
         <span>Sign out and return to the public landing page.</span>
@@ -1150,9 +1167,23 @@ body.dark-theme .view-seg button.active{
       <strong>Open Admin Dashboard</strong>
       <span>Manage users, usage limits, and account access.</span>
     </button>
-  </div>
-</div>
-{% endif %}
+	  </div>
+	  <div class="panel-section">
+	    <h4>Showcase Mode</h4>
+	    <button class="panel-tile" onclick="loadShowcaseImages()">
+	      <strong>Refresh Demo Images</strong>
+	      <span>Use an admin demo image as the live board for recordings and walkthroughs.</span>
+	    </button>
+	    <div class="showcase-picker">
+	      <select id="showcaseSelect">
+	        <option value="">Load demo images first</option>
+	      </select>
+	      <button class="mini-btn" onclick="startShowcaseMode()">Start</button>
+	    </div>
+	    <div class="showcase-note" id="showcaseStatus">Showcase mode is admin-only and does not appear in the normal student gallery.</div>
+	  </div>
+	</div>
+	{% endif %}
 
 <!-- ═══════════════ SETTINGS MODAL ═══════════════ -->
 <div id="settingsModal" style="display:none;position:fixed;inset:0;
@@ -1220,6 +1251,9 @@ let frozenFrameImg  = null;  // cached frozen frame for view switching
 let boardId         = 0;     // increments each time "New Board" is pressed
 let lastBoardSourceAt = '';  // timestamp of the frame behind the visible AI Board
 let galleryAnalysisItems = [];
+let showcaseMode = false;
+let showcaseImage = null;
+let showcaseItems = [];
 const CSRF_TOKEN = {{ csrf_token|tojson }};
 
 function apiHeaders(headers = {}) {
@@ -1406,6 +1440,7 @@ async function smResumeSession(sid) {
 }
 
 function smLaunch(session, isResume) {
+  clearShowcaseMode();
   currentSession = session;
   boardId = 0;   // reset board counter for new/resumed session
   closeClassPicker();
@@ -1480,6 +1515,7 @@ function _syncLockBtn() {
 
 // ── Class picker ─────────────────────────────────
 function openClassPicker() {
+  clearShowcaseMode();
   closePanels();
   // Stop auto-freeze before going home
   stopAutoFreeze();
@@ -1788,7 +1824,7 @@ async function updateBoardOnly(dataURL, quiet = false) {
       lastSvgString = res.svg;
       hasSvg = true;
       if (!lastBoardSourceAt) lastBoardSourceAt = new Date().toISOString();
-      setAiBoardSourceTimestamp(lastBoardSourceAt);
+      setAiBoardSourceTimestamp(lastBoardSourceAt, showcaseMode ? 'Showcase image' : 'Based on frame');
       document.getElementById('newBoardBtn').style.display = '';
       bZoom=1; bPanX=0; bPanY=0; updBoardTransform();
 
@@ -1797,7 +1833,7 @@ async function updateBoardOnly(dataURL, quiet = false) {
       _syncAnalyseBtn();
 
       // Save/overwrite AI board for current board in gallery
-      saveAiBoard(res.svg, `Board ${boardId + 1}`);
+      if (!showcaseMode) saveAiBoard(res.svg, `Board ${boardId + 1}`);
 
       if (quiet) toast('✓ AI Board updated');
 
@@ -1939,6 +1975,19 @@ async function playCameraSound() {
 // ── Session saves (three types) ───────────────────
 async function _saveCapture(origPng, aiboardPng, topic, capType) {
   if (!currentSession) return null;
+  if (currentSession.showcase) {
+    const cap = {
+      id: `showcase_${Date.now()}`,
+      capture_type: capType,
+      board_id: boardId,
+      topic: topic || 'Showcase',
+      timestamp: new Date().toISOString(),
+      original_file: origPng || '',
+      aiboard_file: aiboardPng || '',
+    };
+    currentSession.captures.push(cap);
+    return cap;
+  }
   if (currentSession.locked) {
     toast('Unlock the class before saving a snapshot');
     status('Session is locked');
@@ -2039,6 +2088,107 @@ async function imageSrcToDataUrl(src) {
   });
 }
 
+function loadImageElement(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('Could not load showcase image.'));
+    img.src = src;
+  });
+}
+
+async function loadShowcaseImages() {
+  const statusEl = document.getElementById('showcaseStatus');
+  const select = document.getElementById('showcaseSelect');
+  if (!statusEl || !select) return;
+  statusEl.textContent = 'Loading demo images...';
+  try {
+    const resp = await fetch('/api/demo-images');
+    const data = await resp.json().catch(() => ({error: 'Server returned an unreadable response'}));
+    if (!resp.ok) throw new Error(data.details || data.error || 'Could not load demo images.');
+    showcaseItems = Array.isArray(data) ? data : [];
+    if (!showcaseItems.length) {
+      select.innerHTML = '<option value="">No active demo images</option>';
+      statusEl.textContent = 'No active demo images yet. Upload one from the Admin Dashboard first.';
+      return;
+    }
+    select.innerHTML = showcaseItems.map((item, index) =>
+      `<option value="${index}">${escapeHtml(item.title || 'Demo image')} · ${escapeHtml(item.subject || 'All')}</option>`
+    ).join('');
+    statusEl.textContent = `${showcaseItems.length} demo image${showcaseItems.length === 1 ? '' : 's'} ready for Showcase Mode.`;
+  } catch (error) {
+    select.innerHTML = '<option value="">Could not load demo images</option>';
+    statusEl.textContent = error.message || 'Could not load demo images.';
+  }
+}
+
+async function startShowcaseMode() {
+  const statusEl = document.getElementById('showcaseStatus');
+  const select = document.getElementById('showcaseSelect');
+  if (!showcaseItems.length) await loadShowcaseImages();
+  const index = Number(select?.value || 0);
+  const item = showcaseItems[index];
+  if (!item?.url) {
+    if (statusEl) statusEl.textContent = 'Choose a demo image first.';
+    return;
+  }
+  try {
+    if (statusEl) statusEl.textContent = 'Starting Showcase Mode...';
+    const dataUrl = await imageSrcToDataUrl(item.url);
+    const img = await loadImageElement(dataUrl);
+    stopAutoFreeze();
+    stopCamera({clearCanvas: false});
+    showcaseMode = true;
+    showcaseImage = img;
+    currentSession = {
+      id: 'showcase',
+      subject: item.subject && item.subject !== 'All' ? item.subject : 'Showcase',
+      teacher: 'Demo image',
+      created_at: item.created_at || new Date().toISOString(),
+      locked: false,
+      captures: [],
+      showcase: true,
+    };
+    lastOrigPng = dataUrl;
+    lastBoardSourceAt = item.created_at || new Date().toISOString();
+    frozenFrameImg = img;
+    frozen = true;
+    boardFrozen = true;
+    analysisReady = true;
+    hasSvg = false;
+    previousSvg = '';
+    lastSvgString = '';
+    boardId = 0;
+    document.getElementById('workspaceEmpty').style.display = 'none';
+    document.getElementById('sessionInfo').textContent = `Showcase · ${item.title || 'Demo image'}`;
+    document.getElementById('startClassBtn').textContent = 'Change class';
+    document.getElementById('lockBtn').style.display = 'none';
+    document.getElementById('newBoardBtn').style.display = '';
+    document.getElementById('frozenBadge').style.display = 'block';
+    document.getElementById('showcaseBadge').style.display = 'block';
+    const freezeBtn = document.getElementById('freezeBtn');
+    freezeBtn.textContent = '▶  Resume  [Space]';
+    freezeBtn.classList.add('frozen');
+    _syncAnalyseBtn();
+    setAiBoardSourceTimestamp(lastBoardSourceAt, 'Showcase image');
+    closePanels();
+    setView('orig');
+    renderShowcaseFrame();
+    status(`Showcase Mode — using demo image: ${item.title || 'Demo image'}`);
+    await updateBoardOnly(lastOrigPng);
+  } catch (error) {
+    if (statusEl) statusEl.textContent = error.message || 'Could not start Showcase Mode.';
+    status(`Could not start Showcase Mode: ${error.message || error}`);
+  }
+}
+
+function clearShowcaseMode() {
+  showcaseMode = false;
+  showcaseImage = null;
+  const badge = document.getElementById('showcaseBadge');
+  if (badge) badge.style.display = 'none';
+}
+
 async function analyseGalleryItem(index) {
   const item = galleryAnalysisItems[index];
   if (!item?.src) {
@@ -2073,17 +2223,19 @@ async function analyseGalleryItem(index) {
 async function loadGallery() {
   if (!currentSession) return;
   const grid = document.getElementById('galleryGrid');
+  if (currentSession.showcase) {
+    document.getElementById('galleryTitle').textContent = '🖼️ Gallery — Showcase Mode';
+    document.getElementById('galleryCount').textContent = '0 items';
+    grid.innerHTML = '<div class="gcap-empty">Showcase demo images stay out of the normal student gallery. Use Live Board, AI Board, and AI Analysis to demo this image.</div>';
+    return;
+  }
 
-  // Fetch all sessions for the same subject, plus admin-managed demo images.
-  const [sessionsResult, demosResult] = await Promise.allSettled([
+  // Fetch real class sessions only. Demo images are admin-only Showcase Mode assets.
+  const [sessionsResult] = await Promise.allSettled([
     fetch(`/api/sessions/by-subject/${encodeURIComponent(currentSession.subject)}`),
-    fetch(`/api/demo-images?subject=${encodeURIComponent(currentSession.subject)}`),
   ]);
   const sessions = sessionsResult.status === 'fulfilled' && sessionsResult.value.ok
     ? await sessionsResult.value.json()
-    : [];
-  const demos = demosResult.status === 'fulfilled' && demosResult.value.ok
-    ? await demosResult.value.json()
     : [];
 
   // Flatten all captures with session info, sort newest first
@@ -2108,32 +2260,14 @@ async function loadGallery() {
     }
     return false;
   });
-  const demoEntries = demos.map(demo => ({
-    cap: {
-      id: `demo_${demo.id}`,
-      timestamp: demo.created_at || new Date().toISOString(),
-      topic: demo.caption || 'This is a demo image. Try AI analysis without taking a new snapshot.',
-      capture_type: 'demo',
-      original_file: demo.url,
-      demo_title: demo.title || 'Demo image',
-      is_demo: true,
-    },
-    session: {
-      id: 'demo',
-      subject: demo.subject && demo.subject !== 'All' ? demo.subject : currentSession.subject,
-      teacher: '',
-      locked: false,
-    },
-    demo,
-  }));
-  const visible = [...demoEntries, ...visibleCaptures];
+  const visible = [...visibleCaptures];
 
   const subj = currentSession.subject;
   document.getElementById('galleryTitle').textContent = `🖼️ Gallery — ${subj}`;
   document.getElementById('galleryCount').textContent = `${visible.length} item${visible.length!==1?'s':''}`;
 
   if (!visible.length) {
-    grid.innerHTML = '<div class="gcap-empty">No gallery items yet — snapshots, demo images, and latest auto-refresh images will appear here.</div>';
+    grid.innerHTML = '<div class="gcap-empty">No gallery items yet — snapshots and latest auto-refresh images will appear here.</div>';
     return;
   }
 
@@ -2142,21 +2276,18 @@ async function loadGallery() {
     const when = formatLocalTimestamp(cap.timestamp);
     const origSrc = captureAssetSrc(cap.original_file);
     const secondaryText = _gallerySecondaryText(cap);
-    const titleText = cap.demo_title || `${_capTypeLabel(cap)} · ${session.subject}`;
-    const subjectLine = cap.is_demo
-      ? `${_capTypeLabel(cap)} · ${escapeHtml(cap.demo_title || 'Demo image')}`
-      : `${_capTypeLabel(cap)} · ${escapeHtml(session.subject)}${session.locked?' 🔒':''}`;
+    const titleText = `${_capTypeLabel(cap)} · ${session.subject}`;
+    const subjectLine = `${_capTypeLabel(cap)} · ${escapeHtml(session.subject)}${session.locked?' 🔒':''}`;
     galleryAnalysisItems[index] = {
       src: origSrc,
       title: titleText,
       timestamp: cap.timestamp,
-      isDemo: !!cap.is_demo,
+      isDemo: false,
     };
     return `
     <div class="gcap-card">
-      ${cap.is_demo ? '<div class="gcap-demo-ribbon">DEMO</div>' : `
-        <button class="gcap-del" title="Delete this capture"
-          onclick="deleteCapture('${session.id}','${cap.id}',this)">🗑</button>`}
+      <button class="gcap-del" title="Delete this capture"
+        onclick="deleteCapture('${session.id}','${cap.id}',this)">🗑</button>
       <div class="gcap-thumbs">
         ${origSrc
           ? `<img src="${origSrc}" class="gcap-thumb" title="Click to open Original"
@@ -2888,9 +3019,36 @@ function renderFrozenFrame() {
   cacheFrozenFrame(lastOrigPng);
 }
 
+function renderShowcaseFrame() {
+  if (!showcaseImage) return;
+  resizeCanvas();
+  const cw = mc.width;
+  const ch = mc.height;
+  const iw = showcaseImage.naturalWidth || showcaseImage.width;
+  const ih = showcaseImage.naturalHeight || showcaseImage.height;
+  if (!cw || !ch || !iw || !ih) return;
+  const srcW = iw / zoom;
+  const srcH = ih / zoom;
+  const maxPX = (iw - srcW) / 2;
+  const maxPY = (ih - srcH) / 2;
+  const cpX = Math.max(-maxPX, Math.min(maxPX, panX));
+  const cpY = Math.max(-maxPY, Math.min(maxPY, panY));
+  const scale = Math.min(cw / srcW, ch / srcH);
+  const destW = srcW * scale;
+  const destH = srcH * scale;
+  const destX = (cw - destW) / 2;
+  const destY = (ch - destH) / 2;
+  mCtx.clearRect(0, 0, cw, ch);
+  mCtx.filter = cssFilter();
+  mCtx.drawImage(showcaseImage, iw / 2 - srcW / 2 + cpX, ih / 2 - srcH / 2 + cpY, srcW, srcH, destX, destY, destW, destH);
+  mCtx.filter = 'none';
+}
+
 function refreshOriginalView() {
   resizeCanvas();
-  if (frozen && lastOrigPng) {
+  if (showcaseMode && showcaseImage) {
+    renderShowcaseFrame();
+  } else if (frozen && lastOrigPng) {
     renderFrozenFrame();
   } else if (vid.readyState >= 2) {
     drawFrame();
@@ -3076,7 +3234,7 @@ function startLoop() {
   (function loop(ts = 0) {
     const fps = activePanel ? 12 : (document.fullscreenElement ? 24 : 20);
     const minFrameGap = 1000 / fps;
-    if (!frozen && vid.readyState >= 2 && ts - lastDrawAt >= minFrameGap) {
+    if (!showcaseMode && !frozen && vid.readyState >= 2 && ts - lastDrawAt >= minFrameGap) {
       drawFrame();
       lastDrawAt = ts;
     }
@@ -3129,6 +3287,32 @@ function cssFilter() {
 //  Freeze → trigger Claude
 // ════════════════════════════════════════════════
 function toggleFreeze() {
+  if (showcaseMode) {
+    frozen = !frozen;
+    const btn = document.getElementById('freezeBtn');
+    const badge = document.getElementById('frozenBadge');
+    if (frozen) {
+      btn.textContent = '▶  Resume  [Space]';
+      btn.classList.add('frozen');
+      badge.style.display = 'block';
+      lastBoardSourceAt = lastBoardSourceAt || new Date().toISOString();
+      lastOrigPng = captureCanvasTrimmedPng();
+      cacheFrozenFrame(lastOrigPng);
+      analysisReady = true;
+      _syncAnalyseBtn();
+      status('SHOWCASE — updating AI Board...');
+      updateBoardOnly(lastOrigPng);
+    } else {
+      btn.textContent = '❚❚  Freeze  [Space]';
+      btn.classList.remove('frozen');
+      badge.style.display = 'none';
+      analysisReady = false;
+      _syncAnalyseBtn();
+      renderShowcaseFrame();
+      status('Showcase image live — freeze to run AI again');
+    }
+    return;
+  }
   if (!currentSession || !vid.srcObject) {
     openClassPicker();
     status('Start a class to begin live board capture');
@@ -3232,7 +3416,7 @@ async function runTextAnalysis(options = {}) {
     document.getElementById('analyseBarWrapper').style.display = 'flex';
 
     // Auto-save with analysis
-    if (currentSession) {
+    if (currentSession && !showcaseMode) {
       if (options.saveCapture !== false) autoSaveCapture(analysis, lastSvgString);
       await saveAnalysisHistory(analysis);
     }
@@ -3252,6 +3436,7 @@ function doZoom(dir) {
   if (view === 'orig') {
     zoom = Math.max(1, Math.min(10, Math.round((zoom+dir*0.5)*10)/10));
     syncZUI();
+    if (showcaseMode) renderShowcaseFrame();
   } else if (view === 'board') {
     bZoom = Math.max(0.5, Math.min(8, Math.round((bZoom+dir*0.3)*10)/10));
     updBoardTransform(); syncZUI();
@@ -3260,7 +3445,7 @@ function doZoom(dir) {
 
 function sliderZoom() {
   const v = parseInt(document.getElementById('zoomSlider').value) / 10;
-  if (view === 'orig')  { zoom = v; syncZUI(); }
+  if (view === 'orig')  { zoom = v; syncZUI(); if (showcaseMode) renderShowcaseFrame(); }
   else if (view === 'board') { bZoom = v; updBoardTransform(); syncZUI(); }
 }
 
@@ -3272,8 +3457,10 @@ function syncZUI() {
 
 function doPan(dx, dy) {
   if (view === 'orig') {
-    const step = (vid.videoWidth / zoom) * 0.05;
+    const baseWidth = showcaseMode && showcaseImage ? (showcaseImage.naturalWidth || showcaseImage.width) : vid.videoWidth;
+    const step = ((baseWidth || mc.width) / zoom) * 0.05;
     panX += dx * step; panY += dy * step;
+    if (showcaseMode) renderShowcaseFrame();
   } else if (view === 'board') {
     bPanX -= dx * 40 / bZoom;
     bPanY -= dy * 40 / bZoom;
@@ -3285,6 +3472,7 @@ function resetView() {
   if (view === 'orig')  { zoom=1; panX=0; panY=0; }
   else if (view === 'board') { bZoom=1; bPanX=0; bPanY=0; updBoardTransform(); }
   syncZUI();
+  if (showcaseMode && view === 'orig') renderShowcaseFrame();
 }
 
 function updBoardTransform() {
@@ -3296,10 +3484,13 @@ function updBoardTransform() {
 function oDragStart(e) { oDrag=true; oDX=e.clientX; oDY=e.clientY; mc.classList.add('dragging'); }
 function oDragMove(e) {
   if (!oDrag) return;
-  const srcW=vid.videoWidth/zoom, srcH=vid.videoHeight/zoom;
+  const baseW = showcaseMode && showcaseImage ? (showcaseImage.naturalWidth || showcaseImage.width) : vid.videoWidth;
+  const baseH = showcaseMode && showcaseImage ? (showcaseImage.naturalHeight || showcaseImage.height) : vid.videoHeight;
+  const srcW=(baseW || mc.width)/zoom, srcH=(baseH || mc.height)/zoom;
   const sc=Math.min(mc.width/srcW, mc.height/srcH);
   panX -= (e.clientX-oDX)/sc; panY -= (e.clientY-oDY)/sc;
   oDX=e.clientX; oDY=e.clientY;
+  if (showcaseMode) renderShowcaseFrame();
 }
 function oDragEnd() { oDrag=false; mc.classList.remove('dragging'); }
 function oWheel(e)  { e.preventDefault(); doZoom(e.deltaY<0?1:-1); }
@@ -3359,8 +3550,13 @@ async function doCapture() {
     return;
   }
   if (view === 'gallery') loadGallery();
-  toast('📷 Captured & saved to gallery');
-  status(`📷 Saved to gallery: ${fn}`);
+  if (showcaseMode) {
+    toast('📷 Showcase snapshot captured');
+    status(`📷 Showcase snapshot ready: ${fn}`);
+  } else {
+    toast('📷 Captured & saved to gallery');
+    status(`📷 Saved to gallery: ${fn}`);
+  }
 }
 
 // ════════════════════════════════════════════════

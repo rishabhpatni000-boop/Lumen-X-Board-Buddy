@@ -967,7 +967,7 @@ def api_by_subject(subject):
 
 @app.route("/api/demo-images", methods=["GET"])
 @read_api_limit
-@login_required_api
+@admin_required_api
 def api_demo_images():
     subject = (request.args.get("subject") or "").strip().lower()
     rows = []
@@ -990,7 +990,7 @@ def api_image(filename):
 
 @app.route("/api/demo-images/<path:filename>")
 @read_api_limit
-@login_required_api
+@admin_required_api
 def api_demo_image_file(filename):
     return _serve_stored_file("demo_images", filename)
 

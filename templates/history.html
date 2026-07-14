@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>History - Lumen</title>
+<link rel="icon" type="image/png" href="{{ url_for('static', filename='images/lumen-logo.png') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/brand.css') }}">
 <script type="module">
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
 const supabaseUrl = {{ supabase_url|tojson }};
@@ -49,7 +51,9 @@ body{margin:0;min-height:100vh;background:linear-gradient(160deg,#09121a,#0f1823
 </head>
 <body>
   <div class="topbar">
-    <div class="brand">Lumen</div>
+    <a class="lumen-brand" href="/app" title="Back to Lumen app">
+      <img class="lumen-brand-logo compact" src="{{ url_for('static', filename='images/lumen-logo.png') }}" alt="Lumen logo">
+    </a>
     <div class="chip">{{ current_user.email if current_user else '' }}</div>
     <div class="spacer"></div>
     <button class="btn" onclick="window.location.href='/'">Home</button>
