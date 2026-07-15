@@ -371,6 +371,36 @@ def landing_founder_photo_url():
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
+@app.route("/robots.txt")
+def robots_txt():
+    body = "\n".join([
+        "User-agent: *",
+        "Allow: /",
+        "Disallow: /app",
+        "Disallow: /admin",
+        "Disallow: /api/",
+        "Sitemap: https://lumenboard.org/sitemap.xml",
+        "",
+    ])
+    return Response(body, mimetype="text/plain")
+
+
+@app.route("/sitemap.xml")
+def sitemap_xml():
+    today = datetime.date.today().isoformat()
+    body = f"""<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://lumenboard.org/</loc>
+    <lastmod>{today}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>
+"""
+    return Response(body, mimetype="application/xml")
+
+
 @app.route("/")
 def landing():
     user = current_user()

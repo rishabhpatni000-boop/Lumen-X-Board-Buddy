@@ -3,7 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Lumen</title>
+<title>Lumen Board - AI Visual Assistance for Whiteboards</title>
+<meta name="description" content="Lumen Board helps students capture classroom whiteboards, turn distant writing into clearer digital notes, and review AI-guided explanations.">
+<meta property="og:title" content="Lumen Board - AI Visual Assistance for Whiteboards">
+<meta property="og:description" content="Capture whiteboards, rebuild hard-to-see writing, and understand lessons with guided AI support.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://lumenboard.org/">
+<meta property="og:image" content="https://lumenboard.org/static/images/classroom-hero.png">
+<link rel="canonical" href="https://lumenboard.org/">
 <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/lumen-logo.png') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/brand.css') }}">
 <style>
@@ -182,6 +189,9 @@ a{color:inherit}
   flex-wrap:wrap;
   margin:26px 0 4px;
 }
+.auth-providers{
+  align-items:center;
+}
 .primary-cta,.secondary-cta{
   border:none;
   border-radius:18px;
@@ -209,6 +219,20 @@ a{color:inherit}
   background:#fff8ef;
   color:var(--ink);
   border:1px solid rgba(20,33,47,.12);
+}
+.provider-cta{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+}
+.provider-cta svg{
+  width:18px;
+  height:18px;
+  flex:0 0 auto;
+}
+.provider-cta[data-provider="apple"] svg{
+  fill:currentColor;
 }
 .status-message{
   min-height:24px;
@@ -711,13 +735,43 @@ code{
             Lumen helps students with low vision capture classroom boards, reconstruct the content into something more readable, and understand what happened through guided explanations instead of relying only on fast verbal cues.
           </p>
 
-          <div class="hero-actions">
+          <div class="hero-actions auth-providers">
             <button
               id="googleBtn"
-              class="primary-cta"
+              class="primary-cta provider-cta"
               data-auth-mode="{% if landing_logged_in %}app{% else %}login{% endif %}"
+              data-provider="google"
               {% if not landing_logged_in and not auth_enabled %}disabled{% endif %}
-            >{% if landing_logged_in %}Start{% else %}Log In{% endif %}</button>
+            >
+              {% if landing_logged_in %}
+              Start
+              {% else %}
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285f4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34a853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#fbbc05" d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.84z"/><path fill="#ea4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06L5.84 9.9C6.71 7.3 9.14 5.38 12 5.38z"/></svg>
+              Continue with Google
+              {% endif %}
+            </button>
+            {% if not landing_logged_in %}
+            <button
+              id="microsoftBtn"
+              class="secondary-cta provider-cta"
+              data-auth-mode="login"
+              data-provider="azure"
+              {% if not auth_enabled %}disabled{% endif %}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#f25022" d="M1 1h10.5v10.5H1z"/><path fill="#7fba00" d="M12.5 1H23v10.5H12.5z"/><path fill="#00a4ef" d="M1 12.5h10.5V23H1z"/><path fill="#ffb900" d="M12.5 12.5H23V23H12.5z"/></svg>
+              Microsoft
+            </button>
+            <button
+              id="appleBtn"
+              class="secondary-cta provider-cta"
+              data-auth-mode="login"
+              data-provider="apple"
+              {% if not auth_enabled %}disabled{% endif %}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.37 1.43c0 1.15-.42 2.18-1.25 3.08-.99 1.06-2.07 1.67-3.25 1.57-.14-1.1.43-2.29 1.25-3.13.9-.92 2.43-1.62 3.25-1.52zM20.92 17.33c-.54 1.24-.8 1.79-1.49 2.88-.96 1.47-2.31 3.3-3.98 3.32-1.49.01-1.87-.97-3.89-.96-2.02.01-2.44.98-3.93.97-1.67-.02-2.94-1.67-3.9-3.14-2.66-4.07-2.94-8.85-1.3-11.39 1.16-1.8 3-2.86 4.73-2.86 1.76 0 2.87.98 4.33.98 1.41 0 2.27-.98 4.31-.98 1.54 0 3.18.84 4.33 2.29-3.81 2.09-3.19 7.53.79 8.89z"/></svg>
+              Apple
+            </button>
+            {% endif %}
           </div>
           <p id="status" class="status-message">{% if not landing_logged_in and not auth_enabled %}Supabase Auth is not configured yet. Add the required environment variables to enable login.{% endif %}</p>
         </div>
@@ -887,6 +941,8 @@ code{
     const signInLink = document.getElementById('signInLink');
     const buttons = [
       document.getElementById('googleBtn'),
+      document.getElementById('microsoftBtn'),
+      document.getElementById('appleBtn'),
     ].filter(Boolean);
 
     const goToDashboard = () => {
@@ -925,15 +981,22 @@ code{
       buttons.forEach((button) => button.addEventListener('click', goToDashboard));
     } else if (buttons.length && supabaseUrl && supabaseAnonKey) {
       const supabase = createClient(supabaseUrl, supabaseAnonKey);
-      const signIn = async () => {
-        if (statusEl) statusEl.textContent = 'Redirecting to Google...';
+      const signIn = async (event) => {
+        const button = event.currentTarget;
+        const provider = button.dataset.provider || 'google';
+        const providerLabel = button.textContent.trim() || 'your provider';
+        if (statusEl) statusEl.textContent = `Redirecting to ${providerLabel}...`;
         const redirectTo = `${callbackUrl}?next=${encodeURIComponent(nextUrl || '/app')}`;
+        const options = {
+          redirectTo,
+          queryParams: { prompt: 'select_account' },
+        };
+        if (provider === 'azure') {
+          options.scopes = 'email';
+        }
         const { error } = await supabase.auth.signInWithOAuth({
-          provider: 'google',
-          options: {
-            redirectTo,
-            queryParams: { prompt: 'select_account' },
-          },
+          provider,
+          options,
         });
         if (error && statusEl) {
           statusEl.textContent = error.message;
