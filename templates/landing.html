@@ -231,9 +231,6 @@ a{color:inherit}
   height:18px;
   flex:0 0 auto;
 }
-.provider-cta[data-provider="apple"] svg{
-  fill:currentColor;
-}
 .status-message{
   min-height:24px;
   color:#9a632d;
@@ -750,18 +747,6 @@ code{
               Continue with Google
               {% endif %}
             </button>
-            {% if not landing_logged_in %}
-            <button
-              id="appleBtn"
-              class="secondary-cta provider-cta"
-              data-auth-mode="login"
-              data-provider="apple"
-              {% if not auth_enabled %}disabled{% endif %}
-            >
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.37 1.43c0 1.15-.42 2.18-1.25 3.08-.99 1.06-2.07 1.67-3.25 1.57-.14-1.1.43-2.29 1.25-3.13.9-.92 2.43-1.62 3.25-1.52zM20.92 17.33c-.54 1.24-.8 1.79-1.49 2.88-.96 1.47-2.31 3.3-3.98 3.32-1.49.01-1.87-.97-3.89-.96-2.02.01-2.44.98-3.93.97-1.67-.02-2.94-1.67-3.9-3.14-2.66-4.07-2.94-8.85-1.3-11.39 1.16-1.8 3-2.86 4.73-2.86 1.76 0 2.87.98 4.33.98 1.41 0 2.27-.98 4.31-.98 1.54 0 3.18.84 4.33 2.29-3.81 2.09-3.19 7.53.79 8.89z"/></svg>
-              Apple
-            </button>
-            {% endif %}
           </div>
           <p id="status" class="status-message">{% if not landing_logged_in and not auth_enabled %}Supabase Auth is not configured yet. Add the required environment variables to enable login.{% endif %}</p>
         </div>
@@ -931,7 +916,6 @@ code{
     const signInLink = document.getElementById('signInLink');
     const buttons = [
       document.getElementById('googleBtn'),
-      document.getElementById('appleBtn'),
     ].filter(Boolean);
 
     const goToDashboard = () => {
@@ -970,18 +954,15 @@ code{
       buttons.forEach((button) => button.addEventListener('click', goToDashboard));
     } else if (buttons.length && supabaseUrl && supabaseAnonKey) {
       const supabase = createClient(supabaseUrl, supabaseAnonKey);
-      const signIn = async (event) => {
-        const button = event.currentTarget;
-        const provider = button.dataset.provider || 'google';
-        const providerLabel = button.textContent.trim() || 'your provider';
-        if (statusEl) statusEl.textContent = `Redirecting to ${providerLabel}...`;
+      const signIn = async () => {
+        if (statusEl) statusEl.textContent = 'Redirecting to Google...';
         const redirectTo = `${callbackUrl}?next=${encodeURIComponent(nextUrl || '/app')}`;
         const options = {
           redirectTo,
           queryParams: { prompt: 'select_account' },
         };
         const { error } = await supabase.auth.signInWithOAuth({
-          provider,
+          provider: 'google',
           options,
         });
         if (error && statusEl) {
