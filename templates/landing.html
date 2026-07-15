@@ -752,16 +752,6 @@ code{
             </button>
             {% if not landing_logged_in %}
             <button
-              id="microsoftBtn"
-              class="secondary-cta provider-cta"
-              data-auth-mode="login"
-              data-provider="azure"
-              {% if not auth_enabled %}disabled{% endif %}
-            >
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#f25022" d="M1 1h10.5v10.5H1z"/><path fill="#7fba00" d="M12.5 1H23v10.5H12.5z"/><path fill="#00a4ef" d="M1 12.5h10.5V23H1z"/><path fill="#ffb900" d="M12.5 12.5H23V23H12.5z"/></svg>
-              Microsoft
-            </button>
-            <button
               id="appleBtn"
               class="secondary-cta provider-cta"
               data-auth-mode="login"
@@ -941,7 +931,6 @@ code{
     const signInLink = document.getElementById('signInLink');
     const buttons = [
       document.getElementById('googleBtn'),
-      document.getElementById('microsoftBtn'),
       document.getElementById('appleBtn'),
     ].filter(Boolean);
 
@@ -991,9 +980,6 @@ code{
           redirectTo,
           queryParams: { prompt: 'select_account' },
         };
-        if (provider === 'azure') {
-          options.scopes = 'email';
-        }
         const { error } = await supabase.auth.signInWithOAuth({
           provider,
           options,
