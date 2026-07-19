@@ -53,6 +53,8 @@ textarea{min-height:92px;resize:vertical}
 .demo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;margin-top:16px}
 .demo-tile{background:#0b141d;border:1px solid rgba(126,157,194,.14);border-radius:18px;overflow:hidden}
 .demo-tile img{width:100%;height:150px;object-fit:contain;background:#172331;display:block}
+.demo-tile.image-error img{padding:20px;color:#eda8b7;font-size:12px}
+.demo-tile.image-error{border-color:rgba(237,168,183,.55)}
 .demo-tile-body{padding:12px}
 .demo-title-row{display:flex;gap:8px;align-items:flex-start;justify-content:space-between}
 .demo-title-row strong{font-size:15px}
@@ -345,7 +347,7 @@ textarea{min-height:92px;resize:vertical}
       }
       grid.innerHTML = demos.map(item => `
         <article class="demo-tile">
-          <img src="${escapeHtml(item.url)}" alt="${escapeHtml(item.title)}">
+          <img src="${escapeHtml(item.url)}?v=${encodeURIComponent(item.updated_at || item.created_at || item.id)}" alt="${escapeHtml(item.title)}" onerror="this.closest('.demo-tile').classList.add('image-error'); this.alt='Demo image could not be loaded';">
           <div class="demo-tile-body">
             <div class="demo-title-row">
               <strong>${escapeHtml(item.title)}</strong>
@@ -363,14 +365,13 @@ textarea{min-height:92px;resize:vertical}
     }
 
     async function loadDemoImages() {
-      const resp = await fetch('/api/admin/demo-images');
+      const resp = await fetch(`/api/admin/demo-images?_=${Date.now()}`, {cache: 'no-store'});
       const data = await resp.json();
       if (!resp.ok) {
         document.getElementById('demoStatus').textContent = data.details || data.error || 'Could not load demo images.';
         return;
       }
       adminState.demos = data;
-      document.getElementById('demoStatus').textContent = '';
       renderDemoImages();
     }
 
@@ -403,8 +404,19 @@ textarea{min-height:92px;resize:vertical}
       document.getElementById('demoTitle').value = '';
       document.getElementById('demoCaption').value = '';
       document.getElementById('demoSubject').value = 'All';
+      adminState.demos = [data, ...(adminState.demos || []).filter(item => item.id !== data.id)];
+      renderDemoImages();
       document.getElementById('demoStatus').textContent = 'Demo image uploaded.';
-      await loadDemoImages();
+      // Refresh in the background, but keep the confirmed upload visible and
+      // preserve the success message even if an intermediary cached an old list.
+      try {
+        const refreshResp = await fetch(`/api/admin/demo-images?_=${Date.now()}`, {cache: 'no-store'});
+        const refreshed = await refreshResp.json();
+        if (refreshResp.ok && Array.isArray(refreshed)) {
+          adminState.demos = refreshed;
+          renderDemoImages();
+        }
+      } catch (_) {}
     }
 
     async function toggleDemoImage(id, active) {

@@ -184,6 +184,14 @@ def _demo_image_payload(row: dict) -> dict:
     }
 
 
+def _no_store_json(payload, status: int = 200):
+    response = jsonify(payload)
+    response.status_code = status
+    response.headers["Cache-Control"] = "no-store, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    return response
+
+
 def _use_supabase_session_store() -> bool:
     cfg = supabase_config()
     return bool(cfg["url"] and cfg["anon_key"] and current_user())
@@ -1014,7 +1022,7 @@ def api_demo_images():
             continue
         rows.append(_demo_image_payload(row))
     rows.sort(key=lambda item: item.get("created_at") or "", reverse=True)
-    return jsonify(rows)
+    return _no_store_json(rows)
 
 
 @app.route("/api/images/<path:filename>")
@@ -1235,7 +1243,7 @@ def api_admin_demo_images():
     try:
         rows = [_demo_image_payload(row) for row in _load_demo_images()]
         rows.sort(key=lambda item: item.get("created_at") or "", reverse=True)
-        return jsonify(rows)
+        return _no_store_json(rows)
     except Exception as e:
         log_warning(SECURITY["logger"], "admin_demo_images_list_failed", error=str(e))
         return jsonify({"error": "Could not load demo images", "details": _storage_error_details(e)}), 500
@@ -1255,6 +1263,10 @@ def api_admin_create_demo_image():
     image_id = uuid.uuid4().hex
     try:
         stored = STORAGE.save_data_url(image_data, "demo_images", f"demo_{image_id}.png")
+        # Do not report success unless the same read path used by the browser can
+        # retrieve the object. This catches incomplete remote-storage writes.
+        if STORAGE.read_file("demo_images", stored.filename) is None:
+            raise StorageUnavailable("The demo image was not readable after upload. Please try again.")
         row = {
             "id": image_id,
             "title": (data.get("title") or "Demo image").strip()[:120] or "Demo image",
@@ -1269,7 +1281,7 @@ def api_admin_create_demo_image():
         rows = _load_demo_images()
         rows.append(row)
         _save_demo_images(rows)
-        return jsonify(_demo_image_payload(row))
+        return _no_store_json(_demo_image_payload(row))
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     except Exception as e:

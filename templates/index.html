@@ -2117,7 +2117,7 @@ async function loadShowcaseImages() {
   if (!statusEl || !select) return;
   statusEl.textContent = 'Loading demo images...';
   try {
-    const resp = await fetch('/api/demo-images');
+    const resp = await fetch(`/api/demo-images?_=${Date.now()}`, {cache: 'no-store'});
     const data = await resp.json().catch(() => ({error: 'Server returned an unreadable response'}));
     if (!resp.ok) throw new Error(data.details || data.error || 'Could not load demo images.');
     showcaseItems = Array.isArray(data) ? data : [];
@@ -2148,7 +2148,9 @@ async function startShowcaseMode() {
   }
   try {
     if (statusEl) statusEl.textContent = 'Starting Showcase Mode...';
-    const dataUrl = await imageSrcToDataUrl(item.url);
+    const separator = item.url.includes('?') ? '&' : '?';
+    const imageUrl = `${item.url}${separator}v=${encodeURIComponent(item.updated_at || item.created_at || item.id || Date.now())}`;
+    const dataUrl = await imageSrcToDataUrl(imageUrl);
     const img = await loadImageElement(dataUrl);
     showcaseMode = true;
     stopAutoFreeze();
