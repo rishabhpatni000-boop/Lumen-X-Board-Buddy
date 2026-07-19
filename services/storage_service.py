@@ -240,13 +240,18 @@ class StorageService:
         self._ensure_bucket()
         object_path = quote(self._object_path(folder, filename), safe="/")
         bucket = quote(self.storage_bucket, safe="")
+        # JSON files are mutable indexes (for example demo_images.json). Supabase
+        # Storage/CDN can otherwise return the previous object immediately after
+        # an upsert, making a newly uploaded image briefly appear and disappear.
+        cache_buster = f"?cb={time.time_ns()}" if filename.lower().endswith(".json") else ""
         paths = [
             f"{self.supabase_url}/storage/v1/object/authenticated/{bucket}/{object_path}",
             f"{self.supabase_url}/storage/v1/object/{bucket}/{object_path}",
         ]
         last_resp = None
         for url in paths:
-            resp = requests.get(url, headers=self._remote_headers(), timeout=30)
+            headers = {**self._remote_headers(), "Cache-Control": "no-cache"}
+            resp = requests.get(f"{url}{cache_buster}", headers=headers, timeout=30)
             if resp.status_code == 200:
                 return resp.content, resp.headers.get("Content-Type") or "application/octet-stream"
             if resp.status_code == 404:

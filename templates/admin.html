@@ -407,16 +407,6 @@ textarea{min-height:92px;resize:vertical}
       adminState.demos = [data, ...(adminState.demos || []).filter(item => item.id !== data.id)];
       renderDemoImages();
       document.getElementById('demoStatus').textContent = 'Demo image uploaded.';
-      // Refresh in the background, but keep the confirmed upload visible and
-      // preserve the success message even if an intermediary cached an old list.
-      try {
-        const refreshResp = await fetch(`/api/admin/demo-images?_=${Date.now()}`, {cache: 'no-store'});
-        const refreshed = await refreshResp.json();
-        if (refreshResp.ok && Array.isArray(refreshed)) {
-          adminState.demos = refreshed;
-          renderDemoImages();
-        }
-      } catch (_) {}
     }
 
     async function toggleDemoImage(id, active) {
