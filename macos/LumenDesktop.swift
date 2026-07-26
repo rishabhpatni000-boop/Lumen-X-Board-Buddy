@@ -2,7 +2,7 @@ import AppKit
 import WebKit
 import Carbon.HIToolbox
 
-private let lumenAppURL = URL(string: "https://lumenboard.org/app")!
+private let lumenAppURL = URL(string: "https://lumenboard.org/desktop")!
 private let lumenCallbackOrigin = URL(string: "https://lumenboard.org/auth/callback")!
 
 final class LumenWindowController: NSWindowController, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
@@ -21,6 +21,7 @@ final class LumenWindowController: NSWindowController, WKNavigationDelegate, WKU
         )
 
         webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.customUserAgent = "LumenDesktop/1.1 (macOS)"
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1240, height: 820),
             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],

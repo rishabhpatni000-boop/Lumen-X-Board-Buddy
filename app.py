@@ -70,6 +70,7 @@ configure_supabase(app)
 
 @app.context_processor
 def app_store_links():
+    is_desktop_app = "LumenDesktop/" in request.headers.get("User-Agent", "")
     return {
         "app_store_url": os.getenv("LUMEN_APP_STORE_URL", "").strip(),
         "play_store_url": os.getenv("LUMEN_PLAY_STORE_URL", "").strip(),
@@ -77,6 +78,7 @@ def app_store_links():
             "LUMEN_MAC_DOWNLOAD_URL",
             "/static/downloads/Lumen-macOS.zip",
         ).strip(),
+        "is_desktop_app": is_desktop_app,
     }
 
 @app.after_request
@@ -430,6 +432,8 @@ def sitemap_xml():
 
 @app.route("/")
 def landing():
+    if "LumenDesktop/" in request.headers.get("User-Agent", ""):
+        return redirect(url_for("desktop_landing", next=safe_next_url(request.args.get("next"))))
     user = current_user()
     next_url = safe_next_url(request.args.get("next"))
     return render_template(
@@ -439,6 +443,16 @@ def landing():
         founder_video_url=landing_founder_video_url(),
         landing_logged_in=bool(user),
         landing_user=user,
+        **template_auth_context("auth_callback", next_url=next_url),
+    )
+
+@app.route("/desktop")
+def desktop_landing():
+    next_url = safe_next_url(request.args.get("next"))
+    if current_user():
+        return redirect(next_url)
+    return render_template(
+        "desktop_landing.html",
         **template_auth_context("auth_callback", next_url=next_url),
     )
 

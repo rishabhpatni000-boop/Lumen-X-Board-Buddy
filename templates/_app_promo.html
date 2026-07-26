@@ -1,3 +1,4 @@
+{% if not is_desktop_app %}
 <aside id="lumenAppPromo" class="lumen-app-promo" aria-label="Get the Lumen app" hidden>
   <button class="lumen-app-promo-close" type="button" aria-label="Dismiss app promotion">×</button>
   <img src="{{ url_for('static', filename='images/lumen-logo.png') }}" alt="" aria-hidden="true">
@@ -65,3 +66,4 @@
   });
 })();
 </script>
+{% endif %}
