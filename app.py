@@ -68,6 +68,17 @@ app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 app.config["TEMPLATES_AUTO_RELOAD"] = True
 configure_supabase(app)
 
+@app.context_processor
+def app_store_links():
+    return {
+        "app_store_url": os.getenv("LUMEN_APP_STORE_URL", "").strip(),
+        "play_store_url": os.getenv("LUMEN_PLAY_STORE_URL", "").strip(),
+        "mac_download_url": os.getenv(
+            "LUMEN_MAC_DOWNLOAD_URL",
+            "/static/downloads/Lumen-macOS.zip",
+        ).strip(),
+    }
+
 @app.after_request
 def no_cache(response):
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"

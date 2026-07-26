@@ -22,3 +22,14 @@ __pycache__/
 *.pyc
 cert.pem
 key.pem
+
+# Native app build products and dependencies
+node_modules/
+ios/App/Pods/
+ios/App/DerivedData/
+android/.gradle/
+android/local.properties
+android/**/build/
+*.keystore
+*.jks
+dist/

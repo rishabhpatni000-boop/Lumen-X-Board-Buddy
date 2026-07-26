@@ -52,3 +52,9 @@ bash run.sh
 ## Raspberry Pi
 
 See [README_PI.md](/Users/rishabhpatni/Downloads/Lumen/README_PI.md) for the Pi-specific setup flow.
+
+## Native apps
+
+Lumen includes Capacitor projects for iPhone, iPad, Mac Catalyst, and Android.
+See [MOBILE_APPS.md](MOBILE_APPS.md) for configuration, building, signing, and
+store-submission instructions.

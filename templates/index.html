@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Lumen</title>
 <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/lumen-logo.png') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/brand.css') }}">
@@ -4005,5 +4006,6 @@ if (navigator.mediaDevices?.addEventListener) {
 window.addEventListener('beforeunload', () => stopCamera({clearCanvas: false}));
 openClassPicker();
 </script>
+{% include "_app_promo.html" %}
 </body>
 </html>

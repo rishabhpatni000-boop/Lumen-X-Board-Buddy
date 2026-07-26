@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Lumen Board - AI Visual Assistance for Whiteboards</title>
 <meta name="description" content="Lumen Board helps students capture classroom whiteboards, turn distant writing into clearer digital notes, and review AI-guided explanations.">
 <meta property="og:title" content="Lumen Board - AI Visual Assistance for Whiteboards">
@@ -1015,6 +1015,31 @@ code{
     const buttons = [
       document.getElementById('googleBtn'),
     ].filter(Boolean);
+    const capacitor = window.Capacitor;
+    const isLumenDesktop = Boolean(window.LumenDesktop && window.webkit?.messageHandlers?.lumenOpenExternal);
+    const isNativeApp = Boolean(capacitor?.isNativePlatform?.() || isLumenDesktop);
+    const desktopBrowser = isLumenDesktop ? {
+      open: async ({ url }) => window.webkit.messageHandlers.lumenOpenExternal.postMessage(url),
+      close: async () => {},
+    } : null;
+    const nativeBrowser = capacitor?.Plugins?.Browser || desktopBrowser;
+    const nativeApp = capacitor?.Plugins?.App;
+
+    // Native OAuth runs in the system browser. Google intentionally rejects
+    // sign-in attempts made inside embedded webviews.
+    if (isNativeApp && nativeApp?.addListener) {
+      nativeApp.addListener('appUrlOpen', async ({ url }) => {
+        if (!url?.startsWith('org.lumenboard.app://auth/callback')) return;
+        try {
+          await nativeBrowser?.close?.();
+        } catch (error) {}
+        const deepLink = new URL(url);
+        const callback = new URL('/auth/callback', window.location.origin);
+        deepLink.searchParams.forEach((value, key) => callback.searchParams.set(key, value));
+        if (!callback.searchParams.has('next')) callback.searchParams.set('next', nextUrl || '/app');
+        window.location.href = callback.toString();
+      });
+    }
 
     const goToDashboard = () => {
       window.location.href = nextUrl || '/app';
@@ -1054,21 +1079,27 @@ code{
       const supabase = createClient(supabaseUrl, supabaseAnonKey);
       const signIn = async () => {
         if (statusEl) statusEl.textContent = 'Redirecting to Google...';
-        const redirectTo = `${callbackUrl}?next=${encodeURIComponent(nextUrl || '/app')}`;
+        const redirectTo = isNativeApp
+          ? `org.lumenboard.app://auth/callback?next=${encodeURIComponent(nextUrl || '/app')}`
+          : `${callbackUrl}?next=${encodeURIComponent(nextUrl || '/app')}`;
         const options = {
           redirectTo,
           queryParams: { prompt: 'select_account' },
+          skipBrowserRedirect: isNativeApp,
         };
-        const { error } = await supabase.auth.signInWithOAuth({
+        const { data, error } = await supabase.auth.signInWithOAuth({
           provider: 'google',
           options,
         });
         if (error && statusEl) {
           statusEl.textContent = error.message;
+        } else if (isNativeApp && data?.url && nativeBrowser?.open) {
+          await nativeBrowser.open({ url: data.url, presentationStyle: 'popover' });
         }
       };
       buttons.forEach((button) => button.addEventListener('click', signIn));
     }
   </script>
+  {% include "_app_promo.html" %}
 </body>
 </html>

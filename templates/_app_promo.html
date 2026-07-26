@@ -1,0 +1,67 @@
+<aside id="lumenAppPromo" class="lumen-app-promo" aria-label="Get the Lumen app" hidden>
+  <button class="lumen-app-promo-close" type="button" aria-label="Dismiss app promotion">×</button>
+  <img src="{{ url_for('static', filename='images/lumen-logo.png') }}" alt="" aria-hidden="true">
+  <div class="lumen-app-promo-copy">
+    <strong>Take Lumen with you</strong>
+    <span>Use the app for quicker camera access and a better classroom experience.</span>
+  </div>
+  <div class="lumen-app-promo-actions">
+    {% if mac_download_url %}
+    <a class="lumen-app-store-link" href="{{ mac_download_url }}" download>Download for Mac</a>
+    {% endif %}
+    {% if app_store_url %}
+    <a class="lumen-app-store-link lumen-app-store-apple" href="{{ app_store_url }}" target="_blank" rel="noopener">Download for Apple</a>
+    {% else %}
+    <span class="lumen-app-store-link is-coming-soon">Apple app coming soon</span>
+    {% endif %}
+    {% if play_store_url %}
+    <a class="lumen-app-store-link lumen-app-store-google" href="{{ play_store_url }}" target="_blank" rel="noopener">Get it on Google Play</a>
+    {% else %}
+    <span class="lumen-app-store-link is-coming-soon">Android app coming soon</span>
+    {% endif %}
+  </div>
+</aside>
+
+<style>
+.lumen-app-promo[hidden]{display:none!important}
+.lumen-app-promo{position:fixed;z-index:10000;left:50%;bottom:max(18px,env(safe-area-inset-bottom));
+  transform:translateX(-50%);width:min(760px,calc(100vw - 28px));display:flex;align-items:center;gap:14px;
+  padding:14px 46px 14px 16px;border:1px solid rgba(20,33,47,.16);border-radius:20px;
+  background:rgba(255,250,243,.97);color:#14212f;box-shadow:0 22px 70px rgba(20,33,47,.24);
+  backdrop-filter:blur(18px);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.lumen-app-promo>img{width:52px;height:52px;object-fit:contain;border-radius:13px;background:#fff;flex:0 0 auto}
+.lumen-app-promo-copy{min-width:0;flex:1;display:flex;flex-direction:column;gap:4px}
+.lumen-app-promo-copy strong{font-size:16px;line-height:1.2}
+.lumen-app-promo-copy span{font-size:13px;line-height:1.4;color:#506172}
+.lumen-app-promo-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.lumen-app-store-link{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:0 13px;
+  border-radius:11px;background:#14212f;color:#fff!important;text-decoration:none!important;font-size:12px;font-weight:700;
+  white-space:nowrap;border:1px solid #14212f}
+.lumen-app-store-link:hover{background:#27465a}
+.lumen-app-store-link.is-coming-soon{background:#eee7dc;color:#66717b!important;border-color:rgba(20,33,47,.12)}
+.lumen-app-promo-close{position:absolute;right:10px;top:8px;width:30px;height:30px;border:0;border-radius:50%;
+  background:transparent;color:#506172;font-size:24px;line-height:1;cursor:pointer}
+.lumen-app-promo-close:hover{background:rgba(20,33,47,.08);color:#14212f}
+@media(max-width:680px){
+  .lumen-app-promo{align-items:flex-start;flex-wrap:wrap;padding:14px 42px 14px 14px}
+  .lumen-app-promo>img{width:46px;height:46px}
+  .lumen-app-promo-copy{flex-basis:calc(100% - 64px)}
+  .lumen-app-promo-actions{width:100%;justify-content:stretch}
+  .lumen-app-store-link{flex:1}
+}
+</style>
+
+<script>
+(() => {
+  const promo = document.getElementById('lumenAppPromo');
+  if (!promo || window.Capacitor?.isNativePlatform?.()) return;
+  const dismissedAt = Number(localStorage.getItem('lumen-app-promo-dismissed-at') || 0);
+  const sevenDays = 7 * 24 * 60 * 60 * 1000;
+  if (Date.now() - dismissedAt < sevenDays) return;
+  window.setTimeout(() => { promo.hidden = false; }, 900);
+  promo.querySelector('.lumen-app-promo-close')?.addEventListener('click', () => {
+    promo.hidden = true;
+    localStorage.setItem('lumen-app-promo-dismissed-at', String(Date.now()));
+  });
+})();
+</script>

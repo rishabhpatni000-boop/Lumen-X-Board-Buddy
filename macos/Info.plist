@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleDevelopmentRegion</key>
+  <string>en</string>
+  <key>CFBundleDisplayName</key>
+  <string>Lumen</string>
+  <key>CFBundleExecutable</key>
+  <string>Lumen</string>
+  <key>CFBundleIconFile</key>
+  <string>Lumen.icns</string>
+  <key>CFBundleIdentifier</key>
+  <string>org.lumenboard.app</string>
+  <key>CFBundleInfoDictionaryVersion</key>
+  <string>6.0</string>
+  <key>CFBundleName</key>
+  <string>Lumen</string>
+  <key>CFBundlePackageType</key>
+  <string>APPL</string>
+  <key>CFBundleShortVersionString</key>
+  <string>1.0.0</string>
+  <key>CFBundleVersion</key>
+  <string>1</string>
+  <key>CFBundleURLTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleURLName</key>
+      <string>org.lumenboard.app</string>
+      <key>CFBundleURLSchemes</key>
+      <array>
+        <string>org.lumenboard.app</string>
+      </array>
+    </dict>
+  </array>
+  <key>LSApplicationCategoryType</key>
+  <string>public.app-category.education</string>
+  <key>LSMinimumSystemVersion</key>
+  <string>12.0</string>
+  <key>NSCameraUsageDescription</key>
+  <string>Lumen uses the camera to capture classroom whiteboards for accessible viewing and analysis.</string>
+  <key>NSHighResolutionCapable</key>
+  <true/>
+  <key>NSPrincipalClass</key>
+  <string>NSApplication</string>
+</dict>
+</plist>
