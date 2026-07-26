@@ -91,7 +91,9 @@ button.addEventListener('click', async () => {
   status.textContent = 'Opening Google sign-in…';
   try {
     const supabase = createClient(supabaseUrl, supabaseAnonKey);
-    const redirectTo = `org.lumenboard.app://auth/callback?next=${encodeURIComponent(nextUrl || '/app')}`;
+    // Keep this an exact match for the Supabase redirect allowlist. The native
+    // callback handler supplies /app as the destination after token exchange.
+    const redirectTo = 'org.lumenboard.app://auth/callback';
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {

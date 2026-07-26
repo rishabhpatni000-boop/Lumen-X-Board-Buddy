@@ -1080,7 +1080,7 @@ code{
       const signIn = async () => {
         if (statusEl) statusEl.textContent = 'Redirecting to Google...';
         const redirectTo = isNativeApp
-          ? `org.lumenboard.app://auth/callback?next=${encodeURIComponent(nextUrl || '/app')}`
+          ? 'org.lumenboard.app://auth/callback'
           : `${callbackUrl}?next=${encodeURIComponent(nextUrl || '/app')}`;
         const options = {
           redirectTo,

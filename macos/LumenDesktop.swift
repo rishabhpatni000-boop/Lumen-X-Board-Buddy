@@ -104,7 +104,6 @@ final class LumenAppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         windowController = LumenWindowController()
         windowController?.showWindow(nil)
-        windowController?.start()
 
         NSAppleEventManager.shared().setEventHandler(
             self,
@@ -112,6 +111,7 @@ final class LumenAppDelegate: NSObject, NSApplicationDelegate {
             forEventClass: AEEventClass(kInternetEventClass),
             andEventID: AEEventID(kAEGetURL)
         )
+        windowController?.start()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
