@@ -119,6 +119,14 @@ def landing_founder_photo_url():
             return url_for("static", filename=f"images/{filename}")
     return None
 
+
+def landing_founder_video_url():
+    for filename in ("founder-message.mp4", "founder-message.webm"):
+        video_path = os.path.join(app.root_path, "static", "videos", filename)
+        if os.path.exists(video_path):
+            return url_for("static", filename=f"videos/{filename}")
+    return None
+
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 @app.route("/")
@@ -129,6 +137,7 @@ def landing():
         "landing.html",
         claude_available=CLAUDE_AVAILABLE,
         founder_photo_url=landing_founder_photo_url(),
+        founder_video_url=landing_founder_video_url(),
         landing_logged_in=bool(user),
         landing_user=user,
         **template_auth_context("auth_callback", next_url=next_url),

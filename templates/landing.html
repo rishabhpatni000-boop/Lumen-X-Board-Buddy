@@ -462,7 +462,7 @@ a{color:inherit}
   border-radius:26px;
   overflow:hidden;
   background:#d7c6b0;
-  aspect-ratio:4 / 5.1;
+  aspect-ratio:4 / 4.45;
   display:flex;
   align-items:center;
   justify-content:center;
@@ -542,6 +542,75 @@ a{color:inherit}
   letter-spacing:.1em;
   text-transform:uppercase;
   color:var(--accent);
+}
+.founder-video-card{
+  margin-top:26px;
+  padding:18px;
+  border-radius:30px;
+  color:#f7fbff;
+  background:linear-gradient(160deg,#173849,#214a60 58%,#275d72);
+  box-shadow:0 24px 52px rgba(25,53,69,.2);
+}
+.founder-video-heading{
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:20px;
+  padding:4px 4px 16px;
+}
+.founder-video-heading h3{
+  margin-top:5px;
+  font-size:25px;
+}
+.founder-video-heading p{
+  max-width:48ch;
+  color:rgba(247,251,255,.78);
+  line-height:1.6;
+}
+.founder-video-frame{
+  aspect-ratio:16 / 9;
+  overflow:hidden;
+  position:relative;
+  border-radius:22px;
+  background:#0e2633;
+}
+.founder-video-frame video{
+  width:100%;
+  height:100%;
+  display:block;
+  object-fit:cover;
+}
+.founder-video-placeholder{
+  width:100%;
+  height:100%;
+  display:grid;
+  place-items:center;
+  text-align:center;
+  padding:24px;
+  background:
+    radial-gradient(circle at 50% 42%,rgba(223,143,71,.24),transparent 20%),
+    linear-gradient(145deg,#102d3d,#1e5268);
+}
+.founder-video-placeholder span{
+  width:76px;
+  height:76px;
+  display:grid;
+  place-items:center;
+  margin:0 auto 14px;
+  border-radius:50%;
+  color:#173849;
+  background:#fff8ef;
+  font-family:"Trebuchet MS",sans-serif;
+  font-size:28px;
+  box-shadow:0 14px 34px rgba(0,0,0,.2);
+}
+.founder-video-placeholder strong{
+  display:block;
+  margin-bottom:7px;
+  font-size:22px;
+}
+.founder-video-placeholder p{
+  color:rgba(247,251,255,.72);
 }
 .visual-grid{
   display:grid;
@@ -697,6 +766,9 @@ code{
   .visual-row{grid-template-columns:1fr}
   .comparison-notes{grid-template-columns:1fr}
   .portrait-frame,.portrait-placeholder{min-height:300px}
+  .founder-video-heading{align-items:flex-start;flex-direction:column}
+  .founder-video-card{padding:12px;border-radius:24px}
+  .founder-video-frame{border-radius:17px}
   .navlinks{width:100%}
   .navlinks a{flex:1;text-align:center}
 }
@@ -899,6 +971,32 @@ code{
             </div>
           </article>
         </div>
+
+        <section class="founder-video-card" aria-labelledby="founder-video-title">
+          <div class="founder-video-heading">
+            <div>
+              <div class="eyebrow">In his own words</div>
+              <h3 id="founder-video-title">Hear from the founder</h3>
+            </div>
+            <p>Rishabh shares the classroom experience that inspired Lumen and the difference he hopes it can make for students.</p>
+          </div>
+          <div class="founder-video-frame">
+            {% if founder_video_url %}
+            <video controls playsinline preload="metadata" poster="{{ founder_photo_url or '' }}">
+              <source src="{{ founder_video_url }}">
+              Your browser does not support embedded video.
+            </video>
+            {% else %}
+            <div class="founder-video-placeholder">
+              <div>
+                <span aria-hidden="true">▶</span>
+                <strong>Founder message coming soon</strong>
+                <p>A personal introduction to Lumen from Rishabh Patni.</p>
+              </div>
+            </div>
+            {% endif %}
+          </div>
+        </section>
       </div>
     </section>
 
