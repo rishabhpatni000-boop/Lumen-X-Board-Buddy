@@ -53,7 +53,9 @@ final class LumenWindowController: NSWindowController, WKNavigationDelegate, WKU
               deepLink.host == "auth",
               deepLink.path == "/callback" else { return }
         var components = URLComponents(url: lumenCallbackOrigin, resolvingAgainstBaseURL: false)!
-        components.queryItems = URLComponents(url: deepLink, resolvingAgainstBaseURL: false)?.queryItems
+        let deepLinkComponents = URLComponents(url: deepLink, resolvingAgainstBaseURL: false)
+        components.queryItems = deepLinkComponents?.queryItems
+        components.fragment = deepLinkComponents?.fragment
         if let callback = components.url {
             window?.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
