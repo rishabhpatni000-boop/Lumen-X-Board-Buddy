@@ -1077,6 +1077,34 @@ code{
       buttons.forEach((button) => button.addEventListener('click', goToDashboard));
     } else if (buttons.length && supabaseUrl && supabaseAnonKey) {
       const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+      // A valid Supabase session can outlive Lumen's server cookie (for
+      // example after a deployment or on the first OAuth callback). Restore
+      // the server session silently so returning users stay signed in.
+      const restoreServerSession = async () => {
+        try {
+          const { data, error } = await supabase.auth.getSession();
+          if (error || !data.session?.access_token) return false;
+          if (statusEl) statusEl.textContent = 'Restoring your session...';
+          const response = await fetch('/auth/session', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+              access_token: data.session.access_token,
+              next: nextUrl || '/app',
+            }),
+          });
+          const payload = await response.json();
+          if (!response.ok || !payload.ok) return false;
+          window.location.replace(payload.redirect_to || '/app');
+          return true;
+        } catch (error) {
+          return false;
+        }
+      };
+
+      restoreServerSession();
+
       const signIn = async () => {
         if (statusEl) statusEl.textContent = 'Redirecting to Google...';
         const redirectTo = isNativeApp

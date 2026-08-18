@@ -25,11 +25,12 @@ class QuotaExceeded(Exception):
 
 class QuotaService:
     ADMIN_UNLIMITED = 10**9
+    DEFAULT_UNLIMITED = 10**9
 
     def __init__(self):
-        self.daily_analyses_limit = int(os.getenv("DAILY_ANALYSES_LIMIT", "20"))
-        self.monthly_analyses_limit = int(os.getenv("MONTHLY_ANALYSES_LIMIT", "200"))
-        self.daily_upload_limit = int(os.getenv("DAILY_UPLOAD_LIMIT", "30"))
+        self.daily_analyses_limit = int(os.getenv("DAILY_ANALYSES_LIMIT", str(self.DEFAULT_UNLIMITED)))
+        self.monthly_analyses_limit = int(os.getenv("MONTHLY_ANALYSES_LIMIT", str(self.DEFAULT_UNLIMITED)))
+        self.daily_upload_limit = int(os.getenv("DAILY_UPLOAD_LIMIT", str(self.DEFAULT_UNLIMITED)))
 
     def _headers(self):
         cfg = supabase_config()

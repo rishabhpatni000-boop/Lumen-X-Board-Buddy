@@ -22,11 +22,11 @@ services:
       - key: MAX_REQUEST_BYTES
         value: "8388608"
       - key: DAILY_ANALYSES_LIMIT
-        value: "20"
+        value: "1000000000"
       - key: MONTHLY_ANALYSES_LIMIT
-        value: "200"
+        value: "1000000000"
       - key: DAILY_UPLOAD_LIMIT
-        value: "30"
+        value: "1000000000"
       - key: FLASK_SECRET_KEY
         sync: false
       - key: ANTHROPIC_API_KEY

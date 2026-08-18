@@ -55,7 +55,16 @@ p{margin:0;color:#9fb1c5;line-height:1.7}
     if (!supabaseUrl || !supabaseAnonKey) {
       fail('Supabase configuration is missing.');
     } else {
-      const supabase = createClient(supabaseUrl, supabaseAnonKey);
+      // The callback exchanges the OAuth code explicitly below. Disabling
+      // automatic URL detection prevents Supabase from racing that exchange
+      // and consuming the one-time code before this page can finish sign-in.
+      const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+        auth: {
+          detectSessionInUrl: false,
+          persistSession: true,
+          autoRefreshToken: true,
+        },
+      });
       const callbackUrl = new URL(window.location.href);
       const code = callbackUrl.searchParams.get('code');
       const fragment = new URLSearchParams(callbackUrl.hash.slice(1));
