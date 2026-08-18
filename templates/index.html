@@ -711,6 +711,29 @@ body.dark-theme .activity-pill{
   color:var(--ink-soft) !important;
   border-color:var(--line-strong) !important;
 }
+
+/* ── FIRST CLASS TOUR ── */
+#featureTour{position:fixed;inset:0;z-index:500;display:none;pointer-events:none}
+#featureTour.open{display:block}
+.tour-shade{position:absolute;inset:0;background:transparent;pointer-events:auto}
+.tour-focus{position:fixed;border:3px solid #f4b27e;border-radius:16px;
+  box-shadow:0 0 0 6px rgba(244,178,126,.24),0 0 0 9999px rgba(8,14,21,.62),0 18px 50px rgba(0,0,0,.28);
+  transition:all .22s ease;pointer-events:none;z-index:1}
+.tour-card{position:fixed;width:min(380px,calc(100vw - 28px));background:#fffaf3;color:#14212f;
+  border:1px solid rgba(20,33,47,.14);border-radius:20px;padding:20px;
+  box-shadow:0 24px 70px rgba(0,0,0,.32);pointer-events:auto;z-index:2;
+  font-family:"Trebuchet MS",sans-serif}
+.tour-kicker{font-size:11px;color:#7f8fb2;text-transform:uppercase;letter-spacing:.8px;font-weight:800}
+.tour-card h2{font:700 22px/1.2 Georgia,"Times New Roman",serif;margin:7px 0 8px}
+.tour-card p{font-size:14px;line-height:1.55;color:#506172;margin:0}
+.tour-progress{display:flex;gap:5px;margin:16px 0}
+.tour-progress span{height:4px;flex:1;border-radius:999px;background:#e6ddd2}
+.tour-progress span.done{background:#7f8fb2}
+.tour-actions{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.tour-btn{height:40px;padding:0 15px;border-radius:10px;font-weight:700;cursor:pointer}
+.tour-skip{background:transparent;border:1px solid #d8cbbd;color:#506172}
+.tour-next{background:#14212f;border:1px solid #14212f;color:#fff;margin-left:auto}
+@media(max-width:700px){.tour-card{padding:17px}.tour-card h2{font-size:20px}}
 body.dark-theme #newBoardBtn,
 body.dark-theme #analyseNowBtn,
 body.dark-theme #settingsModal > div,
@@ -837,7 +860,7 @@ body.dark-theme .view-seg button.active{
 
 	  <div class="top-cluster">
 	    <button id="themeToggleBtn" class="tb-btn icon-btn" onclick="toggleTheme()" title="Switch to dark mode" aria-label="Switch to dark mode">🌙</button>
-	    <button class="tb-btn ghost icon-btn" onclick="togglePanel('settingsPanel')" title="Open settings" aria-label="Open settings">⚙</button>
+    <button id="settingsBtn" class="tb-btn ghost icon-btn" onclick="togglePanel('settingsPanel')" title="Open settings" aria-label="Open settings">⚙</button>
 	    <button class="tb-btn" onclick="toggleFullscreen()" title="F">⛶ Fullscreen</button>
 	  </div>
 	</div>
@@ -1065,6 +1088,22 @@ body.dark-theme .view-seg button.active{
 
 <!-- ═══════════════ STATUS ═══════════════ -->
 <div id="statusBar">Ready</div>
+
+<!-- First-class guided tour. It is positioned beside real controls by JS. -->
+<div id="featureTour" role="dialog" aria-modal="true" aria-labelledby="tourTitle" aria-hidden="true">
+  <div class="tour-shade"></div>
+  <div class="tour-focus" aria-hidden="true"></div>
+  <div class="tour-card">
+    <div class="tour-kicker" id="tourKicker">Quick tour</div>
+    <h2 id="tourTitle"></h2>
+    <p id="tourText"></p>
+    <div class="tour-progress" id="tourProgress" aria-hidden="true"></div>
+    <div class="tour-actions">
+      <button class="tour-btn tour-skip" type="button" onclick="finishFeatureTour(true)">Skip tour</button>
+      <button class="tour-btn tour-next" id="tourNext" type="button" onclick="nextFeatureTourStep()">Next</button>
+    </div>
+  </div>
+</div>
 
 <div id="panelBackdrop" class="panel-backdrop" onclick="closePanels()"></div>
 
@@ -1380,6 +1419,9 @@ async function smCreateSession() {
     }
     _smSessions = [s, ..._smSessions.filter(item => item.id !== s.id)];
     smLaunch(s, false);
+    if (s.is_first_class) {
+      setTimeout(startFeatureTour, 700);
+    }
   } catch (error) {
     status(`Could not reach the server to start class: ${error.message || error}`);
   } finally {
@@ -1505,6 +1547,124 @@ function smLaunch(session, isResume) {
   if (afMs > 0 && !afPaused) scheduleAutoFreeze(afMs);
   loadGallery();
 }
+
+// ── First class feature tour ─────────────────────
+const FEATURE_TOUR_STEPS = [
+  {
+    target: '#sessionInfo',
+    title: 'Your class is ready',
+    text: 'Lumen saves boards, snapshots, and analyses inside this class. Use “Change class” whenever you want to start another lesson or reopen an older one.'
+  },
+  {
+    target: '#originalView',
+    title: 'See the live board',
+    text: 'This is the live camera view. Point it at the classroom board; Lumen keeps the feed on your device until you choose to capture or analyse a frame.'
+  },
+  {
+    target: '#essentialsGroup',
+    title: 'Freeze or save a moment',
+    text: 'Freeze holds the current frame and builds a cleaner AI Board. Snapshot saves a useful moment directly into this class’s Gallery.'
+  },
+  {
+    target: '#autoFreezeGroup',
+    title: 'Keep the board refreshed',
+    text: 'Auto-freeze can update the AI Board every 1, 2, 5, or 10 minutes. You can pause it at any time when the class needs a break.'
+  },
+  {
+    target: '#zoomGroup',
+    title: 'Make details easier to see',
+    text: 'Zoom, drag, and move around the board without stretching the camera image. These controls help focus on small writing or one part of a diagram.'
+  },
+  {
+    target: '.view-seg',
+    title: 'Move between four useful views',
+    text: 'Live Board shows the camera, AI Board creates a clean visual, AI Analysis explains the lesson and accepts questions, and Gallery keeps your saved captures.'
+  },
+  {
+    target: '#lockBtn',
+    title: 'Protect the finished class',
+    text: 'Lock a class to prevent accidental new captures. After the first AI Board is created, “New Board” lets you begin a fresh section while preserving the previous one.'
+  },
+  {
+    target: '#settingsBtn',
+    title: 'Adjust Lumen your way',
+    text: 'Settings contains camera selection, image presets, brightness and contrast tools, your saved History, theme controls, and account actions. You are ready to begin!'
+  }
+];
+let featureTourIndex = 0;
+let featureTourTarget = null;
+
+function startFeatureTour() {
+  if (!currentSession) return;
+  featureTourIndex = 0;
+  document.body.classList.add('tour-active');
+  const tour = document.getElementById('featureTour');
+  tour.classList.add('open');
+  tour.setAttribute('aria-hidden', 'false');
+  renderFeatureTourStep();
+}
+
+function renderFeatureTourStep() {
+  const step = FEATURE_TOUR_STEPS[featureTourIndex];
+  if (!step) return finishFeatureTour(false);
+  featureTourTarget = document.querySelector(step.target);
+  if (!featureTourTarget) return nextFeatureTourStep();
+  featureTourTarget.scrollIntoView({block:'nearest', inline:'nearest'});
+
+  document.getElementById('tourKicker').textContent = `Quick tour · ${featureTourIndex + 1} of ${FEATURE_TOUR_STEPS.length}`;
+  document.getElementById('tourTitle').textContent = step.title;
+  document.getElementById('tourText').textContent = step.text;
+  document.getElementById('tourNext').textContent = featureTourIndex === FEATURE_TOUR_STEPS.length - 1 ? 'Start using Lumen' : 'Next';
+  document.getElementById('tourProgress').innerHTML = FEATURE_TOUR_STEPS
+    .map((_, index) => `<span class="${index <= featureTourIndex ? 'done' : ''}"></span>`).join('');
+  requestAnimationFrame(positionFeatureTour);
+}
+
+function positionFeatureTour() {
+  if (!featureTourTarget) return;
+  const rect = featureTourTarget.getBoundingClientRect();
+  const pad = 7;
+  const focus = document.querySelector('.tour-focus');
+  focus.style.left = `${Math.max(5, rect.left - pad)}px`;
+  focus.style.top = `${Math.max(5, rect.top - pad)}px`;
+  focus.style.width = `${Math.min(window.innerWidth - 10, rect.width + pad * 2)}px`;
+  focus.style.height = `${Math.min(window.innerHeight - 10, rect.height + pad * 2)}px`;
+
+  const card = document.querySelector('.tour-card');
+  const cardWidth = Math.min(380, window.innerWidth - 28);
+  const cardHeight = card.offsetHeight || 260;
+  let left = Math.min(window.innerWidth - cardWidth - 14, Math.max(14, rect.left));
+  let top = rect.bottom + 18;
+  if (top + cardHeight > window.innerHeight - 14) top = rect.top - cardHeight - 18;
+  if (top < 14) {
+    top = Math.max(14, (window.innerHeight - cardHeight) / 2);
+    left = Math.max(14, (window.innerWidth - cardWidth) / 2);
+  }
+  card.style.left = `${left}px`;
+  card.style.top = `${top}px`;
+}
+
+function nextFeatureTourStep() {
+  featureTourIndex += 1;
+  if (featureTourIndex >= FEATURE_TOUR_STEPS.length) return finishFeatureTour(false);
+  renderFeatureTourStep();
+}
+
+function finishFeatureTour(skipped) {
+  featureTourTarget = null;
+  document.body.classList.remove('tour-active');
+  const tour = document.getElementById('featureTour');
+  tour.classList.remove('open');
+  tour.setAttribute('aria-hidden', 'true');
+  status(skipped ? 'Tour skipped — you can start using Lumen' : 'Tour complete — welcome to Lumen!');
+}
+
+window.addEventListener('resize', positionFeatureTour);
+document.addEventListener('keydown', (event) => {
+  if (!document.getElementById('featureTour')?.classList.contains('open')) return;
+  if (event.key === 'Escape') finishFeatureTour(true);
+  if (event.key === 'Enter' || event.key === 'ArrowRight') nextFeatureTourStep();
+});
 
 // ── Lock / Unlock ────────────────────────────────
 async function toggleLock() {

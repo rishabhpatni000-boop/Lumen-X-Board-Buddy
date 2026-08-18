@@ -13,6 +13,8 @@ services:
     envVars:
       - key: SESSION_COOKIE_SECURE
         value: "true"
+      - key: SESSION_LIFETIME_DAYS
+        value: "30"
       - key: TRUST_PROXY_COUNT
         value: "1"
       - key: VISUALASSISTCAM_DATA_DIR

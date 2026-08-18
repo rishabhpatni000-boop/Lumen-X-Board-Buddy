@@ -843,8 +843,9 @@ def api_create_session():
         "captures":   [],
     }
     try:
+        is_first_class = len(_sessions_list()) == 0
         _session_save(s)
-        return jsonify(s)
+        return jsonify({**s, "is_first_class": is_first_class})
     except Exception as e:
         log_warning(SECURITY["logger"], "session_create_failed", error=str(e))
         return jsonify({"error": "Could not save class session", "details": _session_store_error_details(e)}), 500

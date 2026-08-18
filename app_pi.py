@@ -469,8 +469,9 @@ def api_create_session():
         "locked":     False,
         "captures":   [],
     }
+    is_first_class = len(_sessions_list()) == 0
     _session_save(s)
-    return jsonify(s)
+    return jsonify({**s, "is_first_class": is_first_class})
 
 @app.route("/api/sessions/<sid>", methods=["GET"])
 @read_api_limit

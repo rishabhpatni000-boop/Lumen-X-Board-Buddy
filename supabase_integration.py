@@ -23,6 +23,8 @@ def configure_supabase(app):
     app.config["SESSION_COOKIE_HTTPONLY"] = True
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
     app.config["SESSION_COOKIE_SECURE"] = os.getenv("SESSION_COOKIE_SECURE", "false").lower() == "true"
+    app.config["PERMANENT_SESSION_LIFETIME"] = int(os.getenv("SESSION_LIFETIME_DAYS", "30")) * 24 * 60 * 60
+    app.config["SESSION_REFRESH_EACH_REQUEST"] = True
 
     app.config["SUPABASE_URL"] = os.getenv("SUPABASE_URL", "").rstrip("/")
     app.config["SUPABASE_ANON_KEY"] = os.getenv("SUPABASE_ANON_KEY", "")
@@ -159,6 +161,7 @@ def store_session_from_token(access_token: str):
         sync_user_profile(access_token, user)
     except Exception:
         pass
+    session.permanent = True
     session["supabase_access_token"] = access_token
     session["user"] = {
         "id": user["id"],
