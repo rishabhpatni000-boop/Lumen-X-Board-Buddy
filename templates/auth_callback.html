@@ -101,11 +101,15 @@ p{margin:0;color:#9fb1c5;line-height:1.7}
         }
 
         statusEl.textContent = 'Creating secure server session…';
+        const sessionAbort = new AbortController();
+        const sessionTimeout = setTimeout(() => sessionAbort.abort(), 20000);
         const resp = await fetch('/auth/session', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({access_token: accessToken, next: nextUrl}),
+          signal: sessionAbort.signal,
         });
+        clearTimeout(sessionTimeout);
         const payload = await resp.json();
         if (!resp.ok || !payload.ok) throw new Error(payload.error || 'Could not create session.');
         window.location.href = payload.redirect_to || '/app';

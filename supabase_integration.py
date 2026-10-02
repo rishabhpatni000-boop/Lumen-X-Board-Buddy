@@ -157,7 +157,7 @@ def fetch_neon_user(access_token: str):
     cfg = neon_config()
     if not cfg["jwks_url"] or not cfg["database_url"]:
         raise RuntimeError("Neon Auth is not configured")
-    signing_key = PyJWKClient(cfg["jwks_url"]).get_signing_key_from_jwt(access_token)
+    signing_key = PyJWKClient(cfg["jwks_url"], timeout=10).get_signing_key_from_jwt(access_token)
     # Neon Auth has emitted the issuer with and without a trailing slash
     # across SDK versions. Normalize only that harmless variation while
     # retaining an exact host/path allow-list for token validation.
