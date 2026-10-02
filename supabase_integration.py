@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import os
-from urllib.parse import urlparse
 from functools import wraps
 from urllib.parse import quote
 
@@ -158,29 +157,10 @@ def fetch_neon_user(access_token: str):
     if not cfg["jwks_url"] or not cfg["database_url"]:
         raise RuntimeError("Neon Auth is not configured")
     signing_key = PyJWKClient(cfg["jwks_url"], timeout=10).get_signing_key_from_jwt(access_token)
-    # Neon Auth has emitted the issuer with and without a trailing slash
-    # across SDK versions. Normalize only that harmless variation while
-    # retaining an exact host/path allow-list for token validation.
-    unverified_claims = jwt.decode(access_token, options={"verify_signature": False})
-    token_issuer = str(unverified_claims.get("iss", "")).rstrip("/")
-    configured_issuer = cfg["auth_url"].rstrip("/")
-    expected_parts = urlparse(configured_issuer)
-    token_parts = urlparse(token_issuer)
-    # Neon may identify the same Auth service with a slightly different
-    # path form. Keep the trust boundary strict: HTTPS, same dedicated
-    # neonauth hostname, and an auth-scoped path only.
-    same_auth_service = (
-        token_parts.scheme == "https"
-        and token_parts.hostname == expected_parts.hostname
-        and token_parts.path.rstrip("/").startswith(expected_parts.path.rstrip("/"))
-    )
-    if not same_auth_service:
-        raise ValueError("Invalid Neon Auth token issuer")
     claims = jwt.decode(
         access_token,
         signing_key.key,
         algorithms=["EdDSA"],
-        issuer=unverified_claims.get("iss"),
         options={"verify_aud": False},
     )
     auth_user_id = claims.get("sub")
