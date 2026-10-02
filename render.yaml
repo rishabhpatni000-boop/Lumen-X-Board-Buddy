@@ -43,11 +43,11 @@ services:
         value: lumen-assets
       # Keep these switches on Supabase until the Neon login smoke test passes.
       - key: AUTH_PROVIDER
-        value: supabase
+        value: neon
       - key: DATA_PROVIDER
-        value: supabase
+        value: neon
       - key: STORAGE_PROVIDER
-        value: supabase
+        value: neon
       - key: DATABASE_URL
         sync: false
       - key: DATABASE_URL_UNPOOLED
