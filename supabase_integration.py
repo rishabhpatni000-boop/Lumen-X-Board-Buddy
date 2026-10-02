@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+from urllib.parse import urlparse
 from functools import wraps
 from urllib.parse import quote
 
@@ -163,7 +164,17 @@ def fetch_neon_user(access_token: str):
     unverified_claims = jwt.decode(access_token, options={"verify_signature": False})
     token_issuer = str(unverified_claims.get("iss", "")).rstrip("/")
     configured_issuer = cfg["auth_url"].rstrip("/")
-    if token_issuer != configured_issuer:
+    expected_parts = urlparse(configured_issuer)
+    token_parts = urlparse(token_issuer)
+    # Neon may identify the same Auth service with a slightly different
+    # path form. Keep the trust boundary strict: HTTPS, same dedicated
+    # neonauth hostname, and an auth-scoped path only.
+    same_auth_service = (
+        token_parts.scheme == "https"
+        and token_parts.hostname == expected_parts.hostname
+        and token_parts.path.rstrip("/").startswith(expected_parts.path.rstrip("/"))
+    )
+    if not same_auth_service:
         raise ValueError("Invalid Neon Auth token issuer")
     claims = jwt.decode(
         access_token,
