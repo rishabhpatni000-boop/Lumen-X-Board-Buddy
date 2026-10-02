@@ -74,27 +74,30 @@ h1{font-family:Georgia,"Times New Roman",serif;font-size:clamp(38px,5vw,68px);li
 </main>
 
 <script type="module">
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+import { createLumenAuthClient } from '/static/js/lumen-auth.js';
 
+const authProvider = {{ auth_provider|tojson }};
+const neonAuthUrl = {{ neon_auth_url|tojson }};
 const supabaseUrl = {{ supabase_url|tojson }};
 const supabaseAnonKey = {{ supabase_anon_key|tojson }};
+const authEnabled = {{ auth_enabled|tojson }};
 const nextUrl = {{ next_url|tojson }};
 const button = document.getElementById('googleBtn');
 const status = document.getElementById('status');
 
 button.addEventListener('click', async () => {
-  if (!supabaseUrl || !supabaseAnonKey) {
+  if (!authEnabled) {
     status.textContent = 'Lumen sign-in is not configured.';
     return;
   }
   button.disabled = true;
   status.textContent = 'Opening Google sign-in…';
   try {
-    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+    const authClient = await createLumenAuthClient({provider: authProvider, neonAuthUrl, supabaseUrl, supabaseAnonKey});
     // Keep this an exact match for the Supabase redirect allowlist. The native
     // callback handler supplies /app as the destination after token exchange.
     const redirectTo = 'org.lumenboard.app://auth/callback';
-    const { data, error } = await supabase.auth.signInWithOAuth({
+    const { data, error } = await authClient.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo,

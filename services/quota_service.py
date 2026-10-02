@@ -7,6 +7,7 @@ import datetime as dt
 import os
 
 import requests
+from psycopg.types.json import Jsonb
 
 from supabase_integration import (
     current_access_token,
@@ -15,6 +16,7 @@ from supabase_integration import (
     supabase_config,
     supabase_service_headers,
 )
+from services.database_service import fetch_all, fetch_one, neon_database_enabled
 
 
 class QuotaExceeded(Exception):
@@ -71,6 +73,19 @@ class QuotaService:
         return start.isoformat() + "Z", end.isoformat() + "Z"
 
     def _count(self, event_type: str, start: str, end: str):
+        if neon_database_enabled():
+            user = current_user()
+            if not user:
+                return 0
+            row = fetch_one(
+                """
+                select count(*) as total from public.usage_events
+                where user_id = %s and event_type = %s
+                  and created_at >= %s::timestamptz and created_at < %s::timestamptz
+                """,
+                (user["id"], event_type, start, end),
+            )
+            return int(row["total"] if row else 0)
         cfg = supabase_config()
         token = current_access_token()
         if not cfg["url"] or not cfg["anon_key"] or not token or not current_user():
@@ -100,6 +115,17 @@ class QuotaService:
             return 0
 
     def record_event(self, event_type: str, metadata: dict | None = None):
+        if neon_database_enabled():
+            user = current_user()
+            if not user:
+                return None
+            return fetch_one(
+                """
+                insert into public.usage_events (user_id, event_type, metadata)
+                values (%s, %s, %s) returning id, user_id, event_type, metadata, created_at
+                """,
+                (user["id"], event_type, Jsonb(metadata or {})),
+            )
         cfg = supabase_config()
         token = current_access_token()
         user = current_user()
@@ -128,6 +154,24 @@ class QuotaService:
             "monthly_analyses": self.monthly_analyses_limit,
             "daily_uploads": self.daily_upload_limit,
         }
+        if neon_database_enabled():
+            user = current_user()
+            if not user:
+                return limits
+            override = fetch_one(
+                """
+                select daily_analyses_limit, monthly_analyses_limit, daily_upload_limit
+                from public.user_quota_overrides where user_id = %s
+                """,
+                (user["id"],),
+            ) or {}
+            if override.get("daily_analyses_limit") is not None:
+                limits["daily_analyses"] = override["daily_analyses_limit"]
+            if override.get("monthly_analyses_limit") is not None:
+                limits["monthly_analyses"] = override["monthly_analyses_limit"]
+            if override.get("daily_upload_limit") is not None:
+                limits["daily_uploads"] = override["daily_upload_limit"]
+            return limits
         cfg = supabase_config()
         token = current_access_token()
         user = current_user()
@@ -204,6 +248,17 @@ class QuotaService:
         return snapshot
 
     def recent_activity(self, limit: int = 8):
+        if neon_database_enabled():
+            user = current_user()
+            if not user:
+                return []
+            return fetch_all(
+                """
+                select event_type, metadata, created_at from public.usage_events
+                where user_id = %s order by created_at desc limit %s
+                """,
+                (user["id"], limit),
+            )
         cfg = supabase_config()
         token = current_access_token()
         if not cfg["url"] or not cfg["anon_key"] or not token or not current_user():

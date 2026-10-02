@@ -1,5 +1,9 @@
 # API keys — never commit this
 .env
+.env.local
+.env.neon
+.agents/
+skills-lock.json
 
 # Python virtual environment
 venv/
@@ -33,3 +37,4 @@ android/**/build/
 *.keystore
 *.jks
 dist/
+.neon

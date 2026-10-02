@@ -8,12 +8,12 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/brand.css') }}">
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script type="module">
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+import { createLumenAuthClient } from '/static/js/lumen-auth.js';
+const authProvider = {{ auth_provider|tojson }};
+const neonAuthUrl = {{ neon_auth_url|tojson }};
 const supabaseUrl = {{ supabase_url|tojson }};
 const supabaseAnonKey = {{ supabase_anon_key|tojson }};
-window.__vacSupabasePromise = (supabaseUrl && supabaseAnonKey)
-  ? Promise.resolve(createClient(supabaseUrl, supabaseAnonKey))
-  : Promise.resolve(null);
+window.__vacSupabasePromise = createLumenAuthClient({provider: authProvider, neonAuthUrl, supabaseUrl, supabaseAnonKey});
 </script>
 <style>
 :root{

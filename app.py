@@ -17,6 +17,7 @@ import threading
 import webbrowser
 import base64
 import requests
+from psycopg.types.json import Jsonb
 from concurrent.futures import ThreadPoolExecutor
 
 from dotenv import load_dotenv
@@ -47,6 +48,7 @@ from services.cache_service import TTLCache, stable_cache_key
 from services.logging_service import log_event, log_warning
 from services.quota_service import QuotaExceeded, QuotaService
 from services.storage_service import StorageService, StorageUnavailable
+from services.database_service import execute as db_execute, fetch_all as db_fetch_all, fetch_one as db_fetch_one, neon_database_enabled
 from web_security import configure_app_security, decode_image_data_url, require_json_payload
 
 # ── Claude ────────────────────────────────────────────────────────────────────
@@ -206,6 +208,8 @@ def _no_store_json(payload, status: int = 200):
 
 
 def _use_supabase_session_store() -> bool:
+    if neon_database_enabled():
+        return True
     cfg = supabase_config()
     return bool(cfg["url"] and cfg["anon_key"] and current_user())
 
@@ -305,6 +309,14 @@ def _delete_stored_file_best_effort(folder: str, filename: str | None, **context
 def _sessions_list() -> list:
     if _use_supabase_session_store():
         try:
+            if neon_database_enabled():
+                return db_fetch_all(
+                    """
+                    select id, subject, teacher, created_at, locked, captures
+                    from public.class_sessions where user_id = %s order by created_at desc
+                    """,
+                    (_current_user_id_required(),),
+                )
             cfg = supabase_config()
             user_id = _current_user_id_required()
             resp = requests.get(
@@ -335,6 +347,14 @@ def _sessions_list() -> list:
 def _session_get(sid: str):
     if _use_supabase_session_store():
         try:
+            if neon_database_enabled():
+                return db_fetch_one(
+                    """
+                    select id, subject, teacher, created_at, locked, captures
+                    from public.class_sessions where id = %s and user_id = %s limit 1
+                    """,
+                    (sid, _current_user_id_required()),
+                )
             cfg = supabase_config()
             user_id = _current_user_id_required()
             resp = requests.get(
@@ -363,6 +383,26 @@ def _session_get(sid: str):
 def _session_save(s: dict):
     if _use_supabase_session_store():
         try:
+            if neon_database_enabled():
+                payload = _session_payload_for_store(s)
+                db_execute(
+                    """
+                    insert into public.class_sessions (
+                        id, user_id, subject, teacher, created_at, locked, captures
+                    ) values (%s, %s, %s, %s, %s, %s, %s)
+                    on conflict (id) do update set
+                        subject = excluded.subject,
+                        teacher = excluded.teacher,
+                        locked = excluded.locked,
+                        captures = excluded.captures
+                    """,
+                    (
+                        payload["id"], payload["user_id"], payload["subject"],
+                        payload["teacher"], payload["created_at"], payload["locked"],
+                        Jsonb(payload["captures"]),
+                    ),
+                )
+                return
             cfg = supabase_config()
             payload = _session_payload_for_store(s)
             resp = requests.post(
@@ -986,6 +1026,16 @@ def api_delete_session(sid):
         return jsonify({"error": "Not found"}), 404
     if _use_supabase_session_store():
         try:
+            if neon_database_enabled():
+                db_execute(
+                    "delete from public.class_sessions where id = %s and user_id = %s",
+                    (sid, _current_user_id_required()),
+                )
+                for cap in s.get("captures", []):
+                    for fkey in ("original_file", "aiboard_file"):
+                        if cap.get(fkey):
+                            _delete_stored_file_best_effort("session_images", cap[fkey], session_id=sid)
+                return jsonify({"ok": True})
             cfg = supabase_config()
             resp = requests.delete(
                 f"{cfg['url']}/rest/v1/class_sessions",
@@ -1084,6 +1134,71 @@ def api_history_image(filename):
 @read_api_limit
 @login_required_api
 def api_dashboard():
+    if neon_database_enabled():
+        user_id = _current_user_id_required()
+        summary = db_fetch_one(
+            """
+            with usage as (
+                select
+                    count(*) filter (
+                        where event_type = 'analysis'
+                          and created_at >= date_trunc('day', now())
+                    ) as daily_analyses,
+                    count(*) filter (
+                        where event_type = 'analysis'
+                          and created_at >= date_trunc('month', now())
+                    ) as monthly_analyses,
+                    count(*) filter (
+                        where event_type = 'upload'
+                          and created_at >= date_trunc('day', now())
+                    ) as daily_uploads
+                from public.usage_events where user_id = %s
+            ), history as (
+                select count(*) as total_analyses,
+                       count(*) filter (where created_at >= date_trunc('month', now())) as analyses_this_month
+                from public.analysis_history where user_id = %s
+            ), recent as (
+                select coalesce(jsonb_agg(to_jsonb(activity) order by activity.created_at desc), '[]'::jsonb) as items
+                from (
+                    select event_type, metadata, created_at
+                    from public.usage_events where user_id = %s
+                    order by created_at desc limit 8
+                ) activity
+            )
+            select usage.*, history.*, recent.items,
+                   quota.daily_analyses_limit, quota.monthly_analyses_limit,
+                   quota.daily_upload_limit
+            from usage cross join history cross join recent
+            left join public.user_quota_overrides quota on quota.user_id = %s
+            """,
+            (user_id, user_id, user_id, user_id),
+        ) or {}
+        admin = is_admin_user()
+        daily_limit = QUOTAS.ADMIN_UNLIMITED if admin else (summary.get("daily_analyses_limit") or QUOTAS.daily_analyses_limit)
+        monthly_limit = QUOTAS.ADMIN_UNLIMITED if admin else (summary.get("monthly_analyses_limit") or QUOTAS.monthly_analyses_limit)
+        upload_limit = QUOTAS.ADMIN_UNLIMITED if admin else (summary.get("daily_upload_limit") or QUOTAS.daily_upload_limit)
+        daily = int(summary.get("daily_analyses") or 0)
+        monthly = int(summary.get("monthly_analyses") or 0)
+        uploads = int(summary.get("daily_uploads") or 0)
+        return jsonify({
+            "total_analyses": int(summary.get("total_analyses") or 0),
+            "analyses_this_month": int(summary.get("analyses_this_month") or 0),
+            "remaining_quota": {
+                "daily_analyses": daily,
+                "monthly_analyses": monthly,
+                "daily_uploads": uploads,
+                "daily_remaining": max(0, daily_limit - daily),
+                "monthly_remaining": max(0, monthly_limit - monthly),
+                "upload_remaining": max(0, upload_limit - uploads),
+                "limits": {
+                    "daily_analyses": daily_limit,
+                    "monthly_analyses": monthly_limit,
+                    "daily_uploads": upload_limit,
+                },
+                "is_admin_unlimited": admin,
+            },
+            "recent_activity": summary.get("items") or [],
+        })
     quota_snapshot = QUOTAS.quota_snapshot()
     recent = QUOTAS.recent_activity(limit=8)
     total_analyses = list_history_records_paginated(page=1, per_page=1)["total"]
@@ -1146,54 +1261,77 @@ def _admin_try_fetch(fetcher, default):
 def api_admin_overview():
     warnings = []
     storage_summary = STORAGE.storage_summary()
-    if storage_summary["durable_required"] and storage_summary["backend"] != "supabase_storage":
-        warnings.append("storage: durable Supabase Storage is required but not configured")
+    if storage_summary["durable_required"] and storage_summary["backend"] == "local_filesystem":
+        warnings.append("storage: durable remote storage is required but not configured")
     if not _allow_local_session_fallback() and not _use_supabase_session_store():
-        warnings.append("sessions: Supabase session storage is required but not currently available")
-    profile_rows, err = _admin_try_fetch(
-        lambda: _admin_rest_get("/rest/v1/users", [
-            ("select", "id,email,full_name,created_at"),
-            ("order", "created_at.desc"),
-        ])[0],
-        [],
-    )
-    if err:
-        warnings.append(f"profiles: {err}")
-
-    auth_users, err = _admin_try_fetch(_admin_auth_users, [])
-    if err:
-        warnings.append(f"auth_users: {err}")
-
-    overrides, err = _admin_try_fetch(
-        lambda: _admin_rest_get("/rest/v1/user_quota_overrides", [
-            ("select", "user_id,daily_analyses_limit,monthly_analyses_limit,daily_upload_limit,notes,updated_at"),
-        ])[0],
-        [],
-    )
-    if err:
-        warnings.append(f"quota_overrides: {err}")
-
-    history, err = _admin_try_fetch(
-        lambda: _admin_rest_get("/rest/v1/analysis_history", [
-            ("select", "user_id,created_at"),
-            ("order", "created_at.desc"),
-            ("limit", "5000"),
-        ])[0],
-        [],
-    )
-    if err:
-        warnings.append(f"history: {err}")
-
-    usage, err = _admin_try_fetch(
-        lambda: _admin_rest_get("/rest/v1/usage_events", [
-            ("select", "user_id,event_type,created_at"),
-            ("order", "created_at.desc"),
-            ("limit", "5000"),
-        ])[0],
-        [],
-    )
-    if err:
-        warnings.append(f"usage: {err}")
+        warnings.append("sessions: durable database storage is required but not currently available")
+    if neon_database_enabled():
+        profile_rows = db_fetch_all(
+            "select id, email, full_name, created_at from public.users order by created_at desc"
+        )
+        auth_users = [
+            {
+                "id": row["id"],
+                "email": row["email"],
+                "created_at": row["created_at"],
+                "user_metadata": {"full_name": row["full_name"]},
+            }
+            for row in profile_rows
+        ]
+        overrides = db_fetch_all(
+            """
+            select user_id, daily_analyses_limit, monthly_analyses_limit,
+                   daily_upload_limit, notes, updated_at
+            from public.user_quota_overrides
+            """
+        )
+        history = db_fetch_all(
+            "select user_id, created_at from public.analysis_history order by created_at desc limit 5000"
+        )
+        usage = db_fetch_all(
+            "select user_id, event_type, created_at from public.usage_events order by created_at desc limit 5000"
+        )
+    else:
+        profile_rows, err = _admin_try_fetch(
+            lambda: _admin_rest_get("/rest/v1/users", [
+                ("select", "id,email,full_name,created_at"),
+                ("order", "created_at.desc"),
+            ])[0],
+            [],
+        )
+        if err:
+            warnings.append(f"profiles: {err}")
+        auth_users, err = _admin_try_fetch(_admin_auth_users, [])
+        if err:
+            warnings.append(f"auth_users: {err}")
+        overrides, err = _admin_try_fetch(
+            lambda: _admin_rest_get("/rest/v1/user_quota_overrides", [
+                ("select", "user_id,daily_analyses_limit,monthly_analyses_limit,daily_upload_limit,notes,updated_at"),
+            ])[0],
+            [],
+        )
+        if err:
+            warnings.append(f"quota_overrides: {err}")
+        history, err = _admin_try_fetch(
+            lambda: _admin_rest_get("/rest/v1/analysis_history", [
+                ("select", "user_id,created_at"),
+                ("order", "created_at.desc"),
+                ("limit", "5000"),
+            ])[0],
+            [],
+        )
+        if err:
+            warnings.append(f"history: {err}")
+        usage, err = _admin_try_fetch(
+            lambda: _admin_rest_get("/rest/v1/usage_events", [
+                ("select", "user_id,event_type,created_at"),
+                ("order", "created_at.desc"),
+                ("limit", "5000"),
+            ])[0],
+            [],
+        )
+        if err:
+            warnings.append(f"usage: {err}")
 
     profile_map = {item["id"]: item for item in profile_rows}
     override_map = {item["user_id"]: item for item in overrides}
@@ -1261,13 +1399,35 @@ def api_admin_user_quota(user_id):
     data, error_response = require_json_payload()
     if error_response:
         return error_response
-    record = _admin_rest_upsert("/rest/v1/user_quota_overrides", {
+    values = {
         "user_id": user_id,
         "daily_analyses_limit": int(data.get("daily_analyses_limit") or 0) or None,
         "monthly_analyses_limit": int(data.get("monthly_analyses_limit") or 0) or None,
         "daily_upload_limit": int(data.get("daily_upload_limit") or 0) or None,
         "notes": (data.get("notes") or "").strip(),
-    })
+    }
+    if neon_database_enabled():
+        record = db_fetch_one(
+            """
+            insert into public.user_quota_overrides (
+                user_id, daily_analyses_limit, monthly_analyses_limit,
+                daily_upload_limit, notes, updated_at
+            ) values (%s, %s, %s, %s, %s, timezone('utc', now()))
+            on conflict (user_id) do update set
+                daily_analyses_limit = excluded.daily_analyses_limit,
+                monthly_analyses_limit = excluded.monthly_analyses_limit,
+                daily_upload_limit = excluded.daily_upload_limit,
+                notes = excluded.notes,
+                updated_at = excluded.updated_at
+            returning *
+            """,
+            tuple(values[key] for key in (
+                "user_id", "daily_analyses_limit", "monthly_analyses_limit",
+                "daily_upload_limit", "notes",
+            )),
+        )
+    else:
+        record = _admin_rest_upsert("/rest/v1/user_quota_overrides", values)
     return jsonify({"ok": True, "record": record})
 
 

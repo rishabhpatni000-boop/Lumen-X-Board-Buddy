@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Supabase auth and history helpers for Lumen."""
+"""Authentication and history helpers for Lumen's phased backend migration."""
 
 from __future__ import annotations
 
@@ -8,7 +8,11 @@ from functools import wraps
 from urllib.parse import quote
 
 import requests
+import jwt
+import psycopg
 from flask import abort, redirect, request, session, url_for
+from jwt import PyJWKClient
+from services.database_service import fetch_all, fetch_one, neon_database_enabled
 
 
 ADMIN_EMAILS = {
@@ -37,7 +41,23 @@ def supabase_config():
     }
 
 
+def auth_provider() -> str:
+    provider = os.getenv("AUTH_PROVIDER", "supabase").strip().lower()
+    return "neon" if provider == "neon" else "supabase"
+
+
+def neon_config():
+    return {
+        "auth_url": os.getenv("NEON_AUTH_BASE_URL", "").rstrip("/"),
+        "jwks_url": os.getenv("NEON_AUTH_JWKS_URL", "").strip(),
+        "database_url": os.getenv("DATABASE_URL", "").strip(),
+    }
+
+
 def auth_enabled() -> bool:
+    if auth_provider() == "neon":
+        cfg = neon_config()
+        return bool(cfg["auth_url"] and cfg["jwks_url"] and cfg["database_url"])
     cfg = supabase_config()
     return bool(cfg["url"] and cfg["anon_key"])
 
@@ -52,7 +72,7 @@ def is_admin_user(user: dict | None = None) -> bool:
 
 
 def current_access_token():
-    return session.get("supabase_access_token")
+    return session.get("auth_access_token") or session.get("supabase_access_token")
 
 
 def is_authenticated() -> bool:
@@ -132,6 +152,44 @@ def fetch_supabase_user(access_token: str):
     return resp.json()
 
 
+def fetch_neon_user(access_token: str):
+    cfg = neon_config()
+    if not cfg["jwks_url"] or not cfg["database_url"]:
+        raise RuntimeError("Neon Auth is not configured")
+    signing_key = PyJWKClient(cfg["jwks_url"]).get_signing_key_from_jwt(access_token)
+    claims = jwt.decode(
+        access_token,
+        signing_key.key,
+        algorithms=["EdDSA"],
+        issuer=cfg["auth_url"],
+        options={"verify_aud": False},
+    )
+    auth_user_id = claims.get("sub")
+    if not auth_user_id:
+        raise ValueError("Neon Auth token is missing a user identifier")
+    with psycopg.connect(cfg["database_url"]) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                select app_user.id, auth_user.email, auth_user.name, auth_user.image
+                from neon_auth."user" as auth_user
+                join public.users as app_user on app_user.neon_auth_user_id = auth_user.id
+                where auth_user.id = %s
+                limit 1
+                """,
+                (auth_user_id,),
+            )
+            row = cursor.fetchone()
+    if not row:
+        raise ValueError("Neon Auth user is not linked to a Lumen profile")
+    return {
+        "id": str(row[0]),
+        "auth_user_id": str(auth_user_id),
+        "email": row[1] or "",
+        "user_metadata": {"full_name": row[2] or "", "avatar_url": row[3] or ""},
+    }
+
+
 def sync_user_profile(access_token: str, user: dict):
     cfg = supabase_config()
     if not cfg["url"] or not cfg["anon_key"]:
@@ -156,13 +214,20 @@ def sync_user_profile(access_token: str, user: dict):
 
 
 def store_session_from_token(access_token: str):
-    user = fetch_supabase_user(access_token)
-    try:
-        sync_user_profile(access_token, user)
-    except Exception:
-        pass
+    provider = auth_provider()
+    user = fetch_neon_user(access_token) if provider == "neon" else fetch_supabase_user(access_token)
+    if provider == "supabase":
+        try:
+            sync_user_profile(access_token, user)
+        except Exception:
+            pass
     session.permanent = True
-    session["supabase_access_token"] = access_token
+    session["auth_access_token"] = access_token
+    session["auth_provider"] = provider
+    if provider == "supabase":
+        session["supabase_access_token"] = access_token
+    else:
+        session.pop("supabase_access_token", None)
     session["user"] = {
         "id": user["id"],
         "email": user.get("email", ""),
@@ -174,16 +239,21 @@ def store_session_from_token(access_token: str):
 
 
 def clear_auth_session():
+    session.pop("auth_access_token", None)
+    session.pop("auth_provider", None)
     session.pop("supabase_access_token", None)
     session.pop("user", None)
 
 
 def template_auth_context(callback_endpoint: str, next_url: str | None = None):
     cfg = supabase_config()
+    neon = neon_config()
     return {
-        "auth_enabled": bool(cfg["url"] and cfg["anon_key"]),
+        "auth_enabled": auth_enabled(),
+        "auth_provider": auth_provider(),
         "supabase_url": cfg["url"],
         "supabase_anon_key": cfg["anon_key"],
+        "neon_auth_url": neon["auth_url"],
         "auth_callback_url": url_for(callback_endpoint, _external=True),
         "next_url": safe_next_url(next_url),
         "current_user": current_user(),
@@ -223,8 +293,29 @@ def _supabase_rest_headers(access_token: str):
 
 
 def insert_history_record(record: dict):
-    cfg = supabase_config()
     user = current_user()
+    if neon_database_enabled():
+        if not user:
+            return None
+        row = fetch_one(
+            """
+            insert into public.analysis_history (
+                user_id, subject, teacher, session_id, board_id, topic,
+                analysis_text, ocr_text, ai_response, board_svg, image_path
+            ) values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            returning id, subject, teacher, session_id, board_id, topic,
+                      analysis_text, ocr_text, ai_response, board_svg,
+                      image_path, created_at
+            """,
+            (
+                user["id"], record.get("subject"), record.get("teacher"),
+                record.get("session_id"), record.get("board_id"), record.get("topic"),
+                record.get("analysis_text"), record.get("ocr_text"),
+                record.get("ai_response"), record.get("board_svg"), record.get("image_path"),
+            ),
+        )
+        return row
+    cfg = supabase_config()
     if not cfg["url"] or not cfg["anon_key"] or not user:
         return None
     payload = {"user_id": user["id"], **record}
@@ -251,8 +342,41 @@ def list_history_records(limit: int = 100):
 
 def list_history_records_paginated(page: int = 1, per_page: int = 12,
                                    search: str = "", subject: str = ""):
-    cfg = supabase_config()
     user = current_user()
+    if neon_database_enabled():
+        if not user:
+            return {"items": [], "page": page, "per_page": per_page, "total": 0}
+        where = ["user_id = %s"]
+        params: list = [user["id"]]
+        if search.strip():
+            where.append("(topic ilike %s or analysis_text ilike %s or subject ilike %s)")
+            term = f"%{search.strip()}%"
+            params.extend([term, term, term])
+        if subject.strip():
+            where.append("subject = %s")
+            params.append(subject.strip())
+        where_sql = " and ".join(where)
+        total_row = fetch_one(f"select count(*) as total from public.analysis_history where {where_sql}", params)
+        total = int(total_row["total"] if total_row else 0)
+        items = fetch_all(
+            f"""
+            select id, subject, teacher, session_id, board_id, topic,
+                   analysis_text, ai_response, ocr_text, board_svg, image_path, created_at
+            from public.analysis_history
+            where {where_sql}
+            order by created_at desc
+            offset %s limit %s
+            """,
+            [*params, max(0, (page - 1) * per_page), per_page],
+        )
+        return {
+            "items": items,
+            "page": page,
+            "per_page": per_page,
+            "total": total,
+            "total_pages": max(1, (total + per_page - 1) // per_page),
+        }
+    cfg = supabase_config()
     if not cfg["url"] or not cfg["anon_key"] or not user:
         return {"items": [], "page": page, "per_page": per_page, "total": 0}
 
@@ -298,8 +422,22 @@ def list_history_records_paginated(page: int = 1, per_page: int = 12,
 
 
 def count_history_records_this_month():
-    cfg = supabase_config()
     user = current_user()
+    if neon_database_enabled():
+        if not user:
+            return 0
+        row = fetch_one(
+            """
+            select count(*) as total
+            from public.analysis_history
+            where user_id = %s
+              and created_at >= date_trunc('month', timezone('utc', now()))
+              and created_at < date_trunc('month', timezone('utc', now())) + interval '1 month'
+            """,
+            (user["id"],),
+        )
+        return int(row["total"] if row else 0)
+    cfg = supabase_config()
     if not cfg["url"] or not cfg["anon_key"] or not user:
         return 0
 

@@ -41,6 +41,31 @@ services:
         sync: false
       - key: SUPABASE_STORAGE_BUCKET
         value: lumen-assets
+      # Keep these switches on Supabase until the Neon login smoke test passes.
+      - key: AUTH_PROVIDER
+        value: supabase
+      - key: DATA_PROVIDER
+        value: supabase
+      - key: STORAGE_PROVIDER
+        value: supabase
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_URL_UNPOOLED
+        sync: false
+      - key: NEON_AUTH_BASE_URL
+        sync: false
+      - key: NEON_AUTH_JWKS_URL
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_ENDPOINT_URL_S3
+        sync: false
+      - key: AWS_REGION
+        sync: false
+      - key: NEON_STORAGE_BUCKET
+        value: lumen-assets
       - key: REQUIRE_DURABLE_STORAGE
         value: "true"
       - key: ALLOW_LOCAL_SESSION_FALLBACK

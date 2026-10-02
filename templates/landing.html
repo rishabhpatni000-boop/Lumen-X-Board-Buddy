@@ -1003,10 +1003,19 @@ code{
   </div>
 
   <script type="module">
-    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+    import { createLumenAuthClient } from '/static/js/lumen-auth.js';
 
+    const authProvider = {{ auth_provider|tojson }};
+    const neonAuthUrl = {{ neon_auth_url|tojson }};
     const supabaseUrl = {{ supabase_url|tojson }};
     const supabaseAnonKey = {{ supabase_anon_key|tojson }};
+    const authEnabled = {{ auth_enabled|tojson }};
+    const authClientPromise = createLumenAuthClient({
+      provider: authProvider,
+      neonAuthUrl,
+      supabaseUrl,
+      supabaseAnonKey,
+    });
     const callbackUrl = {{ auth_callback_url|tojson }};
     const nextUrl = {{ next_url|tojson }};
     const csrfToken = {{ csrf_token|tojson }};
@@ -1047,10 +1056,8 @@ code{
 
     async function logoutAndReturnHome() {
       try {
-        if (supabaseUrl && supabaseAnonKey) {
-          const supabase = createClient(supabaseUrl, supabaseAnonKey);
-          await supabase.auth.signOut();
-        }
+        const authClient = await authClientPromise;
+        if (authClient) await authClient.auth.signOut();
       } catch (error) {}
       try {
         const headers = csrfToken ? { 'X-CSRF-Token': csrfToken } : {};
@@ -1075,15 +1082,16 @@ code{
 
     if (buttons.length && buttons.every((button) => button.dataset.authMode === 'app')) {
       buttons.forEach((button) => button.addEventListener('click', goToDashboard));
-    } else if (buttons.length && supabaseUrl && supabaseAnonKey) {
-      const supabase = createClient(supabaseUrl, supabaseAnonKey);
+    } else if (buttons.length && authEnabled) {
+      const authClient = await authClientPromise;
+      const auth = authClient?.auth;
 
       // A valid Supabase session can outlive Lumen's server cookie (for
       // example after a deployment or on the first OAuth callback). Restore
       // the server session silently so returning users stay signed in.
       const restoreServerSession = async () => {
         try {
-          const { data, error } = await supabase.auth.getSession();
+          const { data, error } = await auth.getSession();
           if (error || !data.session?.access_token) return false;
           if (statusEl) statusEl.textContent = 'Restoring your session...';
           const response = await fetch('/auth/session', {
@@ -1115,7 +1123,7 @@ code{
           queryParams: { prompt: 'select_account' },
           skipBrowserRedirect: isNativeApp,
         };
-        const { data, error } = await supabase.auth.signInWithOAuth({
+        const { data, error } = await auth.signInWithOAuth({
           provider: 'google',
           options,
         });

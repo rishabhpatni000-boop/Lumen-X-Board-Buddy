@@ -12,8 +12,11 @@ from dataclasses import dataclass
 from urllib.parse import quote
 
 import cv2
+import boto3
 import numpy as np
 import requests
+from botocore.config import Config
+from botocore.exceptions import ClientError
 from werkzeug.utils import secure_filename
 
 from web_security import decode_image_data_url
@@ -58,12 +61,41 @@ class StorageService:
         self.max_image_bytes = app_config["MAX_IMAGE_BYTES"]
         self.supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
         self.supabase_service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
-        self.storage_bucket = os.getenv("SUPABASE_STORAGE_BUCKET", "lumen-assets").strip()
+        self.storage_provider = os.getenv("STORAGE_PROVIDER", "supabase").strip().lower()
+        self.storage_bucket = (
+            os.getenv("NEON_STORAGE_BUCKET", "lumen-assets")
+            if self.storage_provider == "neon"
+            else os.getenv("SUPABASE_STORAGE_BUCKET", "lumen-assets")
+        ).strip()
+        self.s3 = self._build_s3_client() if self.storage_provider == "neon" else None
         self.force_durable = _env_bool("REQUIRE_DURABLE_STORAGE", False)
-        self.remote_enabled = bool(self.supabase_url and self.supabase_service_key and self.storage_bucket)
+        self.remote_enabled = (
+            bool(self.s3 and self.storage_bucket)
+            if self.storage_provider == "neon"
+            else bool(self.supabase_url and self.supabase_service_key and self.storage_bucket)
+        )
         self._bucket_checked = False
         self._bucket_lock = threading.Lock()
         self.ensure_dirs()
+
+    @staticmethod
+    def _build_s3_client():
+        required = (
+            os.getenv("AWS_ACCESS_KEY_ID", "").strip(),
+            os.getenv("AWS_SECRET_ACCESS_KEY", "").strip(),
+            os.getenv("AWS_ENDPOINT_URL_S3", "").strip(),
+            os.getenv("AWS_REGION", "").strip(),
+        )
+        if not all(required):
+            return None
+        return boto3.client(
+            "s3",
+            endpoint_url=required[2],
+            region_name=required[3],
+            aws_access_key_id=required[0],
+            aws_secret_access_key=required[1],
+            config=Config(signature_version="s3v4", s3={"addressing_style": "path"}),
+        )
 
     def ensure_dirs(self):
         for path in [
@@ -106,7 +138,11 @@ class StorageService:
 
     def storage_summary(self) -> dict:
         return {
-            "backend": "supabase_storage" if self.remote_enabled else "local_filesystem",
+            "backend": (
+                "neon_object_storage"
+                if self.remote_enabled and self.storage_provider == "neon"
+                else "supabase_storage" if self.remote_enabled else "local_filesystem"
+            ),
             "bucket": self.storage_bucket if self.remote_enabled else None,
             "durable_required": self.force_durable,
             "local_base_dir": self.base_dir,
@@ -160,6 +196,11 @@ class StorageService:
         if self.remote_enabled:
             return
         if self.force_durable:
+            if self.storage_provider == "neon":
+                raise StorageUnavailable(
+                    "Durable storage is required but Neon Object Storage is not configured. "
+                    "Set AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_ENDPOINT_URL_S3, and AWS_REGION."
+                )
             raise StorageUnavailable(
                 "Durable storage is required but Supabase Storage is not configured. "
                 "Set SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, and SUPABASE_STORAGE_BUCKET."
@@ -170,6 +211,13 @@ class StorageService:
             return
         with self._bucket_lock:
             if self._bucket_checked:
+                return
+            if self.storage_provider == "neon":
+                try:
+                    self.s3.head_bucket(Bucket=self.storage_bucket)
+                except ClientError as error:
+                    raise StorageUnavailable(f"Neon storage bucket is unavailable: {error}") from error
+                self._bucket_checked = True
                 return
             encoded_bucket = quote(self.storage_bucket, safe="")
             bucket_url = f"{self.supabase_url}/storage/v1/bucket/{encoded_bucket}"
@@ -216,6 +264,15 @@ class StorageService:
         if not self.remote_enabled:
             return False
         self._ensure_bucket()
+        if self.storage_provider == "neon":
+            self.s3.put_object(
+                Bucket=self.storage_bucket,
+                Key=self._object_path(folder, filename),
+                Body=payload,
+                ContentType=mime_type,
+                CacheControl="max-age=3600",
+            )
+            return True
         object_path = quote(self._object_path(folder, filename), safe="/")
         bucket = quote(self.storage_bucket, safe="")
         url = f"{self.supabase_url}/storage/v1/object/{bucket}/{object_path}"
@@ -238,6 +295,21 @@ class StorageService:
         if not self.remote_enabled:
             return None
         self._ensure_bucket()
+        if self.storage_provider == "neon":
+            try:
+                response = self.s3.get_object(
+                    Bucket=self.storage_bucket,
+                    Key=self._object_path(folder, filename),
+                )
+            except ClientError as error:
+                code = str(error.response.get("Error", {}).get("Code", ""))
+                if code in {"404", "NoSuchKey", "NotFound"}:
+                    return None
+                raise
+            return (
+                response["Body"].read(),
+                response.get("ContentType") or "application/octet-stream",
+            )
         object_path = quote(self._object_path(folder, filename), safe="/")
         bucket = quote(self.storage_bucket, safe="")
         # JSON files are mutable indexes (for example demo_images.json). Supabase
@@ -304,7 +376,7 @@ class StorageService:
             self._ensure_remote_ready()
 
         absolute_path = (
-            f"supabase://{self.storage_bucket}/{self._object_path(folder, safe_name)}"
+            f"{self.storage_provider}://{self.storage_bucket}/{self._object_path(folder, safe_name)}"
             if stored_remotely
             else self._save_local(image_bytes, folder, safe_name)
         )
@@ -336,7 +408,7 @@ class StorageService:
         elif self.force_durable:
             self._ensure_remote_ready()
         if stored_remotely:
-            return f"supabase://{self.storage_bucket}/{self._object_path(folder, safe_name)}"
+            return f"{self.storage_provider}://{self.storage_bucket}/{self._object_path(folder, safe_name)}"
         return self._save_local(payload, folder, safe_name)
 
     def read_file(self, folder: str, filename: str | None):
@@ -368,6 +440,12 @@ class StorageService:
         if self.remote_enabled:
             try:
                 self._ensure_bucket()
+                if self.storage_provider == "neon":
+                    self.s3.delete_object(
+                        Bucket=self.storage_bucket,
+                        Key=self._object_path(folder, filename),
+                    )
+                    return
                 bucket = quote(self.storage_bucket, safe="")
                 object_path = self._object_path(folder, filename)
                 delete_url = f"{self.supabase_url}/storage/v1/object/{bucket}"
